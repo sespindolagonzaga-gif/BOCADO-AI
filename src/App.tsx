@@ -1,5 +1,6 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth'; // Importación necesaria
+import { auth } from './firebaseConfig'; // Importación necesaria
 import HomeScreen from './components/HomeScreen';
 import RegistrationFlow from './components/RegistrationFlow';
 import ConfirmationScreen from './components/ConfirmationScreen';
@@ -14,6 +15,32 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
   const [planId, setPlanId] = useState<string | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
+  const [initializing, setInitializing] = useState(true); // Para no mostrar el home mientras carga el auth
+
+  // --- NUEVO: useEffect para Persistencia de Sesión ---
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // Si hay usuario, vamos a la app
+        setCurrentScreen('recommendation');
+      } else {
+        // Si no hay usuario, vamos al home
+        setCurrentScreen('home');
+      }
+      setInitializing(false);
+    });
+
+    return () => unsubscribe(); // Limpieza del listener
+  }, []);
+
+  // Mientras Firebase verifica la sesión, mostramos un estado de carga simple
+  if (initializing) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-bocado-background">
+        <div className="animate-pulse text-bocado-green font-bold">Cargando Bocado IA...</div>
+      </div>
+    );
+  }
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -22,7 +49,7 @@ function App() {
       case 'register':
         return <RegistrationFlow 
                   onRegistrationComplete={() => {
-                    setIsNewUser(true); // Set flag for tutorial
+                    setIsNewUser(true);
                     setCurrentScreen('recommendation');
                   }} 
                   onGoHome={() => setCurrentScreen('home')} 
@@ -32,21 +59,24 @@ function App() {
       case 'login':
         return <LoginScreen 
                   onLoginSuccess={() => {
-                    setIsNewUser(false); // Standard login, no tutorial
+                    setIsNewUser(false);
                     setCurrentScreen('recommendation');
                   }} 
                   onGoHome={() => setCurrentScreen('home')} 
                />;
       case 'recommendation':
-        // Aquí usamos el nuevo MainApp que contiene los Tabs
         return <MainApp 
-                  showTutorial={isNewUser} // Pass the flag
+                  showTutorial={isNewUser}
                   onPlanGenerated={(id) => {
                     setPlanId(id);
                     setCurrentScreen('plan');
                   }}
-                  onTutorialFinished={() => setIsNewUser(false)} // Add this callback
-                  onLogoutComplete={() => setCurrentScreen('home')} // Restore the logout callback
+                  onTutorialFinished={() => setIsNewUser(false)}
+                  onLogoutComplete={() => {
+                    // El listener de onAuthStateChanged se encargará de mandar a 'home'
+                    // pero forzamos aquí por seguridad visual
+                    setCurrentScreen('home');
+                  }}
                />;
       case 'plan':
         return <PlanScreen planId={planId!} onStartNewPlan={() => {
