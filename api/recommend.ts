@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
-// 1. INICIALIZACIÓN GLOBAL (Fuera del handler)
+// 1. INICIALIZACIÓN GLOBAL
 if (!getApps().length) {
   try {
     const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -21,7 +21,7 @@ if (!getApps().length) {
 
 const db = getFirestore();
 
-// 2. FUNCIONES DE AYUDA (Fuera del handler para limpieza)
+// 2. FUNCIONES DE AYUDA
 const normalizeText = (text: string) => 
   text ? text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim() : "";
 
@@ -41,7 +41,6 @@ const createRegexPattern = (text: string) => {
 
 // 3. HANDLER PRINCIPAL
 export default async function handler(req: any, res: any) {
-  // Configuración de CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -101,88 +100,32 @@ export default async function handler(req: any, res: any) {
       return type === 'En casa' ? d.receta?.recetas?.map((r: any) => r.titulo) : d.recomendaciones?.recomendaciones?.map((r: any) => r.nombre_restaurante);
     }).flat().filter(Boolean);
 
-   // --- BLOQUE 5: Gemini IA (Prompt Inteligente) ---
-    // Prueba cambiando la línea del modelo a esta versión específica
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });   
-
+    // --- BLOQUE 5: Definición del Prompt ---
     const prompt = type === 'En casa' ? `
-Actúa como "Bocado", experto en nutrición clínica y ahorro doméstico.
+Actúa como "Bocado", experto en nutrición clínica.
+REGLAS: Solo ingredientes seguros: [${safeIngredients.slice(0, 50).join(", ")}].
+PRIORIDAD: Usa ingredientes de la despensa: [${priorityList.join(", ")}].
+MEMORIA: No repitas: [${forbidden.join(", ")}].
+META: ${user.nutritionalGoal}. SALUD: ${diseases.join(", ")}.
 
-### PERFIL DEL USUARIO
-* **Meta Nutricional**: ${user.nutritionalGoal}
-* **Condiciones Médicas**: ${diseases.join(", ") || "Ninguna"}
-* **Alergias**: ${allergies.join(", ") || "Ninguna"}
-* **Dislikes (PROHIBIDOS)**: ${dislikedFoods.join(", ")}
-
-### CONTEXTO DE LA SOLICITUD
-* **Ocasión**: ${mealType}
-* **Tiempo disponible**: ${cookingTime} minutos
-
-### REGLAS DE SEGURIDAD ALIMENTARIA (Airtable)
-Solo puedes usar ingredientes de esta lista segura: [${safeIngredients.slice(0, 50).join(", ")}].
-SI el usuario tiene Diabetes, prioriza IG < 55. SI tiene Hipertensión, Sodio < 140mg.
-
-### SCORING DE DESPENSA (Prioridad Alta)
-El usuario TIENE estos ingredientes en casa: [${priorityList.join(", ")}].
-DEBES incluirlos como base principal de las recetas para maximizar el ahorro.
-
-### MEMORIA (No repetir platos recientes)
-PROHIBIDO sugerir estos nombres de platos: [${forbidden.join(", ")}].
-
-### TAREA
-Genera 3 recetas creativas y saludables. Responde ÚNICAMENTE con un objeto JSON siguiendo esta estructura:
+Genera 3 recetas saludables en JSON:
 {
-  "saludo_personalizado": "Un mensaje corto, motivador y clínico sobre por qué elegiste estas recetas.",
-  "recetas": [
-    {
-      "id": 1,
-      "titulo": "Nombre creativo del plato",
-      "tiempo_estimado": "${cookingTime} min",
-      "dificultad": "Baja/Media",
-      "coincidencia_despensa": "Ingredientes que usaste de la despensa",
-      "ingredientes": ["cantidad exacta y nombre"],
-      "pasos_preparacion": ["paso 1", "paso 2"],
-      "macros_por_porcion": { "kcal": 0, "proteinas_g": 0, "carbohidratos_g": 0, "grasas_g": 0 }
-    }
-  ]
-}` 
-: `
-Actúa como "Bocado", el guía gastronómico experto de ${user.city}.
+  "saludo_personalizado": "Mensaje corto",
+  "recetas": [{ "id": 1, "titulo": "...", "tiempo_estimado": "${cookingTime} min", "ingredientes": [], "pasos_preparacion": [], "macros_por_porcion": {} }]
+}` : `
+Actúa como "Bocado", guía gastronómico en ${user.city}. Antojo: ${cravings}.
+Genera 5 recomendaciones en JSON.`;
 
-### CONTEXTO
-* **Antojo del Usuario**: ${cravings}
-* **Ubicación Actual**: ${user.city}, ${user.country}
-* **Restricciones Médicas**: ${diseases.join(", ")}
+    // --- BLOQUE 6: Ejecución de Gemini 2.0 ---
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash-001" });
 
-### MEMORIA
-No sugerir estos lugares: [${forbidden.join(", ")}].
-
-### TAREA
-Sugiere 5 restaurantes reales en ${user.city} que se alineen con su meta de ${user.nutritionalGoal}.
-Si no encuentras 5 reales, sugiere el TIPO de comida ideal para su salud en esa zona.
-Responde ÚNICAMENTE en este JSON:
-{
-  "saludo_personalizado": "Mensaje cálido con recomendación sobre su antojo.",
-  "recomendaciones": [
-    {
-      "id": 1,
-      "nombre_restaurante": "Nombre real",
-      "tipo_comida": "Categoría",
-      "link_maps": "https://www.google.com/maps/search/?api=1&query={NombreRestaurante}+${user.city}",
-      "por_que_es_bueno": "Explicación breve",
-      "plato_sugerido": "Plato específico del menú que sea saludable",
-      "hack_saludable": "Tip para pedir (ej: pide la salsa aparte)"
-    }
-  ]
-}`;
-
-    // Ejecución de la IA
+    console.log("📡 Conectando con Gemini 2.0 Flash...");
     const result = await model.generateContent(prompt);
     const responseText = result.response.text();
     const parsedData = JSON.parse(responseText.replace(/```json|```/gi, "").trim());
 
-    // --- BLOQUE 6: Guardado ---
+    // --- BLOQUE 7: Guardado ---
     const finalObject = {
       user_id: userId,
       user_interactions: interactionId,
