@@ -1,21 +1,33 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Solo permitimos POST (que es lo que enviará tu App)
+  // Manejo de CORS para desarrollo local
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método no permitido' });
   }
 
   try {
-    const data = req.body;
-    console.log("Datos recibidos de la App:", data);
+    const { userId, type, context } = req.body;
+    
+    // Log para ver que los datos llegan bien a Vercel
+    console.log(`Solicitud de ${type} para usuario: ${userId}`);
 
-    // Respuesta temporal para validar que el puente funciona
+    // Aquí es donde en el siguiente paso meteremos a Gemini
     return res.status(200).json({ 
       success: true, 
-      message: "Backend en Vercel activo. Listo para sustituir a n8n." 
+      message: "Conexión exitosa con el backend de Bocado",
+      received: { userId, type } 
     });
   } catch (error) {
+    console.error("Error en API:", error);
     return res.status(500).json({ error: "Error interno del servidor" });
   }
 }
