@@ -102,11 +102,10 @@ export default async function handler(req: any, res: any) {
     }).flat().filter(Boolean);
 
    // --- BLOQUE 5: Gemini IA (Prompt Inteligente) ---
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel(
-    { model: "gemini-1.5-flash" },
-    { apiVersion: "v1" } // <--- ESTO ES LA LLAVE MAESTRA
-  );
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash-latest"
+    });
 
     const prompt = type === 'En casa' ? `
 Actúa como "Bocado", experto en nutrición clínica y ahorro doméstico.
