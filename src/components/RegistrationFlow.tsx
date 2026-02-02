@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { FormData } from '../types';
+import { FormData } from '../../types';
 import ProgressBar from './ProgressBar';
 import Step1 from './form-steps/Step1';
 import Step3 from './form-steps/Step3';
-import { db, auth } from '../firebaseConfig';
+import { db, auth } from '../../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { sanitizeProfileData } from '../utils/profileSanitizer';
+import { sanitizeProfileData } from '../../utils/profileSanitizer';
 import { env } from '../environment/env';
 
 const TOTAL_STEPS = 2;

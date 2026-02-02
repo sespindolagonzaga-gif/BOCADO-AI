@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import HomeScreen from '../components/HomeScreen';
-import RegistrationFlow from '../components/RegistrationFlow';
-import ConfirmationScreen from '../components/ConfirmationScreen';
-import LoginScreen from '../components/LoginScreen';
-import PermissionsScreen from '../components/PermissionsScreen';
-import PlanScreen from '../components/PlanScreen';
-import MainApp from '../components/MainApp';
+import HomeScreen from './components/HomeScreen';
+import RegistrationFlow from './components/RegistrationFlow';
+import ConfirmationScreen from './components/ConfirmationScreen';
+import LoginScreen from './components/LoginScreen';
+import PermissionsScreen from './components/PermissionsScreen';
+import PlanScreen from './components/PlanScreen';
+import MainApp from './components/MainApp';
 
 export type AppScreen = 'home' | 'register' | 'confirmation' | 'login' | 'recommendation' | 'permissions' | 'plan';
 

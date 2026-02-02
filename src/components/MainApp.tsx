@@ -7,7 +7,7 @@ import ProfileScreen from './ProfileScreen';
 import SavedRecipesScreen from './SavedRecipesScreen';
 import SavedRestaurantsScreen from './SavedRestaurantsScreen';
 import TutorialModal from './TutorialModal';
-import { auth } from '../firebaseConfig';
+import { auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 
 interface MainAppProps {

@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import BocadoLogo from './BocadoLogo';
-import { db, auth } from '../firebaseConfig';
-import { EMAIL_DOMAINS } from '../constants';
+import { db, auth } from '../../firebaseConfig';
+import { EMAIL_DOMAINS } from '../../constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { sanitizeProfileData } from '../utils/profileSanitizer';
+import { sanitizeProfileData } from '../../utils/profileSanitizer';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;

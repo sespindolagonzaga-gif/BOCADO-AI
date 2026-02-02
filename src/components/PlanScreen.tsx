@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { db, auth, serverTimestamp } from '../firebaseConfig';
+import { db, auth, serverTimestamp } from '../../firebaseConfig';
 import { collection, query, where, onSnapshot, DocumentSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { Plan, Meal } from '../types';
+import { Plan, Meal } from '../../types';
 import MealCard from './MealCard';
 
 

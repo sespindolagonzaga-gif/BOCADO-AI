@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import BocadoLogo from './BocadoLogo';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth } from '../../firebaseConfig';
 
 interface HomeScreenProps {
   onStartRegistration: () => void;

@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { FormData } from '../../types';
+import { FormData } from '../../../types';
 import { FormStepProps } from './FormStepProps';
-import { COUNTRIES, GENDERS, EMAIL_DOMAINS, COOKING_AFFINITY } from '../../constants';
+import { COUNTRIES, GENDERS, EMAIL_DOMAINS, COOKING_AFFINITY } from '../../../constants';
 import { CITIES_BY_COUNTRY } from '../../data/cities';
 import { MaleIcon } from '../icons/MaleIcon';
 import { FemaleIcon } from '../icons/FemaleIcon';

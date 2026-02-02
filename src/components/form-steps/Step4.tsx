@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { FormStepProps } from './FormStepProps';
-import { ACTIVITY_LEVELS, ACTIVITY_FREQUENCIES, FOOD_CATEGORIES } from '../../constants';
-import { FormData } from '../../types';
+import { ACTIVITY_LEVELS, ACTIVITY_FREQUENCIES, FOOD_CATEGORIES } from '../../../constants';
+import { FormData } from '../../../types';
 import { MeatIcon } from '../icons/MeatIcon';
 import { FishIcon } from '../icons/FishIcon';
 import { DairyIcon } from '../icons/DairyIcon';

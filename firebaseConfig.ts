@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore, serverTimestamp } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { env } from './environment/env';
+import { env } from './src/environment/env';
 
 const app = !getApps().length ? initializeApp(env.firebase) : getApp();
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FormStepProps } from './FormStepProps';
-import { DISEASES, ALLERGIES, GOALS } from '../../constants';
+import { DISEASES, ALLERGIES, GOALS } from '../../../constants';
 
 const MultiSelectButton: React.FC<{
   option: string;
