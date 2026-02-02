@@ -1,0 +1,5 @@
+{
+  "name": "BOCADO IA",
+  "description": "An interactive web application for user registration and onboarding for Bocado, a personalized nutrition guide. It features a modern, multi-step form to collect user's dietary habits and preferences.",
+  "requestFramePermissions": []
+}
