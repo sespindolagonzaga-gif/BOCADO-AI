@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import BottomTabBar, { Tab } from './BottomTabBar';
 import RecommendationScreen from './RecommendationScreen';
@@ -14,7 +13,7 @@ interface MainAppProps {
   onPlanGenerated: (id: string) => void;
   showTutorial?: boolean;
   onTutorialFinished: () => void;
-  onLogoutComplete: () => void; // Add this prop
+  onLogoutComplete: () => void;
 }
 
 const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false, onTutorialFinished, onLogoutComplete }) => {
@@ -25,34 +24,42 @@ const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    if (user) {
-      setUserUid(user.uid);
-      
-      // Lógica mejorada para obtener el nombre inmediatamente
-      let foundName = '';
-      if (user.displayName) {
-        foundName = user.displayName.split(' ')[0];
-      } else {
-        const savedData = localStorage.getItem('bocado-profile-data');
-        if (savedData) {
-          const parsed = JSON.parse(savedData);
-          foundName = parsed.firstName || '';
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUserUid(user.uid);
+        
+        // Intentar obtener el nombre desde Firebase o LocalStorage inmediatamente
+        let foundName = '';
+        if (user.displayName) {
+          foundName = user.displayName.split(' ')[0];
+        } else {
+          const savedData = localStorage.getItem('bocado-profile-data');
+          if (savedData) {
+            try {
+              const parsed = JSON.parse(savedData);
+              foundName = parsed.firstName || '';
+            } catch (e) {
+              console.error("Error al parsear datos locales", e);
+            }
+          }
         }
-      }
-      
-      setUserName(foundName);
-      
-      setIsLoading(false); 
-    } else {
-      setUserUid(null); 
-      localStorage.removeItem('bocado-profile-data');
-      onLogoutComplete();
-    }
-  });
+        
+        setUserName(foundName);
+        
+        // Pequeño delay para asegurar que RecommendationScreen encuentre el localStorage al montarse
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 150);
 
-  return () => unsubscribe();
-}, [onLogoutComplete]);
+      } else {
+        setUserUid(null); 
+        localStorage.removeItem('bocado-profile-data');
+        onLogoutComplete();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [onLogoutComplete]);
 
   const handleTutorialClose = () => {
     setIsTutorialOpen(false);
@@ -60,7 +67,6 @@ const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false
   };
 
   const handleLogout = () => {
-    // Just sign out. The onAuthStateChanged listener will handle the rest.
     auth.signOut();
   };
   
@@ -70,21 +76,16 @@ const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false
 
   if (isLoading) {
       return (
-          <div className="w-full min-h-screen flex items-center justify-center">
-              <p className="text-bocado-green font-bold animate-pulse">Cargando...</p>
+          <div className="w-full min-h-screen flex items-center justify-center bg-bocado-background">
+              <div className="text-center">
+                  <div className="w-12 h-12 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-bocado-green font-bold animate-pulse">Sincronizando Bocado...</p>
+              </div>
           </div>
       );
   }
   
-  // Don't render if user is logged out, parent will redirect
-  if (!userUid) {
-      return (
-           <div className="w-full min-h-screen flex items-center justify-center">
-              <p className="text-bocado-green font-bold animate-pulse">Cerrando sesión...</p>
-          </div>
-      );
-  }
-
+  if (!userUid) return null;
 
   return (
     <div className="w-full min-h-screen bg-bocado-background relative pb-24">
@@ -96,6 +97,7 @@ const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false
       <div className="max-w-2xl mx-auto pt-4">
         {activeTab === 'recommendation' && (
           <RecommendationScreen 
+            key={userUid} // Forzamos el reinicio del componente al detectar el UID
             userName={userName}
             onPlanGenerated={onPlanGenerated}
           />
