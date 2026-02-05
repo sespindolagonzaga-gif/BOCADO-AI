@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore'; // Importamos FieldValue aquí correctamente
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
+// 1. INICIALIZACIÓN GLOBAL DE FIREBASE ADMIN
 if (!getApps().length) {
   try {
     const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
@@ -58,7 +59,7 @@ export default async function handler(req: any, res: any) {
       );
     } catch (e) {}
 
-    // 4. Feedback (Para evitar el bug de 1970, nos aseguramos de que el query sea sólido)
+    // 4. Feedback
     let preferenceContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -68,11 +69,9 @@ export default async function handler(req: any, res: any) {
         const experiences = feedbackSnap.docs.map(doc => `- ${doc.data().itemId}: ${doc.data().rating}/5`).join('\n');
         preferenceContext = `\nGUSTOS RECIENTES DEL USUARIO:\n${experiences}`;
       }
-    } catch (e) {
-        console.log("Info: No hay historial previo para este usuario.");
-    }
+    } catch (e) {}
 
-    // 5. Prompt con contexto de ciudad (GeoNames integration)
+    // 5. Prompt
     const prompt = type === 'En casa' ? `
     Actúa como "Bocado", nutricionista. Genera 3 recetas de ${mealType}.
     META: ${user?.nutritionalGoal || 'Saludable'}. TIEMPO: ${cookingTime}min.
@@ -84,7 +83,7 @@ export default async function handler(req: any, res: any) {
     PRESUPUESTO: ${budget} en moneda ${currency}.
     Responde solo JSON: {"saludo_personalizado": "..", "recomendaciones": []}`;
 
-    // 6. Gemini 2.0 Flash
+    // 6. Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash-001" });
     const result = await model.generateContent(prompt);
@@ -94,20 +93,24 @@ export default async function handler(req: any, res: any) {
     const endIdx = responseText.lastIndexOf('}');
     const parsedData = JSON.parse(responseText.substring(startIdx, endIdx + 1));
 
-    // 7. Guardado con FieldValue.serverTimestamp() corregido
+    // 7. Guardado (CORREGIDO)
     try {
       const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
       
       const docToSave = {
         user_id: userId,
-        fecha_creacion: FieldValue.serverTimestamp(), // <--- ESTO ARREGLA EL BUG DE 1970
+        interaction_id: interactionId, 
+        fecha_creacion: FieldValue.serverTimestamp(), 
         ...parsedData
       };
 
       await db.collection(historyCol).add(docToSave);
       
-      // Marcar interacción procesada
-      await db.collection('user_interactions').doc(interactionId).set({ procesado: true }, { merge: true });
+      await db.collection('user_interactions').doc(interactionId).set({ 
+        procesado: true,
+        updatedAt: FieldValue.serverTimestamp() 
+      }, { merge: true });
+
     } catch (e) {
       console.error("❌ Error Guardando:", e);
     }
@@ -115,7 +118,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json(parsedData);
 
   } catch (error: any) {
-    console.error("❌ ERROR:", error.message);
+    console.error("❌ ERROR GENERAL:", error.message);
     return res.status(500).json({ error: error.message });
   }
 }

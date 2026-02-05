@@ -5,6 +5,7 @@ import { auth, db, serverTimestamp } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { sanitizeProfileData } from '../utils/profileSanitizer';
 import { CurrencyService } from '../data/budgets';
+import { env } from '../environment/env';
 
 interface RecommendationScreenProps {
   userName: string;
@@ -41,12 +42,13 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       if (data) setFormData(data);
     };
     loadProfileData();
+    // Pequeño delay para asegurar que el storage esté listo tras el login
     const timer = setTimeout(loadProfileData, 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // --- LÓGICA DE MONEDA BASADA EN TU SERVICIO ---
-  const countryCode = formData?.country || 'MX'; // Asegúrate de que en el registro guardas el ISO (MX, ES, etc)
+  // --- LÓGICA DE MONEDA (Mejorada con normalización) ---
+  const countryCode = (formData?.country || 'MX').toUpperCase().trim(); 
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
 
@@ -71,9 +73,10 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
     setIsGenerating(true);
 
-    const cravingsList = recommendationType === 'Fuera' 
-      ? (selectedCravings.length > 0 ? selectedCravings.map(stripEmoji) : ['Ninguno']) 
-      : ['Ninguno'];
+    // Fallback inteligente para antojos
+    const cravingsList = recommendationType === 'Fuera' && selectedCravings.length > 0
+      ? selectedCravings.map(stripEmoji)
+      : ['Saludable', 'Recomendación del chef'];
 
     const interactionData = {
       userId: user.uid,
@@ -81,25 +84,31 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       mealType: recommendationType === 'En casa' ? stripEmoji(selectedMeal) : "Fuera de casa",
       cookingTime: recommendationType === 'En casa' ? cookingTime : 0,
       cravings: cravingsList,
-      budget: selectedBudget, // Enviamos 'low', 'medium' o 'high'
-      currency: currencyConfig.code, // Enviamos 'EUR', 'MXN', etc.
+      budget: selectedBudget, 
+      currency: currencyConfig.code, 
       dislikedFoods: formData.dislikedFoods || [],
       createdAt: serverTimestamp(),
       procesado: false,
     };
 
     try {
+      // 1. Guardamos la intención en Firebase
       const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
-      const response = await fetch('/api/recommend', {
+      
+      // 2. Llamamos a la API usando la URL de entorno centralizada
+      const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...interactionData, _id: newDoc.id })
       });
-      if (!response.ok) throw new Error("Error en la IA");
+
+      if (!response.ok) throw new Error("Error en la respuesta de la IA");
+      
+      // 3. Navegamos a la pantalla de resultados
       onPlanGenerated(newDoc.id);
     } catch (error) {
-      console.error("Error:", error);
-      alert('Tuvimos un problema con la IA.');
+      console.error("Error generating recommendation:", error);
+      alert('Tuvimos un problema con la IA. Por favor, intenta de nuevo.');
     } finally {
       setIsGenerating(false);
     }
@@ -170,7 +179,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                                 {selectedMeal && (
                                    <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mt-2 animate-slide-up">
                                         <div className="flex justify-between items-end mb-2">
-                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tiempo</label>
+                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wide">Tiempo de cocina</label>
                                             <span className="text-lg font-bold text-bocado-green">{cookingTime >= 65 ? '60+' : cookingTime} min</span>
                                         </div>
                                         <input type="range" min="10" max="65" step="5" value={cookingTime} onChange={(e) => setCookingTime(Number(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-bocado-green" />
@@ -191,7 +200,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                                 </div>
 
                                 <div className="pt-2">
-                                    <p className="text-center text-sm text-bocado-gray font-medium uppercase tracking-widest mb-3">Presupuesto ({currencyConfig.name})</p>
+                                    <p className="text-center text-sm text-bocado-gray font-medium uppercase tracking-widest mb-3">Presupuesto sugerido ({currencyConfig.name})</p>
                                     <div className="grid grid-cols-1 gap-2.5">
                                         {budgetOptions.map(option => (
                                             <button 
@@ -211,7 +220,12 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
                         <div className={`mt-8 pt-6 border-t border-gray-50 transition-opacity duration-500 ${isSelectionMade ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                             <button onClick={handleGenerateRecommendation} disabled={isGenerating} className="w-full bg-bocado-green text-white font-bold py-4 rounded-2xl text-lg shadow-xl shadow-green-100 disabled:bg-gray-200 flex items-center justify-center gap-2">
-                                {isGenerating ? "Cocinando..." : "¡A comer! 🍽️"}
+                                {isGenerating ? (
+                                  <>
+                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Cocinando recomendaciones...</span>
+                                  </>
+                                ) : "¡A comer! 🍽️"}
                             </button>
                         </div>
                     </div>
