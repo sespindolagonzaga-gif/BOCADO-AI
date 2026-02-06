@@ -22,7 +22,7 @@ if (!getApps().length) {
 const db = getFirestore();
 
 // ============================================
-// 2. TIPOS Y INTERFACES
+// 2. TIPOS E INTERFACES
 // ============================================
 interface UserProfile {
   nutritionalGoal?: string;
@@ -30,7 +30,7 @@ interface UserProfile {
   diseases?: string[];
   dislikedFoods?: string[];
   city?: string;
-  country?: string;
+  countryName?: string;
   gender?: string;
   age?: string;
   weight?: string;
@@ -69,11 +69,13 @@ interface AirtableIngredient {
     Colesterol_mg?: number;
     Yodo_µg?: number;
     Fibra_dietética_g?: number;
+    Azúcares_totales_g?: number;
+    Grasas_saturadas_g?: number;
   };
 }
 
 // ============================================
-// 3. FUNCIONES DE UTILIDAD (De tu n8n)
+// 3. FUNCIONES DE UTILIDAD
 // ============================================
 
 const normalizeText = (text: string): string => 
@@ -106,20 +108,18 @@ const ensureArray = (input: any): string[] => {
 };
 
 const formatList = (data: any): string => {
-  if (!data) return "Ninguna";
-  if (Array.isArray(data)) return data.length > 0 ? data.join(", ") : "Ninguna";
-  if (typeof data === 'string') return data.trim() !== "" ? data : "Ninguna";
-  return "Ninguna";
+  if (!data || (Array.isArray(data) && data.length === 0)) return "Ninguna";
+  if (Array.isArray(data)) return data.join(", ");
+  return String(data);
 };
 
 // ============================================
-// 4. FILTROS DE SEGURIDAD ALIMENTARIA (De n8n)
+// 4. FILTROS DE SEGURIDAD ALIMENTARIA
 // ============================================
 
 const buildAirtableFormula = (user: UserProfile): string => {
   const conditions: string[] = [];
   
-  // Reglas booleanas
   const prefs = ensureArray(user.allergies);
   if (prefs.includes("Vegano")) conditions.push("{Vegano} = TRUE()");
   if (prefs.includes("Vegetariano")) conditions.push("{Vegetariano} = TRUE()");
@@ -127,7 +127,6 @@ const buildAirtableFormula = (user: UserProfile): string => {
   if (prefs.includes("Intolerante a la lactosa")) conditions.push("{Intolerancia_lactosa} = TRUE()");
   if (prefs.includes("Alergia a frutos secos")) conditions.push("{Alergia_frutos_secos} = TRUE()");
   
-  // Reglas numéricas
   const illnesses = ensureArray(user.diseases);
   if (illnesses.includes("Diabetes")) {
     conditions.push("AND({Índice_glucémico} < 55, {Azúcares_totales_g} < 10)");
@@ -142,7 +141,6 @@ const buildAirtableFormula = (user: UserProfile): string => {
     conditions.push("AND({Fibra_dietética_g} > 1, {Fibra_dietética_g} < 10)");
   }
   
-  // Filtro de dislikes
   const dislikes = ensureArray(user.dislikedFoods);
   if (dislikes.length > 0) {
     const searchTarget = 'CONCATENATE({Ingrediente}, " ", {México}, " ", {España}, " ", {EUA})';
@@ -156,31 +154,22 @@ const buildAirtableFormula = (user: UserProfile): string => {
 };
 
 // ============================================
-// 5. SISTEMA DE SCORING (Corregido)
+// 5. SISTEMA DE SCORING
 // ============================================
 
 const scoreIngredients = (
   airtableItems: AirtableIngredient[],
-  pantryItems: any[]
+  pantryItems: string[]
 ): { priorityList: string; marketList: string; hasPantryItems: boolean } => {
   
   const pantryRoots = pantryItems
-    .map(item => {
-      // Maneja si la despensa viene como objetos o strings
-      const txt = typeof item === 'object' ? (item.name || item.nombre || item.ingrediente) : String(item);
-      return getRootWord(txt || "");
-    })
+    .map(item => getRootWord(item))
     .filter(root => root && root.length > 2);
   
   const genericWords = ["aceite", "sal", "leche", "pan", "harina", "agua", "mantequilla", "crema", "salsa"];
   
   const scoredItems = airtableItems.map(atItem => {
-    // CORRECCIÓN: Usamos los campos definidos en la interfaz
-    const rawName = atItem.fields.México || 
-                    atItem.fields.Ingrediente || 
-                    atItem.fields.Nombre || // Ahora TypeScript lo reconocerá
-                    atItem.fields.España;
-
+    const rawName = atItem.fields.México || atItem.fields.Ingrediente || atItem.fields.Nombre || atItem.fields.España || "";
     if (!rawName) return { name: "", score: 0 };
     
     const norm = normalizeText(rawName);
@@ -190,16 +179,10 @@ const scoreIngredients = (
     pantryRoots.forEach(pantryRoot => {
       if (root === pantryRoot) {
         score = 50;
-        return;
-      }
-      
-      const regex = new RegExp(`\\b${pantryRoot}\\b`, 'i');
-      if (regex.test(norm)) {
-        const wordCount = norm.split(/\s+/).length;
-        if (wordCount > 2 && genericWords.includes(pantryRoot)) {
-          return;
+      } else if (new RegExp(`\\b${pantryRoot}\\b`, 'i').test(norm)) {
+        if (!(norm.split(/\s+/).length > 2 && genericWords.includes(pantryRoot))) {
+          score = 20;
         }
-        score = 20;
       }
     });
     
@@ -215,140 +198,10 @@ const scoreIngredients = (
 };
 
 // ============================================
-// 6. CONSTRUCCIÓN DE PROMPTS (De n8n mejorado)
-// ============================================
-
-const buildRecipePrompt = (
-  user: UserProfile,
-  request: RequestBody,
-  priorityIngredients: string,
-  marketIngredients: string,
-  hasPantryItems: boolean,
-  historyContext: string
-): string => {
-  
-  const dislikedString = formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)]);
-  
-  let inventoryInstruction = hasPantryItems ? `
-### 🛒 GESTIÓN DE INVENTARIO (PRIORIDAD ECONÓMICA)
-El usuario tiene estos ingredientes SEGUROS en casa:
-**[ ${priorityIngredients} ]**
-     
-**INSTRUCCIÓN:**
-1. Las recetas DEBEN incluir al menos un ingrediente principal de esta lista.
-2. Ayuda al usuario a ahorrar usando lo que ya tiene.
-  ` : `
-### 🛒 GESTIÓN DE INVENTARIO
-No hay coincidencias directas en la despensa. Usa libremente la lista de mercado.
-  `;
-
-  return `
-Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
-
-### PERFIL CLÍNICO DEL USUARIO
-* **Meta**: ${user.nutritionalGoal || "Comer saludable"}
-* **Salud (Alergias/Enfermedades)**: ${formatList(user.diseases)}, ${formatList(user.allergies)}
-* **NO LE GUSTA (PROHIBIDO USAR)**: ${dislikedString}
-* **Ubicación**: ${user.city || "su ciudad"}, ${user.country || ""}
-
-### CONTEXTO DE LA SOLICITUD
-* **Ocasión**: ${request.mealType || "Comida principal"}
-* **Tiempo Límite**: ${request.cookingTime || "30"} minutos
-* **Presupuesto**: ${request.budget || "No especificado"} ${request.currency || ""}
-
-${historyContext}
-
-${inventoryInstruction}
-
-### 🏪 LISTA DE MERCADO (INGREDIENTES COMPLEMENTARIOS SEGUROS)
-Puedes completar las recetas usando estos ingredientes (ya validados por seguridad):
-**[ ${marketIngredients} ]**
-*(También puedes usar básicos de cocina: Aceite, Sal, Pimienta, Vinagre, Especias secas)*.
-
-### INSTRUCCIONES DE SALIDA (JSON ESTRICTO)
-1. Genera **3 RECETAS** distintas y creativas.
-2. Devuelve **SOLO UN JSON VÁLIDO**. Sin texto antes ni después.
-3. NO uses bloques de código Markdown.
-
-Estructura del JSON requerida:
-{
-  "saludo_personalizado": "Un mensaje breve y cálido (sin usar nombre propio), motivando al usuario según su meta: ${user.nutritionalGoal || "Saludable"}.",
-  "receta": {
-    "recetas": [
-      {
-        "id": 1,
-        "titulo": "Nombre Atractivo del Plato",
-        "tiempo_estimado": "Ej: 25 min",
-        "dificultad": "Fácil|Media|Difícil",
-        "coincidencia_despensa": "Nombre del ingrediente de casa usado (o 'Ninguno')",
-        "ingredientes": ["100g de Pollo", "1 cdta de Aceite..."],
-        "pasos_preparacion": ["Paso 1...", "Paso 2..."],
-        "macros_por_porcion": { "kcal": 0, "proteinas_g": 0, "carbohidratos_g": 0, "grasas_g": 0 }
-      }
-    ]
-  }
-}`;
-};
-
-const buildRestaurantPrompt = (
-  user: UserProfile,
-  request: RequestBody,
-  historyContext: string
-): string => {
-  
-  const dislikedString = formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)]);
-  
-  return `
-Actúa como "Bocado", un experto en nutrición y guía gastronómico local.
-
-### PERFIL DEL USUARIO
-* **Meta Nutricional**: ${user.nutritionalGoal || "Comer saludable"}
-* **Restricciones de Salud**: ${formatList(user.diseases)}, ${formatList(user.allergies)}
-* **ALIMENTOS QUE ODIA (EVITAR)**: ${dislikedString}
-* **Ubicación**: ${user.city || "su ciudad"}, ${user.country || ""}
-
-### SOLICITUD
-El usuario quiere comer fuera.
-* **Antojo / Tipo de cocina**: ${request.cravings || "Cualquier tipo"}
-* **Presupuesto**: ${request.budget || "No especificado"} ${request.currency || ""}
-
-${historyContext}
-
-### TAREA
-Genera **5 RECOMENDACIONES** de restaurantes o cadenas disponibles en **${user.city || "su ciudad"}** que se ajusten a este perfil.
-* Si no conoces restaurantes específicos reales en esa ciudad, sugiere "Tipos de lugar" pero especifica qué buscar.
-* Prioriza lugares que tengan opciones saludables alineadas con la meta: ${user.nutritionalGoal || "Saludable"}.
-
-### INSTRUCCIONES DE SALIDA (JSON ESTRICTO)
-1. Devuelve **SOLO UN JSON VÁLIDO**. Sin texto extra.
-2. NO uses bloques de código Markdown.
-3. Para "link_maps", usa: https://www.google.com/maps/search/?api=1&query={NombreRestaurante}+{Ciudad}
-
-Estructura del JSON:
-{
-  "saludo_personalizado": "Mensaje corto y motivador",
-  "ubicacion_detectada": "${user.city || "su ciudad"}, ${user.country || ""}",
-  "recomendaciones": [
-    {
-      "id": 1,
-      "nombre_restaurante": "Nombre del lugar",
-      "tipo_comida": "Ej: Italiana / Vegana",
-      "direccion_aproximada": "Calle, número, zona",
-      "link_maps": "URL de búsqueda",
-      "por_que_es_bueno": "Explicación breve",
-      "plato_sugerido": "Nombre de plato específico",
-      "hack_saludable": "Consejo experto"
-    }
-  ]
-}`;
-};
-
-// ============================================
-// 7. HANDLER PRINCIPAL
+// 6. HANDLER PRINCIPAL
 // ============================================
 
 export default async function handler(req: any, res: any) {
-  // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -361,20 +214,17 @@ export default async function handler(req: any, res: any) {
     const { userId, type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
 
-    // Validaciones
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
     if (!type || !['En casa', 'Fuera'].includes(type)) {
       return res.status(400).json({ error: 'type debe ser "En casa" o "Fuera"' });
     }
 
-    // Obtener usuario
+    // 1. Obtener Perfil de Usuario
     const userSnap = await db.collection('users').doc(userId).get();
-    if (!userSnap.exists) {
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
+    if (!userSnap.exists) return res.status(404).json({ error: 'Usuario no encontrado' });
     const user = userSnap.data() as UserProfile;
 
-    // Obtener historial
+    // 2. Obtener Historial para NO repetir
     const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
     const historySnap = await db.collection(historyCol)
       .where('user_id', '==', userId)
@@ -384,25 +234,37 @@ export default async function handler(req: any, res: any) {
     
     let historyContext = "";
     if (!historySnap.empty) {
-      const forbiddenItems = historySnap.docs.map(doc => {
-        const data = doc.data();
+      const recent = historySnap.docs.map(doc => {
+        const d = doc.data();
         return type === 'En casa' 
-          ? data.receta?.recetas?.map((r: any) => r.titulo)
-          : data.recomendaciones?.map((r: any) => r.nombre_restaurante);
+          ? d.receta?.recetas?.map((r: any) => r.titulo)
+          : d.recomendaciones?.map((r: any) => r.nombre_restaurante);
       }).flat().filter(Boolean);
-      
-      if (forbiddenItems.length > 0) {
-        historyContext = `
-### 🧠 MEMORIA (NO REPETIR)
-Recientemente recomendaste: ${forbiddenItems.join(", ")}.
-INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.
-        `;
+      if (recent.length > 0) {
+        historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}. INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.`;
       }
     }
 
-    // Configurar Gemini
+    // 3. Obtener Feedback previo para aprender gustos
+    let feedbackContext = "";
+    try {
+      const feedbackSnap = await db.collection('user_history')
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc').limit(5).get();
+      if (!feedbackSnap.empty) {
+        const logs = feedbackSnap.docs.map(d => {
+          const data = d.data();
+          return `- ${data.itemId}: ${data.rating}/5 estrellas${data.comment ? ` - "${data.comment}"` : ''}`;
+        }).join('\n');
+        feedbackContext = `### ⭐️ PREFERENCIAS BASADAS EN FEEDBACK PREVIO:\n${logs}\nUsa esto para entender qué le gusta o no al usuario.`;
+      }
+    } catch (e) {
+      console.log("No se pudo obtener feedback:", e);
+    }
+
+    // 4. Configurar Gemini con safety settings
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({
+    const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",
       safetySettings: [
         { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -410,62 +272,154 @@ INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.
       ],
     });
 
-    let prompt: string;
+    let finalPrompt = "";
+    let parsedData: any;
 
     if (type === 'En casa') {
-      // Obtener ingredientes de Airtable con filtros de seguridad
+      // CORRECCIÓN: URL de Airtable sin espacio
       const formula = buildAirtableFormula(user);
-      const airtableRes = await fetch(
-        `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`,
-        { headers: { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}` } }
-      );
+      const airtableUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
       
-      if (!airtableRes.ok) throw new Error("Error fetching Airtable");
+      const airtableRes = await fetch(airtableUrl, {
+        headers: { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}` }
+      });
+      
+      if (!airtableRes.ok) {
+        const errorText = await airtableRes.text();
+        throw new Error(`Airtable error: ${airtableRes.status} - ${errorText}`);
+      }
       
       const airtableData = await airtableRes.json();
-      const safeIngredients: AirtableIngredient[] = airtableData.records || [];
       
       // Obtener despensa del usuario
-      const pantrySnap = await db.collection('user_pantry').doc(userId).get();
-      const pantryData = pantrySnap.exists ? pantrySnap.data()?.items || [] : [];
+      const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
+      const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
       
-      // Scoring
-      const { priorityList, marketList, hasPantryItems } = scoreIngredients(safeIngredients, pantryData);
-      
-      // Construir prompt
-      prompt = buildRecipePrompt(user, request, priorityList, marketList, hasPantryItems, historyContext);
-      
+      const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableData.records || [], pantryItems);
+
+      // Construir prompt completo (estilo n8n)
+      finalPrompt = `Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
+
+### PERFIL CLÍNICO DEL USUARIO
+* **Meta Nutricional**: ${user.nutritionalGoal || "Comer saludable"}
+* **Restricciones de Salud**: ${formatList(user.diseases)}, ${formatList(user.allergies)}
+* **Alimentos que NO le gustan (PROHIBIDO USAR)**: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
+* **Ubicación**: ${user.city || "su ciudad"}, ${user.countryName || ""}
+
+### CONTEXTO DE LA SOLICITUD
+* **Tipo de comida**: ${request.mealType || "Comida principal"}
+* **Tiempo disponible**: ${request.cookingTime || "30"} minutos
+* **Presupuesto**: ${request.budget || "No especificado"} ${request.currency || ""}
+
+${historyContext}
+
+${feedbackContext}
+
+### 🛒 GESTIÓN DE INVENTARIO
+${hasPantryItems ? `El usuario tiene estos ingredientes en casa (USA ESTOS PRIMERO para ahorrar dinero):
+**[ ${priorityList} ]**` : "No hay coincidencias en la despensa."}
+
+Ingredientes adicionales seguros disponibles en el mercado:
+**[ ${marketList} ]**
+*(También puedes usar básicos: aceite, sal, pimienta, especias)*
+
+### INSTRUCCIONES DE SALIDA (JSON ESTRICTO)
+Genera **3 RECETAS** distintas, creativas y saludables.
+Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
+
+{
+  "saludo_personalizado": "Mensaje cálido y motivador relacionado con su meta: ${user.nutritionalGoal || 'saludable'}",
+  "receta": {
+    "recetas": [
+      {
+        "id": 1,
+        "titulo": "Nombre atractivo del plato",
+        "tiempo_estimado": "Ej: 25 min",
+        "dificultad": "Fácil|Media|Difícil",
+        "coincidencia_despensa": "Ingrediente de casa usado o 'Ninguno'",
+        "ingredientes": ["cantidad + ingrediente", "..."],
+        "pasos_preparacion": ["Paso 1...", "Paso 2..."],
+        "macros_por_porcion": {
+          "kcal": 0,
+          "proteinas_g": 0,
+          "carbohidratos_g": 0,
+          "grasas_g": 0
+        }
+      }
+    ]
+  }
+}`;
+
     } else {
-      // Fuera: restaurantes
-      prompt = buildRestaurantPrompt(user, request, historyContext);
+      // Fuera: Restaurantes
+      finalPrompt = `Actúa como "Bocado", un experto en nutrición y guía gastronómico local en ${user.city || "su ciudad"}.
+
+### PERFIL DEL USUARIO
+* **Meta Nutricional**: ${user.nutritionalGoal || "Comer saludable"}
+* **Restricciones de Salud**: ${formatList(user.diseases)}, ${formatList(user.allergies)}
+* **Alimentos que NO le gustan**: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
+* **Ubicación**: ${user.city || "su ciudad"}, ${user.countryName || ""}
+
+### SOLICITUD
+El usuario quiere comer fuera.
+* **Tipo de cocina/Antojo**: ${request.cravings || "Cualquier tipo saludable"}
+* **Presupuesto**: ${request.budget || "No especificado"} ${request.currency || ""}
+
+${historyContext}
+
+${feedbackContext}
+
+### TAREA
+Genera **5 RECOMENDACIONES** de restaurantes reales en ${user.city || "su ciudad"}.
+Si no conoces lugares específicos, sugiere tipos de restaurante con criterios de búsqueda.
+
+Responde ÚNICAMENTE con este JSON exacto:
+
+{
+  "saludo_personalizado": "Mensaje corto y motivador",
+  "ubicacion_detectada": "${user.city || "su ciudad"}, ${user.countryName || ""}",
+  "recomendaciones": [
+    {
+      "id": 1,
+      "nombre_restaurante": "Nombre del lugar",
+      "tipo_comida": "Ej: Italiana, Vegana, Mexicana",
+      "direccion_aproximada": "Zona o dirección en ${user.city}",
+      "link_maps": "https://www.google.com/maps/search/?api=1&query={NombreRestaurante}+${encodeURIComponent(user.city || '')}",
+      "por_que_es_bueno": "Explicación de por qué encaja con su perfil",
+      "plato_sugerido": "Nombre de un plato específico recomendado",
+      "hack_saludable": "Consejo práctico para pedir más saludable"
+    }
+  ]
+}`;
     }
 
-    // Generar con Gemini
+    // 5. Generar con Gemini
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.7,
+      contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
+      generationConfig: { 
+        temperature: 0.7, 
         maxOutputTokens: 4096,
-        responseMimeType: 'application/json',
+        responseMimeType: 'application/json' 
       },
     });
 
     const responseText = result.response.text();
     
-    // Parsear JSON
-    let parsedData: any;
+    // Parsear JSON con manejo de errores
     try {
-      // Intentar parsear directamente
       parsedData = JSON.parse(responseText);
     } catch (e) {
-      // Si falla, intentar extraer de markdown
-      const startIdx = responseText.indexOf('{');
-      const endIdx = responseText.lastIndexOf('}');
-      if (startIdx === -1 || endIdx === -1) throw new Error("No se encontró JSON válido");
-      parsedData = JSON.parse(responseText.substring(startIdx, endIdx + 1));
+      // Intentar extraer JSON de markdown si existe
+      const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || 
+                        responseText.match(/{[\s\S]*}/);
+      if (jsonMatch) {
+        parsedData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      } else {
+        throw new Error("No se pudo parsear la respuesta de Gemini");
+      }
     }
 
-    // Guardar en Firestore
+    // 6. Guardar en Firestore
     const docToSave = {
       user_id: userId,
       interaction_id: interactionId,
@@ -473,17 +427,17 @@ INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.
       tipo: type,
       ...parsedData
     };
-
+    
     await db.collection(historyCol).add(docToSave);
     await db.collection('user_interactions').doc(interactionId).set({ 
-      procesado: true,
+      procesado: true, 
       updatedAt: FieldValue.serverTimestamp() 
     }, { merge: true });
 
     return res.status(200).json(parsedData);
 
   } catch (error: any) {
-    console.error("❌ Error:", error);
+    console.error("❌ Error completo:", error);
     return res.status(500).json({ 
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
