@@ -209,43 +209,78 @@ export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
+  let interactionRef: FirebaseFirestore.DocumentReference | null = null;
+
   try {
     const request: RequestBody = req.body;
     const { userId, type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
 
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
-
-    // ✅ SEGURIDAD: RATE LIMIT (EVITA SPAM)
-    // Buscamos la última interacción de este usuario para ver cuánto tiempo ha pasado.
-    const lastInteraction = await db.collection('user_interactions')
-      .where('userId', '==', userId)
-      .orderBy('createdAt', 'desc')
-      .limit(1)
-      .get();
-
-    if (!lastInteraction.empty) {
-      const lastData = lastInteraction.docs[0].data();
-      const lastTime = lastData.createdAt ? lastData.createdAt.toMillis() : 0;
-      const now = Date.now();
-      
-      // Bloquear si la última petición fue hace menos de 10 segundos
-      if (now - lastTime < 10000) {
-        return res.status(429).json({ error: "Por favor, espera 10 segundos antes de generar otro plan." });
-      }
-    }
-
     if (!type || !['En casa', 'Fuera'].includes(type)) {
       return res.status(400).json({ error: 'type debe ser "En casa" o "Fuera"' });
     }
 
+    // ============================================
+    // ✅ RATE LIMIT CON TRANSACCIÓN ATÓMICA
+    // ============================================
+    interactionRef = db.collection('user_interactions').doc(interactionId);
+    const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
+
+    try {
+      await db.runTransaction(async (transaction) => {
+        // 1. Buscar última interacción del usuario
+        const lastQuery = db.collection('user_interactions')
+          .where('userId', '==', userId)
+          .orderBy('createdAt', 'desc')
+          .limit(1);
+        
+        const lastSnap = await transaction.get(lastQuery);
+        
+        if (!lastSnap.empty) {
+          const lastData = lastSnap.docs[0].data();
+          const lastTime = lastData.createdAt?.toMillis() || 0;
+          const now = Date.now();
+          
+          // Bloquear si pasaron menos de 30 segundos
+          if (now - lastTime < 30000) {
+            const secondsLeft = Math.ceil((30000 - (now - lastTime)) / 1000);
+            throw new Error(`RATE_LIMIT:${secondsLeft}`);
+          }
+        }
+        
+        // 2. Crear documento INMEDIATAMENTE con status processing
+        // Esto bloquea cualquier otra request concurrente
+        transaction.set(interactionRef!, {
+          userId,
+          interaction_id: interactionId,
+          createdAt: FieldValue.serverTimestamp(),
+          status: 'processing',
+          tipo: type,
+          iniciado: true
+        });
+      });
+    } catch (txError: any) {
+      if (txError.message?.startsWith('RATE_LIMIT:')) {
+        const seconds = txError.message.split(':')[1];
+        return res.status(429).json({ 
+          error: `Espera ${seconds} segundos antes de generar otra recomendación.` 
+        });
+      }
+      throw txError;
+    }
+
+    // Si llegamos aquí, tenemos el "lock" y podemos procesar seguro
+    
     // 1. Obtener Perfil de Usuario
     const userSnap = await db.collection('users').doc(userId).get();
-    if (!userSnap.exists) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!userSnap.exists) {
+      await interactionRef.update({ status: 'error', error: 'Usuario no encontrado' });
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
     const user = userSnap.data() as UserProfile;
 
     // 2. Obtener Historial para NO repetir
-    const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
     const historySnap = await db.collection(historyCol)
       .where('user_id', '==', userId)
       .orderBy('fecha_creacion', 'desc')
@@ -265,7 +300,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Obtener Feedback previo para aprender gustos (SIN ÍNDICE COMPUESTO)
+    // 3. Obtener Feedback previo para aprender gustos
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -286,7 +321,7 @@ export default async function handler(req: any, res: any) {
       console.log("No se pudo obtener feedback:", e);
     }
 
-    // 4. Configurar Gemini con safety settings
+    // 4. Configurar Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",
@@ -300,10 +335,7 @@ export default async function handler(req: any, res: any) {
     let parsedData: any;
 
     if (type === 'En casa') {
-      // ============================================
       // OBTENER DATOS DE AIRTABLE
-      // ============================================
-      
       const formula = buildAirtableFormula(user);
       
       const baseId = process.env.AIRTABLE_BASE_ID?.trim();
@@ -314,7 +346,7 @@ export default async function handler(req: any, res: any) {
         throw new Error(`Missing Airtable config: BASE_ID=${!!baseId}, TABLE_NAME=${!!tableName}, API_KEY=${!!apiKey}`);
       }
       
-      const airtableUrl = `https://api.airtable.com/v0/ ${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
+      const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
       
       let airtableItems: AirtableIngredient[] = [];
       
@@ -332,12 +364,7 @@ export default async function handler(req: any, res: any) {
         }
         
         const airtableData = await airtableRes.json();
-        
-        if (!airtableData || !Array.isArray(airtableData.records)) {
-          airtableItems = [];
-        } else {
-          airtableItems = airtableData.records;
-        }
+        airtableItems = airtableData.records || [];
         
       } catch (airtableError: any) {
         console.error("❌ Airtable Fetch Failed:", airtableError.message);
@@ -438,7 +465,7 @@ Responde ÚNICAMENTE con este JSON exacto:
       "nombre_restaurante": "Nombre del lugar",
       "tipo_comida": "Ej: Italiana, Vegana, Mexicana",
       "direccion_aproximada": "Zona o dirección en ${user.city}",
-      "link_maps": "https://www.google.com/maps/search/?api=1&query=  ${encodeURIComponent('NombreRestaurante')}+${encodeURIComponent(user.city || '')}",
+      "link_maps": "https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('NombreRestaurante')}+${encodeURIComponent(user.city || '')}",
       "por_que_es_bueno": "Explicación de por qué encaja con su perfil",
       "plato_sugerido": "Nombre de un plato específico recomendado",
       "hack_saludable": "Consejo práctico para pedir más saludable"
@@ -472,27 +499,49 @@ Responde ÚNICAMENTE con este JSON exacto:
       }
     }
 
-    // 6. Guardar en Firestore
-    const docToSave = {
+    // 6. Guardar en Firestore (Historial principal + actualizar interacción)
+    const batch = db.batch();
+    
+    // Guardar en historial específico (recetas o restaurantes)
+    const historyRef = db.collection(historyCol).doc();
+    batch.set(historyRef, {
       user_id: userId,
       interaction_id: interactionId,
       fecha_creacion: FieldValue.serverTimestamp(),
       tipo: type,
       ...parsedData
-    };
+    });
     
-    await db.collection(historyCol).add(docToSave);
-    await db.collection('user_interactions').doc(interactionId).set({ 
-      procesado: true, 
-      updatedAt: FieldValue.serverTimestamp() 
-    }, { merge: true });
+    // Actualizar interacción a completada
+    batch.update(interactionRef, {
+      procesado: true,
+      status: 'completed',
+      completedAt: FieldValue.serverTimestamp(),
+      historyDocId: historyRef.id
+    });
+    
+    await batch.commit();
 
     return res.status(200).json(parsedData);
 
   } catch (error: any) {
     console.error("❌ Error completo:", error);
+    
+    // Si tenemos referencia a la interacción, marcar como error
+    if (interactionRef) {
+      try {
+        await interactionRef.update({
+          status: 'error',
+          error: error.message,
+          errorAt: FieldValue.serverTimestamp()
+        });
+      } catch (e) {
+        console.error("No se pudo actualizar el estado de error:", e);
+      }
+    }
+    
     return res.status(500).json({ 
-      error: error.message
+      error: error.message || "Error interno del servidor" 
     });
   }
 }
