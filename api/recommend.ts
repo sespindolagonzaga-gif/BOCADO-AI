@@ -245,17 +245,21 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Obtener Feedback previo para aprender gustos
+    // 3. Obtener Feedback previo para aprender gustos (SIN ÍNDICE COMPUESTO)
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc').limit(5).get();
+        .limit(5)
+        .get();
+        
       if (!feedbackSnap.empty) {
-        const logs = feedbackSnap.docs.map(d => {
-          const data = d.data();
-          return `- ${data.itemId}: ${data.rating}/5 estrellas${data.comment ? ` - "${data.comment}"` : ''}`;
-        }).join('\n');
+        const logs = feedbackSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+          .map((data: any) => {
+            return `- ${data.itemId}: ${data.rating}/5 estrellas${data.comment ? ` - "${data.comment}"` : ''}`;
+          }).join('\n');
         feedbackContext = `### ⭐️ PREFERENCIAS BASADAS EN FEEDBACK PREVIO:\n${logs}\nUsa esto para entender qué le gusta o no al usuario.`;
       }
     } catch (e) {
@@ -276,26 +280,87 @@ export default async function handler(req: any, res: any) {
     let parsedData: any;
 
     if (type === 'En casa') {
+      // ============================================
+      // OBTENER DATOS DE AIRTABLE (CORREGIDO)
+      // ============================================
+      
       const formula = buildAirtableFormula(user);
-      const airtableUrl = `https://api.airtable.com/v0/${process.env.AIRTABLE_BASE_ID}/${process.env.AIRTABLE_TABLE_NAME}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
-      const airtableRes = await fetch(airtableUrl, {
-        headers: { Authorization: `Bearer ${process.env.AIRTABLE_API_KEY}` }
+      
+      // DEBUG: Verificar variables
+      console.log("🔍 Airtable Config:", {
+        baseId: process.env.AIRTABLE_BASE_ID?.substring(0, 6) + '...',
+        tableName: process.env.AIRTABLE_TABLE_NAME,
+        hasApiKey: !!process.env.AIRTABLE_API_KEY,
+        formulaLength: formula.length
       });
       
-      if (!airtableRes.ok) {
-        const errorText = await airtableRes.text();
-        throw new Error(`Airtable error: ${airtableRes.status} - ${errorText}`);
+      const baseId = process.env.AIRTABLE_BASE_ID?.trim();
+      const tableName = process.env.AIRTABLE_TABLE_NAME?.trim();
+      const apiKey = process.env.AIRTABLE_API_KEY?.trim();
+      
+      if (!baseId || !tableName || !apiKey) {
+        throw new Error(`Missing Airtable config: BASE_ID=${!!baseId}, TABLE_NAME=${!!tableName}, API_KEY=${!!apiKey}`);
       }
       
-      const airtableData = await airtableRes.json();
+      const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
       
+      console.log("🌐 Fetching Airtable:", airtableUrl.replace(apiKey, '***'));
+      
+      let airtableItems: AirtableIngredient[] = [];
+      
+      try {
+        const airtableRes = await fetch(airtableUrl, {
+          headers: { 
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log("📡 Airtable Status:", airtableRes.status);
+        
+        if (!airtableRes.ok) {
+          const errorText = await airtableRes.text();
+          console.error("❌ Airtable Error Body:", errorText);
+          throw new Error(`Airtable HTTP ${airtableRes.status}: ${errorText}`);
+        }
+        
+        const airtableData = await airtableRes.json();
+        console.log("📦 Airtable Response Structure:", Object.keys(airtableData));
+        console.log("📊 Records count:", airtableData.records?.length || 0);
+        
+        // Validación defensiva
+        if (!airtableData || typeof airtableData !== 'object') {
+          throw new Error('Airtable response is not an object');
+        }
+        
+        if (!Array.isArray(airtableData.records)) {
+          console.warn("⚠️ Airtable response missing records array:", airtableData);
+          airtableItems = [];
+        } else {
+          airtableItems = airtableData.records;
+        }
+        
+      } catch (airtableError: any) {
+        console.error("❌ Airtable Fetch Failed:", airtableError.message);
+        // Continuar con array vacío en lugar de fallar completamente
+        airtableItems = [];
+      }
+      
+      console.log("✅ Airtable items loaded:", airtableItems.length);
+
       // Obtener despensa del usuario
       const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
       const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
       
-      const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableData.records || [], pantryItems);
+      console.log("🥫 Pantry items:", pantryItems.length);
+      
+      // Scoring
+      const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
+      
+      console.log("🎯 Priority items:", priorityList.split(', ').filter(Boolean).length);
+      console.log("🛒 Market items:", marketList.split(', ').filter(Boolean).length);
 
-      // Construir prompt completo (estilo n8n)
+      // Construir prompt completo
       finalPrompt = `Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
 
 ### PERFIL CLÍNICO DEL USUARIO
@@ -382,7 +447,7 @@ Responde ÚNICAMENTE con este JSON exacto:
       "nombre_restaurante": "Nombre del lugar",
       "tipo_comida": "Ej: Italiana, Vegana, Mexicana",
       "direccion_aproximada": "Zona o dirección en ${user.city}",
-      "link_maps": "https://www.google.com/maps/search/?api=1&query={NombreRestaurante}+${encodeURIComponent(user.city || '')}",
+      "link_maps": "https://www.google.com/maps/search/?api=1&query= ${encodeURIComponent('NombreRestaurante')}+${encodeURIComponent(user.city || '')}",
       "por_que_es_bueno": "Explicación de por qué encaja con su perfil",
       "plato_sugerido": "Nombre de un plato específico recomendado",
       "hack_saludable": "Consejo práctico para pedir más saludable"
@@ -392,6 +457,7 @@ Responde ÚNICAMENTE con este JSON exacto:
     }
 
     // 5. Generar con Gemini
+    console.log("🤖 Generating with Gemini...");
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
       generationConfig: { 
@@ -402,6 +468,7 @@ Responde ÚNICAMENTE con este JSON exacto:
     });
 
     const responseText = result.response.text();
+    console.log("✅ Gemini response received, length:", responseText.length);
     
     // Parsear JSON con manejo de errores
     try {
@@ -431,6 +498,8 @@ Responde ÚNICAMENTE con este JSON exacto:
       procesado: true, 
       updatedAt: FieldValue.serverTimestamp() 
     }, { merge: true });
+
+    console.log("💾 Saved to Firestore, interactionId:", interactionId);
 
     return res.status(200).json(parsedData);
 
