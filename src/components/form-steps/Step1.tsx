@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FormData } from '../../types';
 import { FormStepProps } from './FormStepProps';
-import { GENDERS, EMAIL_DOMAINS, COOKING_AFFINITY } from '../../constants';
+import { EMAIL_DOMAINS } from '../../constants';
 import { MaleIcon } from '../icons/MaleIcon';
 import { FemaleIcon } from '../icons/FemaleIcon';
 import { OtherGenderIcon } from '../icons/OtherGenderIcon';
@@ -11,70 +11,16 @@ import { ScaleIcon } from '../icons/ScaleIcon';
 import { RulerIcon } from '../icons/RulerIcon';
 
 const COUNTRIES_LIST = [
-  // América
   { name: 'México', code: 'MX' },
-  { name: 'Estados Unidos', code: 'US' },
-  { name: 'Canadá', code: 'CA' },
-  { name: 'Argentina', code: 'AR' },
-  { name: 'Brasil', code: 'BR' },
-  { name: 'Chile', code: 'CL' },
+  { name: 'España', code: 'ES' },
   { name: 'Colombia', code: 'CO' },
+  { name: 'Argentina', code: 'AR' },
+  { name: 'Chile', code: 'CL' },
   { name: 'Perú', code: 'PE' },
+  { name: 'Estados Unidos', code: 'US' },
   { name: 'Ecuador', code: 'EC' },
   { name: 'Venezuela', code: 'VE' },
-  { name: 'Uruguay', code: 'UY' },
-  { name: 'Paraguay', code: 'PY' },
-  { name: 'Bolivia', code: 'BO' },
-  { name: 'Panamá', code: 'PA' },
-  { name: 'Costa Rica', code: 'CR' },
-  { name: 'Guatemala', code: 'GT' },
-  { name: 'Honduras', code: 'HN' },
-  { name: 'El Salvador', code: 'SV' },
-  { name: 'República Dominicana', code: 'DO' },
-  { name: 'Cuba', code: 'CU' },
-
-  // Europa
-  { name: 'España', code: 'ES' },
-  { name: 'Francia', code: 'FR' },
-  { name: 'Alemania', code: 'DE' },
-  { name: 'Italia', code: 'IT' },
-  { name: 'Portugal', code: 'PT' },
-  { name: 'Reino Unido', code: 'GB' },
-  { name: 'Irlanda', code: 'IE' },
-  { name: 'Países Bajos', code: 'NL' },
-  { name: 'Bélgica', code: 'BE' },
-  { name: 'Suiza', code: 'CH' },
-  { name: 'Austria', code: 'AT' },
-  { name: 'Suecia', code: 'SE' },
-  { name: 'Noruega', code: 'NO' },
-  { name: 'Dinamarca', code: 'DK' },
-  { name: 'Polonia', code: 'PL' },
-
-  // África
-  { name: 'Marruecos', code: 'MA' },
-  { name: 'Egipto', code: 'EG' },
-  { name: 'Sudáfrica', code: 'ZA' },
-  { name: 'Nigeria', code: 'NG' },
-  { name: 'Kenia', code: 'KE' },
-  { name: 'Ghana', code: 'GH' },
-
-  // Asia
-  { name: 'China', code: 'CN' },
-  { name: 'Japón', code: 'JP' },
-  { name: 'Corea del Sur', code: 'KR' },
-  { name: 'India', code: 'IN' },
-  { name: 'Indonesia', code: 'ID' },
-  { name: 'Tailandia', code: 'TH' },
-  { name: 'Vietnam', code: 'VN' },
-  { name: 'Filipinas', code: 'PH' },
-  { name: 'Israel', code: 'IL' },
-  { name: 'Emiratos Árabes Unidos', code: 'AE' },
-
-  // Oceanía
-  { name: 'Australia', code: 'AU' },
-  { name: 'Nueva Zelanda', code: 'NZ' },
 ];
-
 
 interface ExtendedStep1Props extends FormStepProps {
   cityOptions?: any[];
@@ -144,32 +90,32 @@ const Step1: React.FC<ExtendedStep1Props> = ({
     updateData(name as keyof FormData, validValue);
   };
 
+  // Handler para edad - solo números enteros
   const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === '' || (/^\d+$/.test(value) && value.length <= 3)) {
-      const ageNum = parseInt(value);
-      if (value === '' || (ageNum >= 1 && ageNum <= 120)) {
+    // Solo dígitos, máximo 3 caracteres
+    if (value === '' || (/^\d{0,3}$/.test(value))) {
+      const num = parseInt(value);
+      if (value === '' || (num >= 1 && num <= 120)) {
         updateData('age', value);
       }
     }
   };
 
-  // Handler para peso (kg, decimal permitido)
+  // Handler para peso - números con decimal opcional
   const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Permite números y un punto decimal, max 3 enteros y 1 decimal (ej: 85.5)
+    // Máximo 3 enteros y 1 decimal (ej: 85.5)
     if (value === '' || /^\d{0,3}(\.\d{0,1})?$/.test(value)) {
-      const num = parseFloat(value);
-      if (value === '' || (num >= 0 && num <= 500)) {
-        updateData('weight', value);
-      }
+      updateData('weight', value);
     }
   };
 
-  // Handler para estatura (cm, solo enteros)
+  // Handler para estatura - SOLO NÚMEROS ENTEROS (corregido)
   const handleHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === '' || (/^\d+$/.test(value) && value.length <= 3)) {
+    // Solo dígitos, máximo 3 caracteres (evita e, E, +, -, etc.)
+    if (value === '' || /^\d{0,3}$/.test(value)) {
       const num = parseInt(value);
       if (value === '' || (num >= 30 && num <= 300)) {
         updateData('height', value);
@@ -245,8 +191,9 @@ const Step1: React.FC<ExtendedStep1Props> = ({
         <div>
           <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Edad *</label>
           <input 
-            type="number" 
+            type="text"
             inputMode="numeric"
+            pattern="[0-9]*"
             value={data.age} 
             onChange={handleAgeChange} 
             placeholder="25" 
@@ -256,7 +203,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
         </div>
       </div>
 
-      {/* PESO Y ESTATURA - NUEVA SECCIÓN (OPCIONAL) */}
+      {/* PESO Y ESTATURA - OPCIONALES */}
       <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
         <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Datos corporales (opcional)</p>
         <div className="grid grid-cols-2 gap-4">
@@ -265,12 +212,11 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             <div className="relative">
               <ScaleIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
-                type="number" 
+                type="text"
                 inputMode="decimal"
                 value={data.weight || ''} 
                 onChange={handleWeightChange} 
                 placeholder="70.5" 
-                step="0.1"
                 className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 focus:border-bocado-green focus:outline-none text-sm"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">kg</span>
@@ -282,8 +228,9 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             <div className="relative">
               <RulerIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input 
-                type="number" 
+                type="text"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 value={data.height || ''} 
                 onChange={handleHeightChange} 
                 placeholder="175" 

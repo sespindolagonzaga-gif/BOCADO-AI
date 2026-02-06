@@ -34,7 +34,7 @@ export const CRAVINGS = [
   '🥗 Saludable o fit',
   '🍜 Asiática / China',
   '🌮 Mexicana',
-  '🍔 Americana / fast food',
+  '🍔 Americana / Fast food',
   '🥘 Mediterránea',
   '🥡 Otros'
 ];
