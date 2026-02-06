@@ -43,8 +43,8 @@ interface RequestBody {
   userId: string;
   type: 'En casa' | 'Fuera';
   mealType?: string;
-  cookingTime?: number;
-  servings?: number; // ✅ Nuevo: Número de comensales
+  cookingTime?: string;
+  servings?: number; // ✅ Añadido comensales
   cravings?: string[];
   budget?: string;
   currency?: string;
@@ -131,6 +131,9 @@ const buildAirtableFormula = (user: UserProfile): string => {
   if (illnesses.includes("Diabetes")) conditions.push("AND({Índice_glucémico} < 55, {Azúcares_totales_g} < 10)");
   if (illnesses.includes("Hipertensión")) conditions.push("{Sodio_mg} < 140");
   if (illnesses.includes("Colesterol")) conditions.push("AND({Colesterol_mg} < 20, {Grasas_saturadas_g} < 1.5)");
+  if (illnesses.includes("Hipotiroidismo")) conditions.push("{Yodo_µg} > 10");
+  if (illnesses.includes("Hipertiroidismo")) conditions.push("{Yodo_µg} < 50");
+  if (illnesses.includes("Intestino irritable")) conditions.push("AND({Fibra_dietética_g} > 1, {Fibra_dietética_g} < 10)");
   
   const dislikes = ensureArray(user.dislikedFoods);
   if (dislikes.length > 0) {
@@ -157,7 +160,6 @@ const scoreIngredients = (airtableItems: AirtableIngredient[], pantryItems: stri
     const norm = normalizeText(rawName);
     const root = getRootWord(rawName);
     let score = 1;
-    
     pantryRoots.forEach(pantryRoot => {
       if (root === pantryRoot) score = 50;
       else if (new RegExp(`\\b${pantryRoot}\\b`, 'i').test(norm)) {
@@ -166,7 +168,6 @@ const scoreIngredients = (airtableItems: AirtableIngredient[], pantryItems: stri
     });
     return { name: rawName, score };
   }).filter(item => item.name);
-
   scoredItems.sort((a, b) => b.score - a.score);
   return {
     priorityList: scoredItems.filter(i => i.score >= 20).map(i => i.name).join(", "),
@@ -180,9 +181,10 @@ const scoreIngredients = (airtableItems: AirtableIngredient[], pantryItems: stri
 // ============================================
 
 export default async function handler(req: any, res: any) {
+  // Configuración de CORS corregida
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
@@ -204,27 +206,40 @@ export default async function handler(req: any, res: any) {
     if (!lastInteraction.empty) {
       const lastTime = lastInteraction.docs[0].data().createdAt?.toMillis() || 0;
       if (Date.now() - lastTime < 10000) {
-        return res.status(429).json({ error: "Por favor, espera 10 segundos." });
+        return res.status(429).json({ error: "Por favor, espera 10 segundos antes de generar otro plan." });
       }
+    }
+
+    if (!type || !['En casa', 'Fuera'].includes(type)) {
+      return res.status(400).json({ error: 'type debe ser "En casa" o "Fuera"' });
     }
 
     const userSnap = await db.collection('users').doc(userId).get();
     if (!userSnap.exists) return res.status(404).json({ error: 'Usuario no encontrado' });
     const user = userSnap.data() as UserProfile;
 
-    // 🧠 MEMORIA Y FEEDBACK (Lógica similar a la anterior)
+    // Obtener Historial
     const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
-    // ... (Carga de historial y feedback omitida para brevedad, mantener igual)
+    const historySnap = await db.collection(historyCol).where('user_id', '==', userId).orderBy('fecha_creacion', 'desc').limit(5).get();
+    
+    let historyContext = "";
+    if (!historySnap.empty) {
+      const recent = historySnap.docs.map(doc => {
+        const d = doc.data();
+        return type === 'En casa' ? d.receta?.recetas?.map((r: any) => r.titulo) : d.recomendaciones?.map((r: any) => r.nombre_restaurante);
+      }).flat().filter(Boolean);
+      if (recent.length > 0) historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}.`;
+    }
 
+    // Configurar Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",
-      safetySettings: [
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }
-      ],
+      safetySettings: [{ category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE }],
     });
 
     let finalPrompt = "";
+    let parsedData: any;
 
     if (type === 'En casa') {
       const formula = buildAirtableFormula(user);
@@ -238,60 +253,65 @@ export default async function handler(req: any, res: any) {
       const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "");
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
 
-      // ✅ PROMPT ACTUALIZADO CON SERVINGS
-      finalPrompt = `Actúa como "Bocado", asistente nutricional experto.
-      
-### PERFIL CLÍNICO
-* Meta: ${user.nutritionalGoal} | Restricciones: ${formatList(user.diseases)}, ${formatList(user.allergies)}
-* PROHIBIDO: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
+      // ✅ PROMPT ACTUALIZADO CON SERVINGS (COMENSALES)
+      finalPrompt = `Actúa como "Bocado", un asistente nutricional experto.
 
-### CONTEXTO DE LA SOLICITUD
+### PERFIL DEL USUARIO
+* Meta: ${user.nutritionalGoal} | Salud: ${formatList(user.diseases)}, ${formatList(user.allergies)}
+* NO USAR: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
+
+### CONTEXTO
 * Comida: ${request.mealType} | Tiempo: ${request.cookingTime} min
-* **COMENSALES (PORCIONES)**: ${servings} persona(s)
+* **PORCIONES/COMENSALES**: ${servings} persona(s)
 
-### GESTIÓN DE INVENTARIO
-${hasPantryItems ? `USA ESTOS PRIMERO (Ahorro): [ ${priorityList} ]` : "No hay match en despensa."}
-Otros disponibles: [ ${marketList} ]
+${historyContext}
+
+### INVENTARIO
+${hasPantryItems ? `Ingredientes en casa (priorizar): [ ${priorityList} ]` : "No hay match en despensa."}
+En el mercado: [ ${marketList} ]
 
 ### TAREA
-Genera 3 RECETAS. **IMPORTANTE**: Calcula las cantidades de ingredientes exactamente para alimentar a ${servings} persona(s).
+Genera 3 RECETAS creativas. **IMPORTANTE**: Debes calcular y escribir las cantidades de ingredientes exactas para alimentar a ${servings} persona(s). Los pasos deben ser claros.
 
-Responde ÚNICAMENTE en JSON:
+Responde ÚNICAMENTE con este JSON exacto:
 {
-  "saludo_personalizado": "Cálido, menciona que es para ${servings} personas.",
+  "saludo_personalizado": "Cálido mensaje mencionando que cocinaremos para ${servings} personas.",
   "receta": {
     "recetas": [{
       "id": 1,
       "titulo": "Nombre",
       "tiempo_estimado": "X min",
+      "dificultad": "Fácil|Media|Difícil",
       "coincidencia_despensa": "Cual",
-      "ingredientes": ["cantidad para ${servings} + ingrediente"],
+      "ingredientes": ["cantidad exacta para ${servings} + ingrediente", "..."],
       "pasos_preparacion": ["Paso 1..."],
       "macros_por_porcion_individual": {"kcal": 0, "proteinas_g": 0, "carbohidratos_g": 0, "grasas_g": 0}
     }]
   }
 }`;
     } else {
-      // Prompt Fuera de casa (Se mantiene similar, servings suele ser 1 en búsqueda)
-      finalPrompt = `Actúa como guía gastronómico en ${user.city}. Recomienda 5 lugares para ${user.nutritionalGoal}. Presupuesto: ${request.budget}. Responde en JSON.`;
+      finalPrompt = `Actúa como guía gastronómico experto en ${user.city}. Recomienda 5 restaurantes reales basados en: Meta ${user.nutritionalGoal}, Antojo ${request.cravings?.join(', ')}, Presupuesto ${request.budget}. Responde en JSON estricto.`;
     }
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
-      generationConfig: { temperature: 0.7, responseMimeType: 'application/json' },
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: 'application/json' },
     });
 
-    const parsedData = JSON.parse(result.response.text());
+    const responseText = result.response.text();
+    parsedData = JSON.parse(responseText);
 
-    // Guardar resultado
-    await db.collection(historyCol).add({
+    const docToSave = {
       user_id: userId,
       interaction_id: interactionId,
       fecha_creacion: FieldValue.serverTimestamp(),
       tipo: type,
-      servings: servings, // Guardamos el dato para estadísticas
+      servings_calculated: servings,
       ...parsedData
-    });
+    };
+    
+    await db.collection(historyCol).add(docToSave);
+    await db.collection('user_interactions').doc(interactionId).set({ procesado: true, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 
     return res.status(200).json(parsedData);
 
