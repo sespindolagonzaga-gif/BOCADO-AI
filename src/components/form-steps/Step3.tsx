@@ -23,7 +23,7 @@ const categoryIcons: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   'Hierbas, Especias y Condimentos': SpicesIcon,
 };
 
-const Step4: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
+const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
   const [modalCategory, setModalCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [customFoodInput, setCustomFoodInput] = useState('');
@@ -220,4 +220,4 @@ const Step4: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
   );
 };
 
-export default Step4;
+export default Step3;

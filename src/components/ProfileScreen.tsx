@@ -4,7 +4,7 @@ import { UserIcon } from './icons/UserIcon';
 import { LockIcon } from './icons/LockIcon';
 import Step1 from './form-steps/Step1';
 import Step2 from './form-steps/Step2';
-import Step4 from './form-steps/Step4';
+import Step4 from './form-steps/Step3';
 import { db, auth } from '../firebaseConfig';
 import { doc, setDoc, getDoc, writeBatch } from 'firebase/firestore';
 import { 
