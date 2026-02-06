@@ -44,13 +44,12 @@ interface RequestBody {
   type: 'En casa' | 'Fuera';
   mealType?: string;
   cookingTime?: number;
-  servings?: number;
+  servings?: number; // ✅ Nuevo: Número de comensales
   cravings?: string[];
   budget?: string;
   currency?: string;
   dislikedFoods?: string[];
   _id?: string;
-  clientTimestamp?: string;
 }
 
 interface AirtableIngredient {
@@ -204,31 +203,21 @@ const scoreIngredients = (
 // ============================================
 
 export default async function handler(req: any, res: any) {
-  // Debug logging
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
-  
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') {
-    console.log(`❌ Method ${req.method} not allowed`);
-    return res.status(405).json({ error: `Método ${req.method} no permitido` });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
   try {
     const request: RequestBody = req.body;
-    
-    console.log('Request body:', JSON.stringify(request, null, 2));
-    
     const { userId, type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
 
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
 
-    // Rate Limit check
+    // ✅ SEGURIDAD: RATE LIMIT (EVITA SPAM)
     const lastInteraction = await db.collection('user_interactions')
       .where('userId', '==', userId)
       .orderBy('createdAt', 'desc')
@@ -240,6 +229,7 @@ export default async function handler(req: any, res: any) {
       const lastTime = lastData.createdAt ? lastData.createdAt.toMillis() : 0;
       const now = Date.now();
       
+      // Bloquear si la última petición fue hace menos de 10 segundos
       if (now - lastTime < 10000) {
         return res.status(429).json({ error: "Por favor, espera 10 segundos antes de generar otro plan." });
       }
@@ -275,7 +265,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Obtener Feedback previo
+    // 3. Obtener Feedback previo para aprender gustos
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -310,48 +300,62 @@ export default async function handler(req: any, res: any) {
     let parsedData: any;
 
     if (type === 'En casa') {
-      // Obtener datos de Airtable
+      // ============================================
+      // OBTENER DATOS DE AIRTABLE
+      // ============================================
+      
       const formula = buildAirtableFormula(user);
       
       const baseId = process.env.AIRTABLE_BASE_ID?.trim();
       const tableName = process.env.AIRTABLE_TABLE_NAME?.trim();
       const apiKey = process.env.AIRTABLE_API_KEY?.trim();
       
+      if (!baseId || !tableName || !apiKey) {
+        throw new Error(`Missing Airtable config: BASE_ID=${!!baseId}, TABLE_NAME=${!!tableName}, API_KEY=${!!apiKey}`);
+      }
+      
+      // ✅ Corregido: Eliminado espacio extra en la URL
+      const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
+      
       let airtableItems: AirtableIngredient[] = [];
       
-      if (baseId && tableName && apiKey) {
-        const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
-        
-        try {
-          const airtableRes = await fetch(airtableUrl, {
-            headers: { 
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (airtableRes.ok) {
-            const airtableData = await airtableRes.json();
-            if (airtableData && Array.isArray(airtableData.records)) {
-              airtableItems = airtableData.records;
-            }
-          } else {
-            console.error("Airtable error:", await airtableRes.text());
+      try {
+        const airtableRes = await fetch(airtableUrl, {
+          headers: { 
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
           }
-        } catch (airtableError: any) {
-          console.error("❌ Airtable Fetch Failed:", airtableError.message);
+        });
+        
+        if (!airtableRes.ok) {
+          const errorText = await airtableRes.text();
+          throw new Error(`Airtable HTTP ${airtableRes.status}: ${errorText}`);
         }
+        
+        const airtableData = await airtableRes.json();
+        
+        if (!airtableData || !Array.isArray(airtableData.records)) {
+          airtableItems = [];
+        } else {
+          airtableItems = airtableData.records;
+        }
+        
+      } catch (airtableError: any) {
+        console.error("❌ Airtable Fetch Failed:", airtableError.message);
+        airtableItems = [];
       }
 
-      // Obtener despensa
+      // Obtener despensa del usuario
       const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
       const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
       
+      // Scoring
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
       
-      // ✅ OBTENER SERVINGS (default: 1)
+      // ✅ Obtener número de comensales (default: 1)
       const servings = request.servings || 1;
       
+      // Construir prompt completo
       finalPrompt = `Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
 
 ### PERFIL CLÍNICO DEL USUARIO
@@ -363,7 +367,7 @@ export default async function handler(req: any, res: any) {
 ### CONTEXTO DE LA SOLICITUD
 * **Tipo de comida**: ${request.mealType || "Comida principal"}
 * **Tiempo disponible**: ${request.cookingTime || "30"} minutos
-* **Número de comensales**: ${servings} persona(s) ⚠️ **IMPORTANTE: Ajusta TODAS las cantidades de ingredientes y los macros totales para ${servings} personas**
+* **Número de comensales**: ${servings} persona(s) ⚠️ **IMPORTANTE: Ajusta TODAS las cantidades de ingredientes y los macros para ${servings} personas**
 * **Presupuesto**: ${request.budget || "No especificado"} ${request.currency || ""}
 
 ${historyContext}
@@ -379,10 +383,9 @@ Ingredientes adicionales seguros disponibles en el mercado:
 *(También puedes usar básicos: aceite, sal, pimienta, especias)*
 
 ### INSTRUCCIONES ESPECÍFICAS PARA ${servings} COMENSALES
-1. Multiplica todas las cantidades de ingredientes para ${servings} personas
-2. Los "macros_por_porcion" deben reflejar los valores NUTRICIONALES TOTALES de la receta completa (para ${servings} personas), pero etiquetados como "por porción" (asumiendo que cada persona come 1 porción)
-3. Si son 2+ personas, sugiere recetas que sean fáciles de escalar o que rindan bien
-4. Ajusta los tiempos de preparación si es necesario para cantidades mayores
+1. Multiplica todas las cantidades de ingredientes para ${servings} personas (no para 1)
+2. Los "macros_por_porcion" deben reflejar los valores por porción individual (dividiendo el total entre ${servings})
+3. Si son 2+ personas, sugiere recetas que rindan bien o sean fáciles de preparar en cantidad
 
 ### INSTRUCCIONES DE SALIDA (JSON ESTRICTO)
 Genera **3 RECETAS** distintas, creativas y saludables.
@@ -399,7 +402,7 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
         "dificultad": "Fácil|Media|Difícil",
         "coincidencia_despensa": "Ingrediente de casa usado o 'Ninguno'",
         "porciones": ${servings},
-        "ingredientes": ["cantidad TOTAL para ${servings} personas + ingrediente", "..."],
+        "ingredientes": ["cantidad para ${servings} personas + ingrediente", "..."],
         "pasos_preparacion": ["Paso 1...", "Paso 2..."],
         "macros_por_porcion": {
           "kcal": 0,
@@ -486,7 +489,7 @@ Responde ÚNICAMENTE con este JSON exacto:
       interaction_id: interactionId,
       fecha_creacion: FieldValue.serverTimestamp(),
       tipo: type,
-      servings: request.servings || 1,
+      servings: request.servings || 1, // ✅ Guardamos el número de comensales
       ...parsedData
     };
     
@@ -501,8 +504,7 @@ Responde ÚNICAMENTE con este JSON exacto:
   } catch (error: any) {
     console.error("❌ Error completo:", error);
     return res.status(500).json({ 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     });
   }
 }

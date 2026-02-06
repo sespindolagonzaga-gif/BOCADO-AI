@@ -29,7 +29,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const [selectedCravings, setSelectedCravings] = useState<string[]>([]);
   const [selectedBudget, setSelectedBudget] = useState('');
   const [cookingTime, setCookingTime] = useState(30);
-  const [servings, setServings] = useState(1);
+  const [servings, setServings] = useState(1); // ✅ Nuevo: Estado para comensales
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { user } = useAuthStore();
@@ -41,6 +41,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
   const handleTypeChange = (type: 'En casa' | 'Fuera') => {
       trackEvent('recommendation_type_selected', { type });
+      
       setRecommendationType(type);
       setSelectedBudget('');
       if (type === 'En casa') {
@@ -48,7 +49,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       } else {
         setSelectedMeal('');
         setCookingTime(30);
-        setServings(1);
+        setServings(1); // Reset servings si sale a comer fuera
       }
   };
 
@@ -68,70 +69,51 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       ? selectedCravings.map(stripEmoji)
       : ['Saludable', 'Recomendación del chef'];
 
-    // ✅ Datos base (sin timestamps) para enviar a la API
-    const baseInteractionData = {
+    const interactionData = {
       userId: user.uid,
       type: recommendationType,
       mealType: recommendationType === 'En casa' ? stripEmoji(selectedMeal) : "Fuera de casa",
       cookingTime: recommendationType === 'En casa' ? cookingTime : 0,
-      servings: recommendationType === 'En casa' ? servings : 1,
+      servings: recommendationType === 'En casa' ? servings : 1, // ✅ Enviado a la IA
       cravings: cravingsList,
       budget: selectedBudget, 
       currency: currencyConfig.code, 
       dislikedFoods: profile.dislikedFoods || [],
+      createdAt: serverTimestamp(),
       procesado: false,
     };
 
     trackEvent('recommendation_generation_start', {
       type: recommendationType,
-      meal: baseInteractionData.mealType,
-      servings: baseInteractionData.servings,
+      meal: interactionData.mealType,
+      servings: interactionData.servings,
       budget: selectedBudget,
       cravings_count: cravingsList.length
     });
 
     try {
-      // 1. Guardar en Firestore (aquí sí usamos serverTimestamp)
-      const newDoc = await addDoc(collection(db, 'user_interactions'), {
-        ...baseInteractionData,
-        createdAt: serverTimestamp()
-      });
+      const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
       
       onPlanGenerated(newDoc.id);
       
-      // 2. Llamar a la API (sin serverTimestamp, con _id)
-      const apiPayload = {
-        ...baseInteractionData,
-        _id: newDoc.id,
-        clientTimestamp: new Date().toISOString() // Por si el backend lo necesita
-      };
-
-      console.log('Enviando a API:', env.api.recommendationUrl, apiPayload);
-
-      const response = await fetch(env.api.recommendationUrl, {
+      fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiPayload)
+        body: JSON.stringify({ ...interactionData, _id: newDoc.id })
+      })
+      .then(() => {
+          trackEvent('recommendation_api_success', { type: recommendationType });
+      })
+      .catch(error => {
+        console.error("Background fetch error:", error);
+        trackEvent('recommendation_api_error', { error: 'fetch_failed' });
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error Response:', response.status, errorText);
-        throw new Error(`Error ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('API Success:', result);
-      
-      trackEvent('recommendation_api_success', { type: recommendationType });
       
     } catch (error) {
       console.error("Error generating recommendation:", error);
-      trackEvent('recommendation_generation_error', { 
-        error: error instanceof Error ? error.message : 'unknown_error' 
-      });
-      alert('Tuvimos un problema generando tu recomendación. Por favor, intenta de nuevo.');
-    } finally {
+      trackEvent('recommendation_generation_error', { error: 'firestore_save_failed' });
+      
+      alert('Tuvimos un problema. Por favor, intenta de nuevo.');
       setIsGenerating(false);
     }
   };
@@ -142,6 +124,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         craving: stripEmoji(craving),
         action: isSelecting ? 'select' : 'deselect'
     });
+
     setSelectedCravings(prev => 
       prev.includes(craving) ? prev.filter(c => c !== craving) : [...prev, craving]
     );
@@ -157,8 +140,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
   if (isProfileLoading || !profile) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin"></div>
+      <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-bocado-gray text-sm animate-pulse font-medium">Sincronizando perfil...</p>
       </div>
     );
   }
@@ -216,29 +200,48 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
               
               {selectedMeal && (
                 <div className="space-y-3">
-                  {/* Selector de Porciones/Comensales */}
+                  {/* ✅ Selector de Comensales - Nuevo */}
                   <div className="bg-bocado-background p-4 rounded-2xl animate-fade-in">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center mb-2">
                       <label className="text-xs font-bold text-bocado-gray uppercase tracking-wide">¿Para cuántos?</label>
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={() => {
-                            const val = Math.max(1, servings - 1);
+                      <span className="text-lg font-bold text-bocado-green">{servings} {servings === 1 ? 'persona' : 'personas'}</span>
+                    </div>
+                    <div className="flex items-center gap-4 justify-center">
+                      <button 
+                        onClick={() => {
+                          const val = Math.max(1, servings - 1);
+                          setServings(val);
+                          trackEvent('recommendation_servings_change', { count: val });
+                        }}
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white border-2 border-bocado-border text-bocado-green font-bold text-lg active:scale-90 transition-transform disabled:opacity-50"
+                        disabled={servings <= 1}
+                      >-</button>
+                      
+                      <div className="flex-1 max-w-[120px]">
+                        <input 
+                          type="range" 
+                          min="1" 
+                          max="10" 
+                          step="1" 
+                          value={servings} 
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
                             setServings(val);
                             trackEvent('recommendation_servings_change', { count: val });
                           }}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-bocado-border text-bocado-green font-bold active:scale-90"
-                        >-</button>
-                        <span className="text-lg font-bold text-bocado-green w-4 text-center">{servings}</span>
-                        <button 
-                          onClick={() => {
-                            const val = servings + 1;
-                            setServings(val);
-                            trackEvent('recommendation_servings_change', { count: val });
-                          }}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-white border border-bocado-border text-bocado-green font-bold active:scale-90"
-                        >+</button>
+                          className="w-full h-2 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green" 
+                        />
                       </div>
+                      
+                      <button 
+                        onClick={() => {
+                          const val = Math.min(10, servings + 1);
+                          setServings(val);
+                          trackEvent('recommendation_servings_change', { count: val });
+                        }}
+                        className="w-10 h-10 flex items-center justify-center rounded-full bg-white border-2 border-bocado-border text-bocado-green font-bold text-lg active:scale-90 transition-transform disabled:opacity-50"
+                        disabled={servings >= 10}
+                      >+</button>
                     </div>
                   </div>
 
@@ -254,7 +257,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                       max="65" 
                       step="5" 
                       value={cookingTime} 
-                      onChange={(e) => setCookingTime(Number(e.target.value))} 
+                      onChange={(e) => {
+                          setCookingTime(Number(e.target.value));
+                      }} 
                       onMouseUp={() => trackEvent('recommendation_time_adjusted', { time: cookingTime })}
                       className="w-full h-2 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green" 
                     />
@@ -264,7 +269,6 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Sección Fuera de casa */}
               <div>
                 <p className="text-center text-xs font-bold text-bocado-gray uppercase tracking-wider mb-3">¿Qué se te antoja?</p>
                 <div className="grid grid-cols-2 gap-2">
