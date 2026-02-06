@@ -42,12 +42,10 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       if (data) setFormData(data);
     };
     loadProfileData();
-    // Pequeño delay para asegurar que el storage esté listo tras el login
     const timer = setTimeout(loadProfileData, 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // --- LÓGICA DE MONEDA (Mejorada con normalización) ---
   const countryCode = (formData?.country || 'MX').toUpperCase().trim(); 
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
@@ -73,7 +71,6 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
     setIsGenerating(true);
 
-    // Fallback inteligente para antojos
     const cravingsList = recommendationType === 'Fuera' && selectedCravings.length > 0
       ? selectedCravings.map(stripEmoji)
       : ['Saludable', 'Recomendación del chef'];
@@ -92,24 +89,23 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     };
 
     try {
-      // 1. Guardamos la intención en Firebase
       const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
       
-      // 2. Llamamos a la API usando la URL de entorno centralizada
-      const response = await fetch(env.api.recommendationUrl, {
+      // NAVEGAR INMEDIATAMENTE antes del fetch
+      onPlanGenerated(newDoc.id);
+      
+      // Fetch en segundo plano sin await
+      fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...interactionData, _id: newDoc.id })
+      }).catch(error => {
+        console.error("Background fetch error:", error);
       });
-
-      if (!response.ok) throw new Error("Error en la respuesta de la IA");
       
-      // 3. Navegamos a la pantalla de resultados
-      onPlanGenerated(newDoc.id);
     } catch (error) {
       console.error("Error generating recommendation:", error);
-      alert('Tuvimos un problema con la IA. Por favor, intenta de nuevo.');
-    } finally {
+      alert('Tuvimos un problema. Por favor, intenta de nuevo.');
       setIsGenerating(false);
     }
   };

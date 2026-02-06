@@ -31,7 +31,6 @@ const ErrorDisplay: React.FC<{ errorCode: string; errorMessage: string; onRetry:
     </div>
 );
 
-// --- PROCESADOR DE RECETAS (Actualizado al nuevo formato de mapa) ---
 const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
@@ -43,12 +42,10 @@ const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
     let recipesArray: any[] = [];
     let greeting = data.saludo_personalizado || "Aquí tienes tu plan";
     
-    // Acceso al nuevo formato: receta (mapa) -> recetas (array)
     if (data.receta && Array.isArray(data.receta.recetas)) {
         recipesArray = data.receta.recetas;
         if (data.saludo_personalizado) greeting = data.saludo_personalizado;
     } 
-    // Fallback para formato antiguo plano
     else if (Array.isArray(data.recetas)) {
         recipesArray = data.recetas;
     }
@@ -75,7 +72,6 @@ const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
   } catch (e) { return null; }
 };
 
-// --- PROCESADOR DE RECOMENDACIONES ---
 const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
@@ -116,6 +112,7 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
   const [savedRecipeTitles, setSavedRecipeTitles] = useState<Set<string>>(new Set());
   const [savedRestaurantTitles, setSavedRestaurantTitles] = useState<Set<string>>(new Set());
   const [savingCardTitle, setSavingCardTitle] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
   const planFoundRef = useRef(false);
 
   useEffect(() => {
@@ -147,6 +144,8 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
     if (!user) return;
 
     setIsLoading(true);
+    setHasError(false);
+    
     const unsubRec = onSnapshot(query(collection(db, "historial_recetas"), where("user_id", "==", user.uid)), (snap) => {
         setRecipePlans(snap.docs.map(processFirestoreDoc).filter((p): p is Plan => p !== null));
     });
@@ -155,7 +154,19 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
         setRestaurantPlans(snap.docs.map(processRecommendationDoc).filter((p): p is Plan => p !== null));
     });
 
-    return () => { unsubRec(); unsubRem(); };
+    // Timeout de 45 segundos para mostrar error si no llegan datos
+    const timeout = setTimeout(() => {
+        if (!planFoundRef.current) {
+            setHasError(true);
+            setIsLoading(false);
+        }
+    }, 45000);
+
+    return () => { 
+        unsubRec(); 
+        unsubRem(); 
+        clearTimeout(timeout);
+    };
   }, [planId]);
 
   const recentPlans = useMemo(() => {
@@ -175,6 +186,7 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
           if (found) {
               setSelectedPlan(found);
               setIsLoading(false);
+              planFoundRef.current = true;
           }
       }
   }, [recentPlans, planId]);
@@ -204,7 +216,9 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
     );
   }
 
-  if (!selectedPlan) return <ErrorDisplay errorCode="recovery-failed" errorMessage="No se pudo cargar el plan." onRetry={onStartNewPlan} />
+  if (hasError || !selectedPlan) {
+    return <ErrorDisplay errorCode="recovery-failed" errorMessage="No se pudo cargar el plan. El chef tardó demasiado o hubo un error." onRetry={onStartNewPlan} />
+  }
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-lg w-full animate-fade-in pb-20">
