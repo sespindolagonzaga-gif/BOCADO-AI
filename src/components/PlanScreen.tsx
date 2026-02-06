@@ -20,7 +20,7 @@ const loadingMessages = [
   "¡Casi listo! Preparando la mesa...",
 ];
 
-// --- PROCESAMIENTO DE DATOS (FUNCIONALIDAD NUEVA) ---
+// --- PROCESAMIENTO DE RECETAS (EN CASA) ---
 const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
@@ -55,22 +55,29 @@ const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
   } catch (e) { return null; }
 };
 
+// --- PROCESAMIENTO DE RESTAURANTES (FUERA) - CAMBIO CLAVE AQUÍ ---
 const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
     if (!data) return null;
     const interactionId = data.interaction_id || data.user_interactions;
     const rawDate = data.fecha_creacion || data.createdAt;
-    let items = data.recomendaciones || [];
+    
+    // Gemini puede devolverlo como recomendaciones o recomendaciones.recomendaciones
+    let items = data.recomendaciones?.recomendaciones || data.recomendaciones || [];
     let greeting = data.saludo_personalizado || "Opciones fuera de casa";
     if (!Array.isArray(items) || items.length === 0) return null;
 
     const meals: Meal[] = items.map((rec: any, index: number) => ({
       mealType: `Sugerencia ${index + 1}`,
       recipe: {
-        title: rec.nombre_restaurante || 'Restaurante',
-        time: 'N/A', difficulty: 'Restaurante', calories: 'N/A', savingsMatch: 'Ninguno',
-        cuisine: rec.tipo_comida || '',
+        title: rec.nombre_restaurante || rec.nombre || 'Restaurante',
+        // MAPEO ELÁSTICO PARA LA ETIQUETA:
+        cuisine: rec.tipo_comida || rec.cuisine || rec.tipo || 'Gastronomía', 
+        time: 'N/A', 
+        difficulty: 'Restaurante', 
+        calories: 'N/A', 
+        savingsMatch: 'Ninguno',
         ingredients: [rec.direccion_aproximada, rec.link_maps].filter(Boolean),
         instructions: [rec.plato_sugerido, rec.por_que_es_bueno, rec.hack_saludable].filter(Boolean)
       }
@@ -80,7 +87,7 @@ const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
   } catch (e) { return null; }
 };
 
-// --- HOOK DE CONSULTA (FUNCIONALIDAD NUEVA) ---
+// --- HOOK DE CONSULTA ---
 const usePlanQuery = (planId: string | undefined, userId: string | undefined) => {
   return useQuery({
     queryKey: ['plan', planId, userId],
@@ -136,8 +143,6 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
       isSaved: false, 
     });
   };
-
-  // --- RENDERS CON ESTILO VIEJO ---
 
   if (isLoading) {
     return (

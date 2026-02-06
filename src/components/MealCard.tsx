@@ -44,7 +44,6 @@ const MealCard: React.FC<MealCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
-  // ✅ TANSTACK QUERY: Hooks para guardados
   const { user } = useAuthStore();
   const toggleMutation = useToggleSavedItem();
   
@@ -52,7 +51,6 @@ const MealCard: React.FC<MealCardProps> = ({
   const isRestaurant = recipe.difficulty === 'Restaurante';
   const type = isRestaurant ? 'restaurant' : 'recipe';
   
-  // ✅ Verificar si está guardado (reactivo)
   const saved = useIsItemSaved(user?.uid, type, recipe.title);
   
   const emoji = getSmartEmoji(recipe.title);
@@ -60,21 +58,19 @@ const MealCard: React.FC<MealCardProps> = ({
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    
     if (!user) return;
     
-    // ✅ Usar mutation de TanStack Query
     toggleMutation.mutate({
       userId: user.uid,
       type,
       recipe,
       mealType: meal.mealType,
-      isSaved: saved, // Si está guardado, lo quitamos; si no, lo agregamos
+      isSaved: saved,
     });
     
     onInteraction?.('save', { 
       recipe: recipe.title, 
-      isSaved: !saved, // Estado después del toggle
+      isSaved: !saved, 
       isRestaurant 
     });
   };
@@ -102,7 +98,6 @@ const MealCard: React.FC<MealCardProps> = ({
       >
         <div className="flex justify-between items-start gap-3">
           
-          {/* Title Section */}
           <div className="flex gap-3 flex-1 min-w-0">
             <span className="text-2xl shrink-0 leading-none" role="img" aria-label="Tipo de comida">
               {emoji}
@@ -114,6 +109,13 @@ const MealCard: React.FC<MealCardProps> = ({
               </h3>
 
               <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                {/* ✅ ETIQUETA DE TIPO DE COMIDA (SOLO RESTAURANTES) */}
+                {isRestaurant && recipe.cuisine && (
+                  <span className="px-2 py-1 bg-bocado-green/10 text-bocado-green rounded-lg font-bold">
+                    {recipe.cuisine}
+                  </span>
+                )}
+
                 {!isRestaurant && (
                   <span className="px-2 py-1 bg-bocado-background text-bocado-dark-gray rounded-lg font-medium">
                     ⏱️ {recipe.time}
@@ -141,7 +143,6 @@ const MealCard: React.FC<MealCardProps> = ({
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col items-center gap-1 shrink-0">
             <button
               onClick={handleSaveClick}
@@ -149,8 +150,6 @@ const MealCard: React.FC<MealCardProps> = ({
               className={`p-2 rounded-full transition-all active:scale-90 disabled:opacity-50 ${
                 saved ? 'text-red-500' : 'text-bocado-gray hover:text-red-400'
               }`}
-              aria-label={saved ? 'Quitar de guardados' : 'Guardar receta'}
-              aria-pressed={saved}
             >
               <HeartIcon className="w-6 h-6" filled={saved} />
             </button>
@@ -159,7 +158,6 @@ const MealCard: React.FC<MealCardProps> = ({
               className={`w-5 h-5 text-bocado-gray transition-transform duration-200 ${
                 isExpanded ? 'rotate-180' : ''
               }`}
-              aria-expanded={isExpanded}
             />
           </div>
         </div>
@@ -168,8 +166,6 @@ const MealCard: React.FC<MealCardProps> = ({
       {/* EXPANDED CONTENT */}
       {isExpanded && (
         <div className="px-4 pb-4 pt-2 border-t border-bocado-border space-y-4 animate-fade-in">
-          
-          {/* Ingredients */}
           <div>
             <h4 className="text-xs font-bold text-bocado-dark-gray uppercase tracking-wider mb-2">
               {isRestaurant ? 'Detalles' : 'Ingredientes'}
@@ -177,10 +173,7 @@ const MealCard: React.FC<MealCardProps> = ({
 
             <ul className="space-y-1.5">
               {recipe.ingredients.map((ing, index) => (
-                <li
-                  key={index}
-                  className="text-sm text-bocado-text flex items-start gap-2"
-                >
+                <li key={index} className="text-sm text-bocado-text flex items-start gap-2">
                   <span className="w-1.5 h-1.5 bg-bocado-green rounded-full mt-1.5 shrink-0"></span>
                   <span className="leading-relaxed">{ing}</span>
                 </li>
@@ -188,7 +181,6 @@ const MealCard: React.FC<MealCardProps> = ({
             </ul>
           </div>
 
-          {/* Instructions */}
           {recipe.instructions && recipe.instructions.length > 0 && (
             <div>
               <h4 className="text-xs font-bold text-bocado-dark-gray uppercase tracking-wider mb-2">
@@ -199,9 +191,7 @@ const MealCard: React.FC<MealCardProps> = ({
                 {recipe.instructions.map((step, i) => (
                   <div key={i} className="flex gap-2 text-sm text-bocado-text">
                     {!isRestaurant && (
-                      <span className="text-bocado-green font-bold shrink-0">
-                        {i + 1}.
-                      </span>
+                      <span className="text-bocado-green font-bold shrink-0">{i + 1}.</span>
                     )}
                     <p className="leading-relaxed">{step}</p>
                   </div>
@@ -210,7 +200,6 @@ const MealCard: React.FC<MealCardProps> = ({
             </div>
           )}
 
-          {/* CTA */}
           <button
             onClick={handleFeedbackOpen}
             className="w-full py-3 rounded-xl bg-bocado-dark-green text-white font-semibold text-sm shadow-bocado hover:bg-bocado-green active:scale-[0.98] transition-all"
