@@ -43,13 +43,14 @@ interface RequestBody {
   userId: string;
   type: 'En casa' | 'Fuera';
   mealType?: string;
-  cookingTime?: string;
-  servings?: number; // ✅ NUEVO: Número de comensales
-  cravings?: string;
+  cookingTime?: number;
+  servings?: number;
+  cravings?: string[];
   budget?: string;
   currency?: string;
   dislikedFoods?: string[];
   _id?: string;
+  clientTimestamp?: string;
 }
 
 interface AirtableIngredient {
@@ -203,21 +204,31 @@ const scoreIngredients = (
 // ============================================
 
 export default async function handler(req: any, res: any) {
+  // Debug logging
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  
+  // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+  if (req.method !== 'POST') {
+    console.log(`❌ Method ${req.method} not allowed`);
+    return res.status(405).json({ error: `Método ${req.method} no permitido` });
+  }
 
   try {
     const request: RequestBody = req.body;
+    
+    console.log('Request body:', JSON.stringify(request, null, 2));
+    
     const { userId, type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
 
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
 
-    // ✅ SEGURIDAD: RATE LIMIT (EVITA SPAM)
+    // Rate Limit check
     const lastInteraction = await db.collection('user_interactions')
       .where('userId', '==', userId)
       .orderBy('createdAt', 'desc')
@@ -264,7 +275,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    // 3. Obtener Feedback previo para aprender gustos
+    // 3. Obtener Feedback previo
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -299,61 +310,48 @@ export default async function handler(req: any, res: any) {
     let parsedData: any;
 
     if (type === 'En casa') {
-      // ============================================
-      // OBTENER DATOS DE AIRTABLE
-      // ============================================
-      
+      // Obtener datos de Airtable
       const formula = buildAirtableFormula(user);
       
       const baseId = process.env.AIRTABLE_BASE_ID?.trim();
       const tableName = process.env.AIRTABLE_TABLE_NAME?.trim();
       const apiKey = process.env.AIRTABLE_API_KEY?.trim();
       
-      if (!baseId || !tableName || !apiKey) {
-        throw new Error(`Missing Airtable config: BASE_ID=${!!baseId}, TABLE_NAME=${!!tableName}, API_KEY=${!!apiKey}`);
-      }
-      
-      const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
-      
       let airtableItems: AirtableIngredient[] = [];
       
-      try {
-        const airtableRes = await fetch(airtableUrl, {
-          headers: { 
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+      if (baseId && tableName && apiKey) {
+        const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
+        
+        try {
+          const airtableRes = await fetch(airtableUrl, {
+            headers: { 
+              Authorization: `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (airtableRes.ok) {
+            const airtableData = await airtableRes.json();
+            if (airtableData && Array.isArray(airtableData.records)) {
+              airtableItems = airtableData.records;
+            }
+          } else {
+            console.error("Airtable error:", await airtableRes.text());
           }
-        });
-        
-        if (!airtableRes.ok) {
-          const errorText = await airtableRes.text();
-          throw new Error(`Airtable HTTP ${airtableRes.status}: ${errorText}`);
+        } catch (airtableError: any) {
+          console.error("❌ Airtable Fetch Failed:", airtableError.message);
         }
-        
-        const airtableData = await airtableRes.json();
-        
-        if (!airtableData || !Array.isArray(airtableData.records)) {
-          airtableItems = [];
-        } else {
-          airtableItems = airtableData.records;
-        }
-        
-      } catch (airtableError: any) {
-        console.error("❌ Airtable Fetch Failed:", airtableError.message);
-        airtableItems = [];
       }
 
-      // Obtener despensa del usuario
+      // Obtener despensa
       const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
       const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
       
-      // Scoring
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
       
-      // ✅ OBTENER NÚMERO DE COMENSALES (default: 1)
+      // ✅ OBTENER SERVINGS (default: 1)
       const servings = request.servings || 1;
       
-      // Construir prompt completo
       finalPrompt = `Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
 
 ### PERFIL CLÍNICO DEL USUARIO
@@ -415,7 +413,7 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
 }`;
 
     } else {
-      // Fuera: Restaurantes (no aplica servings)
+      // Fuera: Restaurantes
       finalPrompt = `Actúa como "Bocado", un experto en nutrición y guía gastronómico local en ${user.city || "su ciudad"}.
 
 ### PERFIL DEL USUARIO
@@ -488,7 +486,7 @@ Responde ÚNICAMENTE con este JSON exacto:
       interaction_id: interactionId,
       fecha_creacion: FieldValue.serverTimestamp(),
       tipo: type,
-      servings: request.servings || 1, // ✅ Guardamos también el número de comensales
+      servings: request.servings || 1,
       ...parsedData
     };
     
@@ -503,7 +501,8 @@ Responde ÚNICAMENTE con este JSON exacto:
   } catch (error: any) {
     console.error("❌ Error completo:", error);
     return res.status(500).json({ 
-      error: error.message
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

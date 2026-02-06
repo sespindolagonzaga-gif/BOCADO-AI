@@ -29,7 +29,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const [selectedCravings, setSelectedCravings] = useState<string[]>([]);
   const [selectedBudget, setSelectedBudget] = useState('');
   const [cookingTime, setCookingTime] = useState(30);
-  const [servings, setServings] = useState(1); // ✅ Nuevo: Estado para comensales
+  const [servings, setServings] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { user } = useAuthStore();
@@ -48,7 +48,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       } else {
         setSelectedMeal('');
         setCookingTime(30);
-        setServings(1); // Reset servings si sale a comer fuera
+        setServings(1);
       }
   };
 
@@ -68,50 +68,70 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       ? selectedCravings.map(stripEmoji)
       : ['Saludable', 'Recomendación del chef'];
 
-    const interactionData = {
+    // ✅ Datos base (sin timestamps) para enviar a la API
+    const baseInteractionData = {
       userId: user.uid,
       type: recommendationType,
       mealType: recommendationType === 'En casa' ? stripEmoji(selectedMeal) : "Fuera de casa",
       cookingTime: recommendationType === 'En casa' ? cookingTime : 0,
-      servings: recommendationType === 'En casa' ? servings : 1, // ✅ Enviado a la IA
+      servings: recommendationType === 'En casa' ? servings : 1,
       cravings: cravingsList,
       budget: selectedBudget, 
       currency: currencyConfig.code, 
       dislikedFoods: profile.dislikedFoods || [],
-      createdAt: serverTimestamp(),
       procesado: false,
     };
 
     trackEvent('recommendation_generation_start', {
       type: recommendationType,
-      meal: interactionData.mealType,
-      servings: interactionData.servings,
+      meal: baseInteractionData.mealType,
+      servings: baseInteractionData.servings,
       budget: selectedBudget,
       cravings_count: cravingsList.length
     });
 
     try {
-      const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
+      // 1. Guardar en Firestore (aquí sí usamos serverTimestamp)
+      const newDoc = await addDoc(collection(db, 'user_interactions'), {
+        ...baseInteractionData,
+        createdAt: serverTimestamp()
+      });
       
       onPlanGenerated(newDoc.id);
       
-      fetch(env.api.recommendationUrl, {
+      // 2. Llamar a la API (sin serverTimestamp, con _id)
+      const apiPayload = {
+        ...baseInteractionData,
+        _id: newDoc.id,
+        clientTimestamp: new Date().toISOString() // Por si el backend lo necesita
+      };
+
+      console.log('Enviando a API:', env.api.recommendationUrl, apiPayload);
+
+      const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...interactionData, _id: newDoc.id })
-      })
-      .then(() => {
-          trackEvent('recommendation_api_success', { type: recommendationType });
-      })
-      .catch(error => {
-        console.error("Background fetch error:", error);
-        trackEvent('recommendation_api_error', { error: 'fetch_failed' });
+        body: JSON.stringify(apiPayload)
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', response.status, errorText);
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('API Success:', result);
+      
+      trackEvent('recommendation_api_success', { type: recommendationType });
       
     } catch (error) {
       console.error("Error generating recommendation:", error);
-      trackEvent('recommendation_generation_error', { error: 'firestore_save_failed' });
-      alert('Tuvimos un problema. Por favor, intenta de nuevo.');
+      trackEvent('recommendation_generation_error', { 
+        error: error instanceof Error ? error.message : 'unknown_error' 
+      });
+      alert('Tuvimos un problema generando tu recomendación. Por favor, intenta de nuevo.');
+    } finally {
       setIsGenerating(false);
     }
   };
@@ -244,7 +264,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Sección Fuera de casa (igual que antes) */}
+              {/* Sección Fuera de casa */}
               <div>
                 <p className="text-center text-xs font-bold text-bocado-gray uppercase tracking-wider mb-3">¿Qué se te antoja?</p>
                 <div className="grid grid-cols-2 gap-2">
