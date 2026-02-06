@@ -7,19 +7,74 @@ import { FemaleIcon } from '../icons/FemaleIcon';
 import { OtherGenderIcon } from '../icons/OtherGenderIcon';
 import { LockIcon } from '../icons/LockIcon';
 import { LocationIcon } from '../icons/LocationIcon';
+import { ScaleIcon } from '../icons/ScaleIcon';
+import { RulerIcon } from '../icons/RulerIcon';
 
-// Lista amigable de países
 const COUNTRIES_LIST = [
+  // América
   { name: 'México', code: 'MX' },
-  { name: 'España', code: 'ES' },
-  { name: 'Colombia', code: 'CO' },
-  { name: 'Argentina', code: 'AR' },
-  { name: 'Chile', code: 'CL' },
-  { name: 'Perú', code: 'PE' },
   { name: 'Estados Unidos', code: 'US' },
+  { name: 'Canadá', code: 'CA' },
+  { name: 'Argentina', code: 'AR' },
+  { name: 'Brasil', code: 'BR' },
+  { name: 'Chile', code: 'CL' },
+  { name: 'Colombia', code: 'CO' },
+  { name: 'Perú', code: 'PE' },
   { name: 'Ecuador', code: 'EC' },
   { name: 'Venezuela', code: 'VE' },
+  { name: 'Uruguay', code: 'UY' },
+  { name: 'Paraguay', code: 'PY' },
+  { name: 'Bolivia', code: 'BO' },
+  { name: 'Panamá', code: 'PA' },
+  { name: 'Costa Rica', code: 'CR' },
+  { name: 'Guatemala', code: 'GT' },
+  { name: 'Honduras', code: 'HN' },
+  { name: 'El Salvador', code: 'SV' },
+  { name: 'República Dominicana', code: 'DO' },
+  { name: 'Cuba', code: 'CU' },
+
+  // Europa
+  { name: 'España', code: 'ES' },
+  { name: 'Francia', code: 'FR' },
+  { name: 'Alemania', code: 'DE' },
+  { name: 'Italia', code: 'IT' },
+  { name: 'Portugal', code: 'PT' },
+  { name: 'Reino Unido', code: 'GB' },
+  { name: 'Irlanda', code: 'IE' },
+  { name: 'Países Bajos', code: 'NL' },
+  { name: 'Bélgica', code: 'BE' },
+  { name: 'Suiza', code: 'CH' },
+  { name: 'Austria', code: 'AT' },
+  { name: 'Suecia', code: 'SE' },
+  { name: 'Noruega', code: 'NO' },
+  { name: 'Dinamarca', code: 'DK' },
+  { name: 'Polonia', code: 'PL' },
+
+  // África
+  { name: 'Marruecos', code: 'MA' },
+  { name: 'Egipto', code: 'EG' },
+  { name: 'Sudáfrica', code: 'ZA' },
+  { name: 'Nigeria', code: 'NG' },
+  { name: 'Kenia', code: 'KE' },
+  { name: 'Ghana', code: 'GH' },
+
+  // Asia
+  { name: 'China', code: 'CN' },
+  { name: 'Japón', code: 'JP' },
+  { name: 'Corea del Sur', code: 'KR' },
+  { name: 'India', code: 'IN' },
+  { name: 'Indonesia', code: 'ID' },
+  { name: 'Tailandia', code: 'TH' },
+  { name: 'Vietnam', code: 'VN' },
+  { name: 'Filipinas', code: 'PH' },
+  { name: 'Israel', code: 'IL' },
+  { name: 'Emiratos Árabes Unidos', code: 'AE' },
+
+  // Oceanía
+  { name: 'Australia', code: 'AU' },
+  { name: 'Nueva Zelanda', code: 'NZ' },
 ];
+
 
 interface ExtendedStep1Props extends FormStepProps {
   cityOptions?: any[];
@@ -61,9 +116,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
   const handleCountrySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const code = e.target.value;
     const name = e.target.options[e.target.selectedIndex].text;
-    
     setLocalCityQuery('');
-    
     if (onCountryChange) {
       onCountryChange(code, name);
     } else {
@@ -91,14 +144,35 @@ const Step1: React.FC<ExtendedStep1Props> = ({
     updateData(name as keyof FormData, validValue);
   };
 
-  // Handler para la edad (solo números)
   const handleAgeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Solo permite números y máximo 3 dígitos (edades razonables)
     if (value === '' || (/^\d+$/.test(value) && value.length <= 3)) {
       const ageNum = parseInt(value);
       if (value === '' || (ageNum >= 1 && ageNum <= 120)) {
         updateData('age', value);
+      }
+    }
+  };
+
+  // Handler para peso (kg, decimal permitido)
+  const handleWeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Permite números y un punto decimal, max 3 enteros y 1 decimal (ej: 85.5)
+    if (value === '' || /^\d{0,3}(\.\d{0,1})?$/.test(value)) {
+      const num = parseFloat(value);
+      if (value === '' || (num >= 0 && num <= 500)) {
+        updateData('weight', value);
+      }
+    }
+  };
+
+  // Handler para estatura (cm, solo enteros)
+  const handleHeightChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '' || (/^\d+$/.test(value) && value.length <= 3)) {
+      const num = parseInt(value);
+      if (value === '' || (num >= 30 && num <= 300)) {
+        updateData('height', value);
       }
     }
   };
@@ -125,7 +199,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
       {/* Nombre y Apellido */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Nombre(s)</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Nombre(s) *</label>
           <input 
             type="text" 
             name="firstName" 
@@ -137,7 +211,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
           {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
         </div>
         <div>
-          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Apellido(s)</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Apellido(s) *</label>
           <input 
             type="text" 
             name="lastName" 
@@ -153,7 +227,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
       {/* Género y Edad */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-bold text-bocado-dark-green mb-2 ml-1 uppercase text-center">Género</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-2 ml-1 uppercase text-center">Género *</label>
           <div className="flex gap-3">
             {['Mujer', 'Hombre', 'Otro'].map(gender => (
               <GenderButton 
@@ -168,28 +242,66 @@ const Step1: React.FC<ExtendedStep1Props> = ({
           {errors.gender && <p className="text-red-500 text-xs mt-1 text-center">{errors.gender}</p>}
         </div>
 
-        {/* EDAD - NUEVO CAMPO */}
         <div>
-          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Edad</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Edad *</label>
           <input 
             type="number" 
             inputMode="numeric"
-            pattern="[0-9]*"
             value={data.age} 
             onChange={handleAgeChange} 
-            placeholder="Ej. 25" 
-            min="1"
-            max="120"
+            placeholder="25" 
             className={`w-full px-4 py-3 rounded-xl border-2 transition-all text-center ${errors.age ? 'border-red-300 bg-red-50' : 'border-gray-100 focus:border-bocado-green focus:outline-none'}`} 
           />
           {errors.age && <p className="text-red-500 text-xs mt-1">{errors.age}</p>}
         </div>
       </div>
 
+      {/* PESO Y ESTATURA - NUEVA SECCIÓN (OPCIONAL) */}
+      <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+        <p className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wide">Datos corporales (opcional)</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1 ml-1">Peso (kg)</label>
+            <div className="relative">
+              <ScaleIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="number" 
+                inputMode="decimal"
+                value={data.weight || ''} 
+                onChange={handleWeightChange} 
+                placeholder="70.5" 
+                step="0.1"
+                className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 focus:border-bocado-green focus:outline-none text-sm"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">kg</span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1 ml-1">Estatura (cm)</label>
+            <div className="relative">
+              <RulerIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input 
+                type="number" 
+                inputMode="numeric"
+                value={data.height || ''} 
+                onChange={handleHeightChange} 
+                placeholder="175" 
+                className="w-full pl-9 pr-8 py-2.5 rounded-lg border border-gray-200 focus:border-bocado-green focus:outline-none text-sm"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">cm</span>
+            </div>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-2 leading-tight">
+          Estos datos nos ayudan a personalizar mejor tus planes nutricionales. Puedes completarlos más tarde en tu perfil.
+        </p>
+      </div>
+
       {/* País y Ciudad */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">País</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">País *</label>
           <div className="relative">
             <LocationIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <select 
@@ -205,7 +317,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
         </div>
 
         <div className="relative">
-          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Ciudad</label>
+          <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Ciudad *</label>
           <div className="relative">
             <input 
               type="text" 
@@ -243,7 +355,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
       
       {/* Email */}
       <div className="relative">
-        <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Email</label>
+        <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Email *</label>
         <input 
           type="email" 
           value={data.email} 
@@ -272,7 +384,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
       {!hidePasswordFields && (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Contraseña</label>
+            <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Contraseña *</label>
             <div className="relative">
               <LockIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input 
@@ -286,7 +398,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
           </div>
           <div>
-            <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Confirmar</label>
+            <label className="block text-xs font-bold text-bocado-dark-green mb-1 ml-1 uppercase">Confirmar *</label>
             <input 
               type="password" 
               name="confirmPassword" 

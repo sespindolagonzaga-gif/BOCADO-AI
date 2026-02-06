@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import BocadoLogo from './BocadoLogo'; // Importación por defecto corregida
-import { db, auth } from '../firebaseConfig'; // Ruta corregida a la raíz de src
-import { EMAIL_DOMAINS } from '../constants'; // Ruta corregida a la raíz de src
+import BocadoLogo from './BocadoLogo';
+import { db, auth } from '../firebaseConfig';
+import { EMAIL_DOMAINS } from '../constants';
 import { doc, getDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { sanitizeProfileData } from '../utils/profileSanitizer'; // Ruta y nombre corregidos
+import { sanitizeProfileData } from '../utils/profileSanitizer';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -47,7 +47,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         const lastName = nameParts.slice(1).join(' ') || '';
 
         const combinedData = { ...firestoreData, firstName, lastName, email: user.email };
-        const fullProfileData = sanitizeProfileData(combinedData); 
+        const fullProfileData = sanitizeProfileData(combinedData);
 
         localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
         onLoginSuccess();
@@ -106,10 +106,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
       const textBeforeAt = value.substring(0, atIndex);
       const textAfterAt = value.substring(atIndex + 1);
 
-      // Tipado explícito de 'domain' para evitar errores de compilación
       const filtered = EMAIL_DOMAINS
-        .filter((domain: string) => domain.startsWith(textAfterAt))
-        .map((domain: string) => `${textBeforeAt}@${domain}`);
+        .filter(domain => domain.startsWith(textAfterAt))
+        .map(domain => `${textBeforeAt}@${domain}`);
 
       setEmailSuggestions(filtered);
       setShowEmailSuggestions(filtered.length > 0);
@@ -127,8 +126,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     <>
       <div className="text-center mb-6">
         <BocadoLogo className="w-full max-w-sm -my-16 mx-auto" />
-        <h1 className="text-2xl font-bold text-green-800 mt-4">Iniciar Sesión</h1>
-        <p className="text-gray-600 mt-1">Accede a tu perfil para ver tu información.</p>
+        <h1 className="text-2xl font-bold text-bocado-dark-green mt-4">Iniciar Sesión</h1>
+        <p className="text-bocado-dark-gray mt-1">Accede a tu perfil para ver tu información.</p>
       </div>
       <form onSubmit={handleLogin} className="space-y-6">
         <div className="relative">
@@ -142,7 +141,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
             onChange={handleEmailChange}
             onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 150)}
             autoComplete="email"
-            className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500`}
+            className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-bocado-green focus:border-bocado-green`}
             placeholder="tu@correo.com"
             disabled={isLoading}
           />
@@ -172,7 +171,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
             id="password"
             value={password}
             onChange={(e) => { setPassword(e.target.value); setError(''); }}
-            className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500`}
+            className={`mt-1 block w-full px-3 py-2 bg-white border ${error ? 'border-red-500' : 'border-gray-300'} rounded-md shadow-sm focus:outline-none focus:ring-bocado-green focus:border-bocado-green`}
             placeholder="••••••••••"
             disabled={isLoading}
           />
@@ -183,7 +182,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         <div>
           <button
             type="submit"
-            className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-full text-lg shadow-lg hover:bg-green-700 transition-colors duration-300 disabled:bg-gray-400"
+            className="w-full bg-bocado-green text-white font-bold py-3 px-4 rounded-full text-lg shadow-lg hover:bg-bocado-green-light transition-colors duration-300 disabled:bg-gray-400"
             disabled={isLoading}
           >
             {isLoading ? 'Cargando...' : 'Entrar'}
@@ -193,7 +192,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
             <button
                 type="button"
                 onClick={() => setView('reset')}
-                className="text-sm text-green-700 font-semibold hover:underline"
+                className="text-sm text-bocado-green font-semibold hover:underline"
             >
                 Olvidé mi contraseña
             </button>
@@ -206,8 +205,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     <>
       <div className="text-center mb-6">
         <BocadoLogo className="w-full max-w-sm -my-16 mx-auto" />
-        <h1 className="text-2xl font-bold text-green-800 mt-4">Restablecer Contraseña</h1>
-        <p className="text-gray-600 mt-1">Introduce tu correo para enviarte un enlace de recuperación.</p>
+        <h1 className="text-2xl font-bold text-bocado-dark-green mt-4">Restablecer Contraseña</h1>
+        <p className="text-bocado-dark-gray mt-1">Introduce tu correo para enviarte un enlace de recuperación.</p>
       </div>
       <form onSubmit={handlePasswordReset} className="space-y-6">
         <div>
@@ -219,7 +218,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
             id="reset-email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500"
+            className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-bocado-green focus:border-bocado-green"
             placeholder="tu@correo.com"
             disabled={isLoading}
           />
@@ -231,7 +230,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         <div>
           <button
             type="submit"
-            className="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-full text-lg shadow-lg hover:bg-green-700 transition-colors duration-300 disabled:bg-gray-400"
+            className="w-full bg-bocado-green text-white font-bold py-3 px-4 rounded-full text-lg shadow-lg hover:bg-bocado-green-light transition-colors duration-300 disabled:bg-gray-400"
             disabled={isLoading}
           >
             {isLoading ? 'Enviando...' : 'Enviar enlace'}
@@ -241,7 +240,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
           <button
             type="button"
             onClick={() => setView('login')}
-            className="text-sm text-green-700 font-semibold hover:underline"
+            className="text-sm text-bocado-green font-semibold hover:underline"
           >
             Volver a Iniciar Sesión
           </button>
@@ -254,7 +253,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg w-full max-w-md animate-fade-in">
         {view === 'login' ? renderLoginView() : renderResetView()}
         <div className="mt-6 text-center">
-            <button onClick={onGoHome} className="text-sm text-gray-500 hover:underline" disabled={isLoading}>
+            <button onClick={onGoHome} className="text-sm text-bocado-dark-gray hover:underline" disabled={isLoading}>
                 Volver al inicio
             </button>
         </div>

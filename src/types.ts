@@ -4,6 +4,8 @@ export interface FormData {
   lastName: string;
   gender: string;
   age: string;
+  weight?: string;        // <-- NUEVO (kg, opcional)
+  height?: string;        // <-- NUEVO (cm, opcional)
   country: string;
   city: string;
   email: string;
