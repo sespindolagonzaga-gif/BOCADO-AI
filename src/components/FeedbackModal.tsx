@@ -55,7 +55,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
         createdAt: serverTimestamp()
       };
 
-      await addDoc(collection(db, 'user_feedback'), feedbackData); // Colección renombrada a 'user_feedback'
+      await addDoc(collection(db, 'user_history'), feedbackData); // Colección renombrada a 'user_feedback'
       
       setIsSuccess(true);
       
