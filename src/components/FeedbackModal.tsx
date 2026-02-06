@@ -10,41 +10,62 @@ interface FeedbackModalProps {
   originalData: any;
 }
 
+// Helper para sanitizar comentarios (evita XSS básico)
+const sanitizeComment = (text: string): string => {
+  return text
+    .trim()
+    .replace(/[<>]/g, '') // Elimina < y > para evitar HTML
+    .substring(0, 500);   // Máximo 500 caracteres
+};
+
 const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitle, type, originalData }) => {
   const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState(""); // Nuevo estado para comentario
+  const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false); // Estado para mensaje de éxito
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
     if (rating === 0) return;
+    
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      setError('Debes iniciar sesión para enviar feedback');
+      return;
+    }
 
     setIsSubmitting(true);
+    setError('');
+    
     try {
-      await addDoc(collection(db, 'user_history'), {
-        userId: user.uid,
+      // Datos a guardar (SIN información sensible)
+      const feedbackData = {
+        userId: user.uid,           // Solo UID, no email ni nombre
         itemId: itemTitle,
         type: type,
         rating: rating,
-        comment: comment, // Guardamos el comentario
-        metadata: originalData,
+        comment: sanitizeComment(comment), // Comentario sanitizado
+        // Metadata mínima necesaria
+        metadata: {
+          title: originalData?.title || itemTitle,
+          timestamp: new Date().toISOString(),
+        },
         createdAt: serverTimestamp()
-      });
+      };
+
+      await addDoc(collection(db, 'user_feedback'), feedbackData); // Colección renombrada a 'user_feedback'
       
       setIsSuccess(true);
       
-      // Auto-cerrar después de 2 segundos
       setTimeout(() => {
         handleClose();
       }, 2000);
       
     } catch (error) {
       console.error("Error guardando feedback:", error);
-      alert("No se pudo guardar la calificación.");
+      setError("No se pudo guardar la calificación. Inténtalo de nuevo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -54,7 +75,16 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
     setRating(0);
     setComment("");
     setIsSuccess(false);
+    setError('');
     onClose();
+  };
+
+  // Limitar caracteres en tiempo real
+  const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    if (value.length <= 500) {
+      setComment(value);
+    }
   };
 
   return (
@@ -71,6 +101,13 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
               Califica tu experiencia con <br/><strong>{itemTitle}</strong>
             </p>
             
+            {/* Error message */}
+            {error && (
+              <p className="text-red-500 text-sm mb-4 bg-red-50 p-2 rounded-lg">
+                {error}
+              </p>
+            )}
+            
             {/* Estrellas */}
             <div className="flex justify-center gap-2 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
@@ -80,20 +117,27 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
                   className={`text-4xl transition-all transform active:scale-125 ${
                     rating >= star ? 'grayscale-0' : 'grayscale opacity-30'
                   }`}
+                  aria-label={`Calificar con ${star} estrellas`}
                 >
                   ⭐
                 </button>
               ))}
             </div>
 
-            {/* Caja de Comentario Opcional */}
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="¿Algún detalle extra? (opcional)"
-              className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-bocado-green/30 mb-6 resize-none"
-              rows={3}
-            />
+            {/* Caja de Comentario con contador */}
+            <div className="relative mb-6">
+              <textarea
+                value={comment}
+                onChange={handleCommentChange}
+                placeholder="¿Algún detalle extra? (opcional)"
+                className="w-full p-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-bocado-green/30 resize-none"
+                rows={3}
+                maxLength={500}
+              />
+              <span className="absolute bottom-2 right-2 text-xs text-gray-400">
+                {comment.length}/500
+              </span>
+            </div>
 
             <div className="flex gap-3">
               <button

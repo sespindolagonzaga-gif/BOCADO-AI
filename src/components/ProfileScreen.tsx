@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { FormData } from '../types';
+import { FormData, UserProfile } from '../types';
 import { UserIcon } from './icons/UserIcon';
 import { LockIcon } from './icons/LockIcon';
 import Step1 from './form-steps/Step1';
 import Step2 from './form-steps/Step2';
 import Step3 from './form-steps/Step3';
 import { db, auth } from '../firebaseConfig';
-import { doc, setDoc, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   updatePassword, 
   reauthenticateWithCredential, 
@@ -15,7 +15,7 @@ import {
   sendEmailVerification, 
   updateProfile 
 } from 'firebase/auth';
-import { sanitizeProfileData } from '../utils/profileSanitizer';
+import { sanitizeProfileData, separateUserData } from '../utils/profileSanitizer';
 import { env } from '../environment/env';
 
 interface ProfileScreenProps {
@@ -37,7 +37,12 @@ const stripEmoji = (str: string) => {
 const getProfileDataFromStorage = (): FormData => {
   const savedData = localStorage.getItem('bocado-profile-data');
   const parsedData = savedData ? JSON.parse(savedData) : {};
-  return sanitizeProfileData(parsedData);
+  return {
+    ...sanitizeProfileData(parsedData),
+    firstName: parsedData.firstName || '',
+    lastName: parsedData.lastName || '',
+    email: parsedData.email || '',
+  } as FormData;
 };
 
 const InfoSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
@@ -70,7 +75,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   const [emailPassword, setEmailPassword] = useState('');
   const [newEmail, setNewEmail] = useState('');
   
-  // Estados para búsqueda de ciudades (NUEVO de tu versión actual)
+  // Estados para búsqueda de ciudades
   const [cityOptions, setCityOptions] = useState<any[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
   
@@ -84,7 +89,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     setInitialFormData(data);
   }, []);
 
-  // --- LÓGICA DE BÚSQUEDA GEONAMES (de tu versión nueva) ---
+  // --- LÓGICA DE BÚSQUEDA GEONAMES ---
   const fetchCities = async (query: string) => {
     if (query.trim().length < 3) {
         setCityOptions([]);
@@ -106,37 +111,67 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     }
   };
 
+  // --- GUARDAR PERFIL (solo datos no sensibles a Firestore) ---
   const handleSaveProfile = async () => {
     const user = auth.currentUser;
-    if (!formData || !user || !userUid) {
+    if (!user || !userUid) {
         setError("No se pudo verificar la sesión de usuario.");
         return;
     }
+
     setIsLoading(true);
     setError('');
+
     try {
-      const dataToSave = {
-        ...formData,
-        activityLevel: stripEmoji(formData.activityLevel),
-        country: formData.country.toUpperCase(),
-        // Asegurar que peso/estatura se guarden como números si existen
-        weight: formData.weight ? parseFloat(formData.weight) : null,
-        height: formData.height ? parseInt(formData.height) : null,
-      };
-
-      const userDocRef = doc(db, 'users', userUid);
-      await setDoc(userDocRef, dataToSave, { merge: true });
-
-      const newDisplayName = `${formData.firstName} ${formData.lastName}`;
+      // 1. Separar datos: auth (sensibles) vs perfil (Firestore)
+      const { auth: authData, profile } = separateUserData(formData);
+      
+      // 2. Actualizar displayName en Auth si cambió el nombre
+      const newDisplayName = `${authData.firstName} ${authData.lastName}`;
       if (user.displayName !== newDisplayName) {
         await updateProfile(user, { displayName: newDisplayName });
       }
 
-      localStorage.setItem('bocado-profile-data', JSON.stringify(formData));
+      // 3. Preparar datos de perfil para Firestore (SIN email, SIN nombres, SIN password)
+      const userProfile: UserProfile = {
+        uid: userUid,
+        gender: profile.gender,
+        age: profile.age,
+        weight: profile.weight,
+        height: profile.height,
+        country: profile.country.toUpperCase(),
+        city: profile.city,
+        diseases: profile.diseases,
+        allergies: profile.allergies,
+        otherAllergies: profile.otherAllergies,
+        eatingHabit: profile.eatingHabit,
+        activityLevel: stripEmoji(profile.activityLevel),
+        otherActivityLevel: profile.otherActivityLevel,
+        activityFrequency: profile.activityFrequency,
+        nutritionalGoal: profile.nutritionalGoal,
+        cookingAffinity: profile.cookingAffinity,
+        dislikedFoods: profile.dislikedFoods,
+        updatedAt: serverTimestamp(),
+      };
+
+      // 4. Guardar SOLO perfil en Firestore
+      const userDocRef = doc(db, 'users', userUid);
+      await setDoc(userDocRef, userProfile, { merge: true });
+
+      // 5. Actualizar localStorage con datos completos (para UI)
+      const fullProfileData = {
+        ...userProfile,
+        firstName: authData.firstName,
+        lastName: authData.lastName,
+        email: authData.email,
+      };
+      
+      localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
       setInitialFormData(formData);
       setViewMode('view');
       setSuccessMessage('¡Perfil actualizado con éxito!');
-      onProfileUpdate(formData.firstName);
+      onProfileUpdate(authData.firstName);
+      
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error("Error updating profile:", err);
@@ -150,6 +185,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // --- CAMBIAR CONTRASEÑA ---
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -179,6 +215,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         const credential = EmailAuthProvider.credential(user.email, currentPassword);
         await reauthenticateWithCredential(user, credential);
         await updatePassword(user, newPassword);
+        
         setSuccessMessage('¡Contraseña actualizada correctamente!');
         setCurrentPassword('');
         setNewPassword('');
@@ -195,7 +232,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     }
   };
   
-  // --- CAMBIO DE EMAIL (RECUPERADO del anterior) ---
+  // --- CAMBIAR EMAIL ---
   const handleChangeEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -227,22 +264,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
 
     setIsLoading(true);
     try {
+        // 1. Reautenticar
         const credential = EmailAuthProvider.credential(user.email, emailPassword);
         await reauthenticateWithCredential(user, credential);
         
-        const batch = writeBatch(db);
-        const userDocRef = doc(db, 'users', userUid);
-        batch.update(userDocRef, { email: normalizedNewEmail });
-        
+        // 2. Actualizar email en Auth
         await updateEmail(user, normalizedNewEmail);
-        await batch.commit();
         
+        // 3. Actualizar localStorage
         const updatedFormData = { ...formData, email: normalizedNewEmail };
         setFormData(updatedFormData);
         localStorage.setItem('bocado-profile-data', JSON.stringify(updatedFormData));
         
+        // 4. Enviar verificación
         await sendEmailVerification(user);
         setSuccessMessage('¡Correo actualizado! Te hemos enviado un link de verificación.');
+        
         setEmailPassword('');
         setNewEmail('');
         setTimeout(() => setViewMode('view'), 4000);
@@ -252,13 +289,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         if (err.code === 'auth/wrong-password') setError('La contraseña es incorrecta.');
         else if (err.code === 'auth/email-already-in-use') setError('Este correo ya está en uso por otra cuenta.');
         else if (err.code === 'auth/invalid-email') setError('El formato del correo no es válido.');
+        else if (err.code === 'auth/requires-recent-login') setError('Por seguridad, cierra sesión y vuelve a iniciar sesión antes de cambiar el email.');
         else setError('Error al actualizar el correo. Inténtalo más tarde.');
     } finally {
         setIsLoading(false);
     }
   };
 
-  // --- MOSTRAR PESO/ESTATURA EN EL PERFIL (NUEVO) ---
+  // --- MOSTRAR DATOS CORPORALES ---
   const renderPhysicalData = () => {
     const parts: string[] = [];
     if (formData.weight) parts.push(`${formData.weight} kg`);
@@ -266,20 +304,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     
     if (parts.length === 0) return null;
     
-    // Calcular IMC si tenemos ambos datos
+    // Calcular IMC
     let bmi = null;
+    let bmiText = '';
     if (formData.weight && formData.height) {
       const w = parseFloat(formData.weight);
       const h = parseInt(formData.height) / 100;
       if (w > 0 && h > 0) {
         bmi = (w / (h * h)).toFixed(1);
+        const bmiNum = parseFloat(bmi);
+        if (bmiNum < 18.5) bmiText = ' (Bajo peso)';
+        else if (bmiNum < 25) bmiText = ' (Normal)';
+        else if (bmiNum < 30) bmiText = ' (Sobrepeso)';
+        else bmiText = ' (Obesidad)';
       }
     }
     
     return (
       <InfoSection title="Datos Corporales">
         <Badge text={parts.join(' / ')} color="yellow" />
-        {bmi && <Badge text={`IMC: ${bmi}`} color="gray" />}
+        {bmi && <Badge text={`IMC: ${bmi}${bmiText}`} color="gray" />}
       </InfoSection>
     );
   };
@@ -466,7 +510,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                         )}
                     </InfoSection>
 
-                    {/* DATOS CORPORALES NUEVOS */}
+                    {/* DATOS CORPORALES */}
                     {renderPhysicalData()}
 
                     <InfoSection title="Objetivo(s) Nutricional(es)">

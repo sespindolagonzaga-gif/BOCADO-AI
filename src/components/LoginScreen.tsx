@@ -2,9 +2,14 @@ import React, { useState } from 'react';
 import BocadoLogo from './BocadoLogo';
 import { db, auth } from '../firebaseConfig';
 import { EMAIL_DOMAINS } from '../constants';
-import { doc, getDoc } from 'firebase/firestore';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { 
+  signInWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  sendEmailVerification
+} from 'firebase/auth';
 import { sanitizeProfileData } from '../utils/profileSanitizer';
+import { FormData } from '../types';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -20,10 +25,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
   const [emailSuggestions, setEmailSuggestions] = useState<string[]>([]);
   const [view, setView] = useState<'login' | 'reset'>('login');
+  
+  // NUEVO: Estado para verificación de correo
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [unverifiedUser, setUnverifiedUser] = useState<any>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
 
     if (!email || !password) {
       setError('Por favor, introduce tu correo y contraseña.');
@@ -32,33 +42,60 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
 
     setIsLoading(true);
     const lowercasedEmail = email.toLowerCase();
+    
     try {
       const userCredential = await signInWithEmailAndPassword(auth, lowercasedEmail, password);
       const user = userCredential.user;
 
+      // NUEVO: Verificar si el correo está verificado
+      if (!user.emailVerified) {
+        setNeedsVerification(true);
+        setUnverifiedUser(user);
+        setIsLoading(false);
+        return;
+      }
+
+      // Si está verificado, continuar con el flujo normal
       const userDocRef = doc(db, 'users', user.uid);
       const userDoc = await getDoc(userDocRef);
 
       if (userDoc.exists()) {
         const firestoreData = userDoc.data();
+        
+        // Actualizar estado de verificación en Firestore
+        if (!firestoreData.emailVerified) {
+          await updateDoc(userDocRef, { emailVerified: true });
+        }
+        
         const displayName = user.displayName || '';
         const nameParts = displayName.split(' ');
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
-
-        const combinedData = { ...firestoreData, firstName, lastName, email: user.email };
-        const fullProfileData = sanitizeProfileData(combinedData);
+        
+        const sanitizedProfile = sanitizeProfileData(firestoreData);
+        
+        const fullProfileData: FormData = Object.assign(
+          {},
+          sanitizedProfile,
+          {
+            firstName,
+            lastName,
+            email: user.email || lowercasedEmail,
+            password: '',
+            confirmPassword: '',
+          }
+        );
 
         localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
         onLoginSuccess();
       } else {
-        setError('No se encontró un perfil asociado a este usuario. Por favor, intenta registrarte de nuevo.');
+        setError('Perfil incompleto. Por favor contacta soporte.');
         auth.signOut();
       }
     } catch (err: any) {
       console.error("Error logging in:", err.code);
       if (['auth/network-request-failed', 'auth/unavailable'].includes(err.code)) {
-        setError('Error de red. No pudimos conectar con el servidor. Por favor, revisa tu conexión a internet.');
+        setError('Error de red. No pudimos conectar con el servidor.');
       } else if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(err.code)) {
         setError('Correo electrónico o contraseña incorrectos.');
       } else {
@@ -67,6 +104,29 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // NUEVO: Reenviar correo de verificación
+  const handleResendVerification = async () => {
+    if (!unverifiedUser) return;
+    
+    setIsLoading(true);
+    try {
+      await sendEmailVerification(unverifiedUser);
+      setSuccessMessage('Correo de verificación reenviado. Revisa tu bandeja de entrada.');
+    } catch (err) {
+      setError('No se pudo reenviar el correo. Inténtalo más tarde.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // NUEVO: Cerrar sesión del usuario no verificado
+  const handleLogoutUnverified = () => {
+    auth.signOut();
+    setNeedsVerification(false);
+    setUnverifiedUser(null);
+    setError('');
   };
   
   const handlePasswordReset = async (e: React.FormEvent) => {
@@ -100,6 +160,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     setEmail(value);
     setError('');
     setSuccessMessage('');
+    setNeedsVerification(false);
 
     const atIndex = value.indexOf('@');
     if (atIndex > -1) {
@@ -121,6 +182,49 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     setEmail(suggestion);
     setShowEmailSuggestions(false);
   };
+
+  // NUEVO: Vista de verificación de correo
+  if (needsVerification && unverifiedUser) {
+    return (
+      <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg w-full max-w-md animate-fade-in text-center">
+        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-bold text-bocado-dark-green mb-2">Correo no verificado</h2>
+        <p className="text-gray-600 mb-4">
+          Para continuar usando Bocado, debes verificar tu correo electrónico.
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          Hemos enviado un enlace a <strong>{unverifiedUser.email}</strong>. Revisa tu bandeja de entrada y spam.
+        </p>
+        
+        {successMessage && (
+          <p className="text-green-600 text-sm mb-4 bg-green-50 p-2 rounded">{successMessage}</p>
+        )}
+        {error && (
+          <p className="text-red-500 text-sm mb-4 bg-red-50 p-2 rounded">{error}</p>
+        )}
+
+        <div className="space-y-3">
+          <button
+            onClick={handleResendVerification}
+            disabled={isLoading}
+            className="w-full bg-bocado-green text-white font-bold py-3 px-4 rounded-full shadow-lg hover:bg-bocado-green-light transition-colors disabled:bg-gray-400"
+          >
+            {isLoading ? 'Enviando...' : 'Reenviar correo de verificación'}
+          </button>
+          <button
+            onClick={handleLogoutUnverified}
+            className="w-full text-gray-500 font-medium py-2 hover:text-gray-700 transition-colors"
+          >
+            Usar otra cuenta
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const renderLoginView = () => (
     <>

@@ -1,16 +1,22 @@
-
-export interface FormData {
+// Datos que van a Firebase Auth (sensibles)
+export interface AuthData {
   firstName: string;
   lastName: string;
-  gender: string;
-  age: string;
-  weight?: string;        // <-- NUEVO (kg, opcional)
-  height?: string;        // <-- NUEVO (cm, opcional)
-  country: string;
-  city: string;
   email: string;
   password?: string;
   confirmPassword?: string;
+}
+
+// Datos que van a Firestore (perfil sanitizado, NO sensibles)
+export interface UserProfile {
+  uid: string;                    // Referencia al UID de Auth
+  gender: string;
+  age: string;
+  emailVerified?: boolean;
+  weight?: string;
+  height?: string;
+  country: string;
+  city: string;
   diseases: string[];
   allergies: string[];
   otherAllergies: string;
@@ -21,7 +27,12 @@ export interface FormData {
   nutritionalGoal: string[];
   cookingAffinity: string;
   dislikedFoods: string[];
+  createdAt?: any;
+  updatedAt?: any;
 }
+
+// Para el formulario completo (unión de ambos)
+export interface FormData extends AuthData, Omit<UserProfile, 'uid' | 'createdAt' | 'updatedAt'> {}
 
 // Updated to support simple string ingredients from the new structure
 export type Ingredient = string; 
