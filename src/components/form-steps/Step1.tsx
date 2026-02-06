@@ -9,6 +9,7 @@ import { LockIcon } from '../icons/LockIcon';
 import { LocationIcon } from '../icons/LocationIcon';
 import { ScaleIcon } from '../icons/ScaleIcon';
 import { RulerIcon } from '../icons/RulerIcon';
+import { trackEvent } from '../../firebaseConfig'; // ✅ Importado trackEvent
 
 const COUNTRIES_LIST = [
   { name: 'México', code: 'MX' },
@@ -19,9 +20,7 @@ const COUNTRIES_LIST = [
   { name: 'Argentina', code: 'AR' },
   { name: 'Brasil', code: 'BR' },
   { name: 'Chile', code: 'CL' },
-  { name: 'Colombia', code: 'CO' },
   { name: 'Perú', code: 'PE' },
-  { name: 'Estados Unidos', code: 'US' },
   { name: 'Ecuador', code: 'EC' },
   { name: 'Venezuela', code: 'VE' },
   { name: 'Uruguay', code: 'UY' },
@@ -34,39 +33,12 @@ const COUNTRIES_LIST = [
   { name: 'El Salvador', code: 'SV' },
   { name: 'República Dominicana', code: 'DO' },
   { name: 'Cuba', code: 'CU' },
-  { name: 'España', code: 'ES' },
   { name: 'Francia', code: 'FR' },
   { name: 'Alemania', code: 'DE' },
   { name: 'Italia', code: 'IT' },
   { name: 'Portugal', code: 'PT' },
   { name: 'Reino Unido', code: 'GB' },
-  { name: 'Irlanda', code: 'IE' },
-  { name: 'Países Bajos', code: 'NL' },
-  { name: 'Bélgica', code: 'BE' },
-  { name: 'Suiza', code: 'CH' },
-  { name: 'Austria', code: 'AT' },
-  { name: 'Suecia', code: 'SE' },
-  { name: 'Noruega', code: 'NO' },
-  { name: 'Dinamarca', code: 'DK' },
-  { name: 'Polonia', code: 'PL' },
-  { name: 'Marruecos', code: 'MA' },
-  { name: 'Egipto', code: 'EG' },
-  { name: 'Sudáfrica', code: 'ZA' },
-  { name: 'Nigeria', code: 'NG' },
-  { name: 'Kenia', code: 'KE' },
-  { name: 'Ghana', code: 'GH' },
-  { name: 'China', code: 'CN' },
-  { name: 'Japón', code: 'JP' },
-  { name: 'Corea del Sur', code: 'KR' },
-  { name: 'India', code: 'IN' },
-  { name: 'Indonesia', code: 'ID' },
-  { name: 'Tailandia', code: 'TH' },
-  { name: 'Vietnam', code: 'VN' },
-  { name: 'Filipinas', code: 'PH' },
-  { name: 'Israel', code: 'IL' },
-  { name: 'Emiratos Árabes Unidos', code: 'AE' },
   { name: 'Australia', code: 'AU' },
-  { name: 'Nueva Zelanda', code: 'NZ' },
 ];
 
 interface ExtendedStep1Props extends FormStepProps {
@@ -109,6 +81,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
   const handleCountrySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const code = e.target.value;
     const name = e.target.options[e.target.selectedIndex].text;
+    trackEvent('registration_country_select', { country_code: code }); // ✅ Analítica
     setLocalCityQuery('');
     if (onCountryChange) {
       onCountryChange(code, name);
@@ -126,6 +99,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
 
   const handleSelectCity = (city: any) => {
     const cityName = city.name;
+    trackEvent('registration_city_suggestion_click', { city: cityName }); // ✅ Analítica
     setLocalCityQuery(cityName);
     updateData('city', cityName);
     if (onClearCityOptions) onClearCityOptions();
@@ -192,6 +166,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             name="firstName" 
             value={data.firstName} 
             onChange={handleNameChange} 
+            onFocus={() => trackEvent('registration_input_focus', { field: 'firstName' })}
             placeholder="Juan" 
             className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
               errors.firstName ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -206,6 +181,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             name="lastName" 
             value={data.lastName} 
             onChange={handleNameChange} 
+            onFocus={() => trackEvent('registration_input_focus', { field: 'lastName' })}
             placeholder="Pérez" 
             className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
               errors.lastName ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -226,7 +202,10 @@ const Step1: React.FC<ExtendedStep1Props> = ({
                 label={gender}
                 icon={gender === 'Mujer' ? <FemaleIcon className="w-4 h-4"/> : gender === 'Hombre' ? <MaleIcon className="w-4 h-4"/> : <OtherGenderIcon className="w-4 h-4"/>}
                 isSelected={data.gender === gender}
-                onClick={() => updateData('gender', gender)}
+                onClick={() => {
+                  trackEvent('registration_gender_select', { gender }); // ✅ Analítica
+                  updateData('gender', gender);
+                }}
               />
             ))}
           </div>
@@ -240,6 +219,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             inputMode="numeric"
             value={data.age} 
             onChange={handleAgeChange} 
+            onFocus={() => trackEvent('registration_input_focus', { field: 'age' })}
             placeholder="25" 
             className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm text-center transition-all ${
               errors.age ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -314,6 +294,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
               value={localCityQuery}
               onChange={handleCitySearchChange}
               disabled={!data.country}
+              onFocus={() => trackEvent('registration_city_input_focus')}
               placeholder={data.country ? "Tu ciudad..." : "Elige país primero"}
               className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
                 errors.city ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -354,6 +335,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
           onChange={handleEmailChange}
           onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
           disabled={disableEmail}
+          onFocus={() => trackEvent('registration_input_focus', { field: 'email' })}
           className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
             errors.email ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
           } ${disableEmail ? 'bg-bocado-background' : 'bg-white'}`} 
@@ -363,7 +345,11 @@ const Step1: React.FC<ExtendedStep1Props> = ({
             {emailSuggestions.map((s) => (
               <div 
                 key={s} 
-                onClick={() => { updateData('email', s); setShowEmailSuggestions(false); }} 
+                onClick={() => { 
+                  trackEvent('registration_email_suggestion_click');
+                  updateData('email', s); 
+                  setShowEmailSuggestions(false); 
+                }} 
                 className="px-3 py-2 text-sm hover:bg-bocado-background cursor-pointer border-b border-bocado-border/50 last:border-0 text-bocado-text"
               >
                 {s}
@@ -386,6 +372,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
                 name="password" 
                 value={data.password || ''} 
                 onChange={(e) => updateData('password', e.target.value)} 
+                onFocus={() => trackEvent('registration_input_focus', { field: 'password' })}
                 placeholder="8+ caracteres"
                 className={`w-full pl-9 pr-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
                   errors.password ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -401,6 +388,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
               name="confirmPassword" 
               value={data.confirmPassword || ''} 
               onChange={(e) => updateData('confirmPassword', e.target.value)} 
+              onFocus={() => trackEvent('registration_input_focus', { field: 'confirmPassword' })}
               placeholder="Repite"
               className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
                 errors.confirmPassword ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'

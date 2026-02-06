@@ -1,17 +1,18 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { auth } from './firebaseConfig';
+import { auth, trackEvent } from './firebaseConfig';
 import { useAuthStore } from './stores/authStore';
+import ErrorBoundary from './components/ErrorBoundary'; // ✅ Importado el componente
 
-// Screens
-import HomeScreen from './components/HomeScreen';
-import RegistrationFlow from './components/RegistrationFlow';
-import ConfirmationScreen from './components/ConfirmationScreen';
-import LoginScreen from './components/LoginScreen';
-import PermissionsScreen from './components/PermissionsScreen';
-import PlanScreen from './components/PlanScreen';
-import MainApp from './components/MainApp';
+// ✅ IMPORTACIÓN DINÁMICA (Lazy Loading)
+const HomeScreen = lazy(() => import('./components/HomeScreen'));
+const RegistrationFlow = lazy(() => import('./components/RegistrationFlow'));
+const ConfirmationScreen = lazy(() => import('./components/ConfirmationScreen'));
+const LoginScreen = lazy(() => import('./components/LoginScreen'));
+const PermissionsScreen = lazy(() => import('./components/PermissionsScreen'));
+const PlanScreen = lazy(() => import('./components/PlanScreen'));
+const MainApp = lazy(() => import('./components/MainApp'));
 
 export type AppScreen = 'home' | 'register' | 'confirmation' | 'login' | 'recommendation' | 'permissions' | 'plan';
 
@@ -19,31 +20,51 @@ export type AppScreen = 'home' | 'register' | 'confirmation' | 'login' | 'recomm
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos
+      staleTime: 1000 * 60 * 5,
       refetchOnWindowFocus: false,
     },
   },
 });
+
+// ✅ Componente de Carga Simple para el Suspense
+const ScreenLoader = () => (
+  <div className="flex-1 flex items-center justify-center bg-bocado-background">
+    <div className="w-8 h-8 border-3 border-bocado-green border-t-transparent rounded-full animate-spin"></div>
+  </div>
+);
 
 function AppContent() {
   const [currentScreen, setCurrentScreen] = React.useState<AppScreen>('home');
   const [planId, setPlanId] = React.useState<string | null>(null);
   const [isNewUser, setIsNewUser] = React.useState(false);
   
-  // Usamos Zustand en lugar de useState local
   const { setUser, isLoading, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user); // Guarda en Zustand (y persiste lo seguro)
-      
-      if (user) {
-        setCurrentScreen('recommendation');
-      } else {
-        setCurrentScreen('home');
-      }
-    });
+    const handleGlobalError = (event: ErrorEvent) => {
+      trackEvent('exception', { description: event.message, fatal: true });
+    };
+    const handlePromiseError = (event: PromiseRejectionEvent) => {
+      trackEvent('promise_error', { reason: String(event.reason) });
+    };
+    window.addEventListener('error', handleGlobalError);
+    window.addEventListener('unhandledrejection', handlePromiseError);
+    return () => {
+      window.removeEventListener('error', handleGlobalError);
+      window.removeEventListener('unhandledrejection', handlePromiseError);
+    };
+  }, []);
 
+  useEffect(() => {
+    trackEvent('screen_view', { screen_name: currentScreen });
+  }, [currentScreen]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      if (user) setCurrentScreen('recommendation');
+      else setCurrentScreen('home');
+    });
     return () => unsubscribe();
   }, [setUser]);
 
@@ -63,45 +84,18 @@ function AppContent() {
       case 'permissions':
         return <PermissionsScreen onAccept={() => setCurrentScreen('register')} onGoHome={() => setCurrentScreen('home')} />;
       case 'register':
-        return <RegistrationFlow 
-                  onRegistrationComplete={() => {
-                    setIsNewUser(true);
-                    setCurrentScreen('recommendation');
-                  }} 
-                  onGoHome={() => setCurrentScreen('home')} 
-               />;
+        return <RegistrationFlow onRegistrationComplete={() => { setIsNewUser(true); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
       case 'confirmation':
         return <ConfirmationScreen onGoHome={() => setCurrentScreen('home')} />;
       case 'login':
-        return <LoginScreen 
-                  onLoginSuccess={() => {
-                    setIsNewUser(false);
-                    setCurrentScreen('recommendation');
-                  }} 
-                  onGoHome={() => setCurrentScreen('home')} 
-               />;
+        return <LoginScreen onLoginSuccess={() => { setIsNewUser(false); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
       case 'recommendation':
-        return <MainApp 
-                  showTutorial={isNewUser}
-                  onPlanGenerated={(id) => {
-                    setPlanId(id);
-                    setCurrentScreen('plan');
-                  }}
-                  onTutorialFinished={() => setIsNewUser(false)}
-                  onLogoutComplete={() => setCurrentScreen('home')}
-               />;
+        return <MainApp showTutorial={isNewUser} onPlanGenerated={(id) => { setPlanId(id); setCurrentScreen('plan'); }} onTutorialFinished={() => setIsNewUser(false)} onLogoutComplete={() => setCurrentScreen('home')} />;
       case 'plan':
-        return <PlanScreen planId={planId!} onStartNewPlan={() => {
-          setPlanId(null);
-          setCurrentScreen('recommendation');
-        }} />;
+        return <PlanScreen planId={planId!} onStartNewPlan={() => { setPlanId(null); setCurrentScreen('recommendation'); }} />;
       case 'home':
       default:
-        return <HomeScreen 
-                  onStartRegistration={() => setCurrentScreen('permissions')} 
-                  onGoToApp={() => setCurrentScreen('recommendation')} 
-                  onGoToLogin={() => setCurrentScreen('login')}
-                />;
+        return <HomeScreen onStartRegistration={() => setCurrentScreen('permissions')} onGoToApp={() => setCurrentScreen('recommendation')} onGoToLogin={() => setCurrentScreen('login')} />;
     }
   };
 
@@ -112,17 +106,22 @@ function AppContent() {
                       md:rounded-[2.5rem] md:shadow-bocado-lg 
                       md:border-8 md:border-white
                       overflow-hidden relative flex flex-col">
-        {renderScreen()}
+        {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE */}
+        <Suspense fallback={<ScreenLoader />}>
+          {renderScreen()}
+        </Suspense>
       </div>
     </div>
   );
 }
 
-// Wrapper con Providers
+// ✅ WRAPPER CON PROVIDERS Y ERROR BOUNDARY GLOBAL
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </QueryClientProvider>
   );
 }

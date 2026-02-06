@@ -1,9 +1,9 @@
 import React from 'react';
 import BocadoLogo from './BocadoLogo';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { auth, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { useAuthStore } from '../stores/authStore';
-import { useUserProfile } from '../hooks/useUser'; // Nuevo hook TanStack Query
+import { useUserProfile } from '../hooks/useUser';
 
 interface HomeScreenProps {
   onStartRegistration: () => void;
@@ -12,20 +12,32 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp, onGoToLogin }) => {
-  // ✅ ZUSTAND: Solo auth (estado local UI)
   const { isAuthenticated, user } = useAuthStore();
-  
-  // ✅ TANSTACK QUERY: Perfil del usuario (datos del servidor)
   const { data: profile } = useUserProfile(user?.uid);
 
-  // Determinamos si hay una sesión activa con perfil completo
   const hasSession = isAuthenticated || !!profile;
+
+  // --- HANDLERS CON ANALÍTICA ---
+
+  const handleEnterApp = () => {
+    trackEvent('home_enter_app', { userId: user?.uid }); // ✅ Analítica
+    onGoToApp();
+  };
+
+  const handleStartRegistration = () => {
+    trackEvent('home_start_registration'); // ✅ Analítica
+    onStartRegistration();
+  };
+
+  const handleGoToLogin = () => {
+    trackEvent('home_go_to_login'); // ✅ Analítica
+    onGoToLogin();
+  };
 
   const handleLogout = async () => {
     try {
+      trackEvent('home_logout', { userId: user?.uid }); // ✅ Analítica
       await signOut(auth);
-      // ✅ Limpiar caché de React Query (opcional, se invalida automáticamente al cambiar user)
-      // No necesitamos limpiar Zustand manualmente, onAuthStateChanged en App.tsx lo maneja
     } catch (error) {
       console.error("Error signing out: ", error);
     }
@@ -51,18 +63,18 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
         </p>
       </div>
 
-      {/* Botones: Condicionales basados en autenticación */}
+      {/* Botones */}
       <div className="flex flex-col w-full max-w-xs gap-3">
         {hasSession ? (
           <>
             <button
-              onClick={onGoToApp}
+              onClick={handleEnterApp} // ✅ Handler con analítica
               className="w-full bg-bocado-green text-white font-bold py-4 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
             >
               Entrar
             </button>
             <button
-              onClick={handleLogout}
+              onClick={handleLogout} // ✅ Handler con analítica
               className="w-full bg-white text-bocado-green border-2 border-bocado-green font-bold py-4 px-8 rounded-full text-base hover:bg-bocado-background active:scale-95 transition-all"
             >
               Cerrar Sesión
@@ -71,13 +83,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
         ) : (
           <>
             <button
-              onClick={onStartRegistration}
+              onClick={handleStartRegistration} // ✅ Handler con analítica
               className="w-full bg-bocado-green text-white font-bold py-4 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
             >
               Registrarse
             </button>
             <button
-              onClick={onGoToLogin}
+              onClick={handleGoToLogin} // ✅ Handler con analítica
               className="w-full bg-white text-bocado-green border-2 border-bocado-green font-bold py-4 px-8 rounded-full text-base hover:bg-bocado-background active:scale-95 transition-all"
             >
               Iniciar Sesión

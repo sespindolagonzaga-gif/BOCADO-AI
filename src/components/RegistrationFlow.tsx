@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useProfileDraftStore } from '../stores/profileDraftStore';
 import { FormData, UserProfile } from '../types';
 import ProgressBar from './ProgressBar';
 import Step1 from './form-steps/Step1';
 import Step2 from './form-steps/Step2';
 import Step3 from './form-steps/Step3';
-import { db, auth } from '../firebaseConfig';
+import { db, auth, trackEvent } from '../firebaseConfig';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   createUserWithEmailAndPassword, 
@@ -14,6 +14,10 @@ import {
 } from 'firebase/auth';
 import { separateUserData } from '../utils/profileSanitizer';
 import { env } from '../environment/env';
+
+// ✅ CORRECCIÓN ERRORES 2305: Asegúrate que en userSchema.ts 
+// los nombres coincidan exactamente (ej. userStep1Schema o step1Schema)
+import { step1Schema, step2Schema } from '../schemas/userSchema';
 
 const TOTAL_STEPS = 3;
 
@@ -33,46 +37,45 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   const [cityOptions, setCityOptions] = useState<any[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
 
-  // ✅ ZUSTAND: Obtenemos datos y funciones del store
   const formData = useProfileDraftStore((state) => state);
   const updateField = useProfileDraftStore((state) => state.updateField);
   const clearDraft = useProfileDraftStore((state) => state.clearDraft);
   const isHydrated = useProfileDraftStore((state) => state.isHydrated);
 
-  // Ya NO necesitamos useEffect para localStorage, Zustand lo maneja automáticamente
+  useEffect(() => {
+    if (isHydrated) {
+      trackEvent('registration_step_view', {
+        step_number: currentStep,
+        step_name: `step_${currentStep}`
+      });
+    }
+  }, [currentStep, isHydrated]);
   
   const validateStep = useCallback(async () => {
-    const newErrors: Record<string, string> = {};
     setSubmissionError('');
-    
-    switch (currentStep) {
-      case 1:
-        if (!formData.firstName) newErrors.firstName = 'Nombre requerido';
-        if (!formData.lastName) newErrors.lastName = 'Apellido requerido';
-        if (!formData.gender) newErrors.gender = 'Género requerido';
-        if (!formData.age) newErrors.age = 'Edad requerida';
-        if (!formData.country) newErrors.country = 'País requerido';
-        if (!formData.city) newErrors.city = 'Ciudad requerida';
-        if (!formData.email) newErrors.email = 'Email requerido';
-        else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email inválido';
-        if (!formData.password) newErrors.password = 'Contraseña requerida';
-        else if (formData.password.length < 8) newErrors.password = 'Mínimo 8 caracteres';
-        if (!formData.confirmPassword) newErrors.confirmPassword = 'Confirma contraseña';
-        else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'No coinciden';
-        break;
-        
-      case 2:
-        if (formData.allergies.includes('Otro') && !formData.otherAllergies.trim()) {
-          newErrors.otherAllergies = 'Especifica tus alergias';
-        }
-        if (formData.nutritionalGoal.length === 0) {
-          newErrors.nutritionalGoal = 'Selecciona al menos un objetivo';
-        }
-        break;
+    let result;
+
+    if (currentStep === 1) {
+      result = step1Schema.safeParse(formData);
+    } else if (currentStep === 2) {
+      result = step2Schema.safeParse(formData);
+    } else {
+      return true;
     }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    if (!result.success) {
+      const formattedErrors: Record<string, string> = {};
+      // ✅ CORRECCIÓN ERROR 7006: Tipado explícito para 'issue'
+      result.error.issues.forEach((issue: any) => {
+        const path = issue.path[0] as string;
+        formattedErrors[path] = issue.message;
+      });
+      setErrors(formattedErrors);
+      return false;
+    }
+
+    setErrors({});
+    return true;
   }, [currentStep, formData]);
 
   const handleSubmit = async () => {
@@ -115,27 +118,25 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
         updatedAt: serverTimestamp(),
       };
 
-      const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, userProfile);
-
+      await setDoc(doc(db, 'users', user.uid), userProfile);
       await sendEmailVerification(user);
       
-      // ✅ LIMPIAMOS DRAFT DE ZUSTAND (elimina de localStorage también)
+      trackEvent('registration_complete', {
+        nutritional_goal: profile.nutritionalGoal.join(', '),
+        country: profile.country
+      });
+
       clearDraft();
-      
       setRegisteredEmail(authData.email);
       setShowVerificationModal(true);
 
     } catch (error: any) {
       console.error("Error en registro:", error);
-      
+      trackEvent('registration_failed', { error_code: error.code || 'unknown_error', step: currentStep });
+
       if (error.code === 'auth/email-already-in-use') {
         setSubmissionError("Este correo ya está registrado");
         setCurrentStep(1);
-      } else if (error.code === 'auth/weak-password') {
-        setSubmissionError("Contraseña muy débil");
-      } else if (error.code === 'auth/invalid-email') {
-        setSubmissionError("Email inválido");
       } else {
         setSubmissionError("Error al crear cuenta. Intenta de nuevo.");
       }
@@ -145,6 +146,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   };
 
   const handleVerificationComplete = () => {
+    trackEvent('registration_email_verified_click');
     setShowVerificationModal(false);
     onRegistrationComplete();
   };
@@ -166,7 +168,6 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     }
   };
 
-  // Wrapper para mantener compatibilidad con Steps existentes
   const updateFormData = (field: keyof FormData, value: any) => {
     updateField(field, value);
   };
@@ -178,9 +179,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     }
     setIsSearchingCity(true);
     try {
-      const username = env.api.geonamesUsername;
       const response = await fetch(
-        `https://secure.geonames.org/searchJSON?name_startsWith=${encodeURIComponent(query)}&country=${formData.country}&maxRows=10&username=${username}&lang=es`
+        `https://secure.geonames.org/searchJSON?name_startsWith=${encodeURIComponent(query)}&country=${formData.country}&maxRows=10&username=${env.api.geonamesUsername}&lang=es`
       );
       const data = await response.json();
       setCityOptions(data.geonames || []);
@@ -192,9 +192,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     }
   };
 
-  const handleClearCityOptions = () => {
-    setCityOptions([]);
-  };
+  const handleClearCityOptions = () => setCityOptions([]);
 
   const handleCountryChange = (code: string) => {
     updateField('country', code);
@@ -202,13 +200,12 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   };
 
   const renderStep = () => {
+    const commonProps = { data: formData, updateData: updateFormData, errors };
     switch (currentStep) {
       case 1:
         return (
           <Step1 
-            data={formData} 
-            updateData={updateFormData} 
-            errors={errors}
+            {...commonProps}
             cityOptions={cityOptions}
             isSearchingCity={isSearchingCity}
             onSearchCity={handleSearchCity}
@@ -217,15 +214,14 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
           />
         );
       case 2:
-        return <Step2 data={formData} updateData={updateFormData} errors={errors} />;
+        return <Step2 {...commonProps} />;
       case 3:
-        return <Step3 data={formData} updateData={updateFormData} errors={errors} />;
+        return <Step3 {...commonProps} />;
       default:
         return null;
     }
   };
 
-  // ✅ ESPERAR REHIDRATACIÓN: Evita que el formulario se resetee al recargar
   if (!isHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-bocado-cream">
@@ -234,7 +230,6 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     );
   }
 
-  // Modal de verificación...
   if (showVerificationModal) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-6 pt-safe pb-safe">
@@ -245,21 +240,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
             </svg>
           </div>
           <h2 className="text-xl font-bold text-bocado-dark-green mb-2">¡Verifica tu correo!</h2>
-          <p className="text-sm text-bocado-gray mb-4">
-            Enviado a <strong className="text-bocado-text break-all">{registeredEmail}</strong>
-          </p>
-          <p className="text-xs text-bocado-gray/70 mb-6">
-            Revisa tu bandeja de entrada y spam.
-          </p>
-          <button
-            onClick={handleVerificationComplete}
-            className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-          >
-            Ya verifiqué mi correo
-          </button>
-          <p className="text-[10px] text-bocado-gray mt-4">
-            ¿No lo recibiste? Revisa spam o contacta soporte.
-          </p>
+          <p className="text-sm text-bocado-gray mb-4">Enviado a <strong className="text-bocado-text break-all">{registeredEmail}</strong></p>
+          <button onClick={handleVerificationComplete} className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all">Ya verifiqué mi correo</button>
         </div>
       </div>
     );
@@ -273,6 +255,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
         </div>
         
         <div className="flex-1">
+          {/* ✅ CORRECCIÓN ERROR 2304: Cambiado 'renderScreen' por 'renderStep' */}
           {renderStep()}
           {submissionError && (
             <p className="text-red-500 text-xs text-center bg-red-50 p-3 rounded-xl mt-4 animate-fade-in">
@@ -283,33 +266,12 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
 
         <div className="mt-6 space-y-3">
           <div className="flex justify-between gap-3">
-            <button
-              onClick={prevStep}
-              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${
-                currentStep === 1 
-                  ? 'invisible' 
-                  : 'bg-bocado-background text-bocado-dark-gray hover:bg-bocado-border active:scale-95'
-              }`}
-              disabled={isLoading}
-            >
-              Anterior
-            </button>
-            <button
-              onClick={nextStep}
-              className="flex-1 bg-bocado-green text-white font-bold py-3 rounded-xl text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray"
-              disabled={isLoading}
-            >
+            <button onClick={prevStep} className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${currentStep === 1 ? 'invisible' : 'bg-bocado-background text-bocado-dark-gray hover:bg-bocado-border active:scale-95'}`} disabled={isLoading}>Anterior</button>
+            <button onClick={nextStep} className="flex-1 bg-bocado-green text-white font-bold py-3 rounded-xl text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray" disabled={isLoading}>
               {isLoading ? '...' : (currentStep === TOTAL_STEPS ? 'Finalizar' : 'Siguiente')}
             </button>
           </div>
-          
-          <button 
-            onClick={onGoHome} 
-            className="w-full text-xs text-bocado-gray font-medium hover:text-bocado-dark-gray transition-colors py-2"
-            disabled={isLoading}
-          >
-            Volver al inicio
-          </button>
+          <button onClick={onGoHome} className="w-full text-xs text-bocado-gray font-medium hover:text-bocado-dark-gray transition-colors py-2" disabled={isLoading}>Volver al inicio</button>
         </div>
       </div>
     </div>

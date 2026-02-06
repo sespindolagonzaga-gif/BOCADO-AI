@@ -5,7 +5,7 @@ import { LockIcon } from './icons/LockIcon';
 import Step1 from './form-steps/Step1';
 import Step2 from './form-steps/Step2';
 import Step3 from './form-steps/Step3';
-import { db, auth } from '../firebaseConfig';
+import { db, auth, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   updatePassword, 
@@ -37,7 +37,6 @@ const stripEmoji = (str: string) => {
     return str;
 };
 
-// ✅ Helper para construir FormData desde Auth + Profile
 const buildFormData = (user: any, profile: UserProfile | null | undefined): FormData => {
   const nameParts = user?.displayName?.split(' ') || ['', ''];
   const firstName = nameParts[0] || '';
@@ -89,17 +88,14 @@ const Badge: React.FC<{ text: string; color: 'green' | 'blue' | 'red' | 'gray' |
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate, userUid }) => {
   const [viewMode, setViewMode] = useState<'view' | 'edit' | 'changePassword' | 'changeEmail'>('view');
   
-  // ✅ TANSTACK QUERY: Datos y mutación del perfil
   const { user } = useAuthStore();
   const { data: profile } = useUserProfile(userUid);
   const updateProfileMutation = useUpdateUserProfile();
   const queryClient = useQueryClient();
   
-  // ✅ Estado local del formulario - inicializado correctamente
   const [formData, setFormData] = useState<FormData>(() => buildFormData(user, profile));
   const [initialFormData, setInitialFormData] = useState<FormData>(() => buildFormData(user, profile));
   
-  // Estados para cambio de password/email
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -111,7 +107,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   
-  // ✅ Sincronizar formData cuando cambia el perfil de la query
+  // ✅ ANALÍTICA: Trackeo de entrada a la pantalla
+  useEffect(() => {
+    trackEvent('profile_screen_view', { userId: userUid });
+  }, [userUid]);
+
   useEffect(() => {
     const data = buildFormData(user, profile);
     setFormData(data);
@@ -151,14 +151,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     try {
       const { auth: authData, profile: profileData } = separateUserData(formData);
       
-      // Actualizar displayName en Auth
       const newDisplayName = `${authData.firstName} ${authData.lastName}`;
       if (currentUser.displayName !== newDisplayName) {
         await updateProfile(currentUser, { displayName: newDisplayName });
         useAuthStore.getState().setUser({ ...currentUser, displayName: newDisplayName });
       }
 
-      // Construir objeto para Firestore
       const userProfile: UserProfile = {
         uid: userUid,
         gender: profileData.gender,
@@ -180,12 +178,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         updatedAt: serverTimestamp(),
       };
 
-      // ✅ TANSTACK QUERY: Usar mutation para actualizar
       await updateProfileMutation.mutateAsync({ userId: userUid, data: userProfile });
-      
-      // ✅ Actualizar caché local inmediatamente
       queryClient.setQueryData(['userProfile', userUid], userProfile);
       
+      // ✅ ANALÍTICA: Perfil actualizado correctamente
+      trackEvent('profile_update_success', {
+        goals: userProfile.nutritionalGoal.join(','),
+        has_allergies: userProfile.allergies.length > 0
+      });
+
       setInitialFormData(formData);
       setViewMode('view');
       setSuccessMessage('¡Perfil actualizado!');
@@ -194,6 +195,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error("Error updating profile:", err);
+      // ✅ ANALÍTICA: Error en actualización
+      trackEvent('profile_update_error');
       setError("No se pudieron guardar los cambios.");
     }
   };
@@ -231,12 +234,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         await reauthenticateWithCredential(currentUser, credential);
         await updatePassword(currentUser, newPassword);
         
+        // ✅ ANALÍTICA: Password cambiado
+        trackEvent('profile_security_password_changed');
+
         setSuccessMessage('¡Contraseña actualizada!');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
         setTimeout(() => setViewMode('view'), 2000);
     } catch (err: any) {
+        trackEvent('profile_security_password_error', { code: err.code });
         if (err.code === 'auth/wrong-password') setError('Contraseña actual incorrecta.');
         else setError('Error al actualizar.');
     }
@@ -259,7 +266,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     }
 
     const normalizedNewEmail = newEmail.toLowerCase().trim();
-    
     if (currentUser.email.toLowerCase() === normalizedNewEmail) {
         setError('El correo es igual al actual.');
         return;
@@ -270,6 +276,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         await reauthenticateWithCredential(currentUser, credential);
         await updateEmail(currentUser, normalizedNewEmail);
         
+        // ✅ ANALÍTICA: Email cambiado
+        trackEvent('profile_security_email_changed');
+
         const updatedFormData = { ...formData, email: normalizedNewEmail };
         setFormData(updatedFormData);
         
@@ -280,6 +289,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         setNewEmail('');
         setTimeout(() => setViewMode('view'), 4000);
     } catch (err: any) {
+        trackEvent('profile_security_email_error', { code: err.code });
         if (err.code === 'auth/wrong-password') setError('Contraseña incorrecta.');
         else if (err.code === 'auth/email-already-in-use') setError('Correo en uso.');
         else setError('Error al actualizar.');
@@ -341,6 +351,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
               <div className="fixed bottom-0 left-0 right-0 bg-white p-4 border-t border-bocado-border flex gap-3 z-50">
                   <button 
                     onClick={() => { 
+                      trackEvent('profile_edit_cancel'); // ✅ Analítica
                       setViewMode('view'); 
                       setFormData(initialFormData); 
                       setError('');
@@ -545,14 +556,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                     </div>
                     <div className="space-y-2">
                         <button 
-                          onClick={() => setViewMode('changePassword')} 
+                          onClick={() => {
+                            trackEvent('profile_security_mode_change', { mode: 'password' }); // ✅ Analítica
+                            setViewMode('changePassword');
+                          }} 
                           className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
                         >
                             <span>Cambiar Contraseña</span>
                             <span className="text-bocado-gray">›</span>
                         </button>
                         <button 
-                          onClick={() => setViewMode('changeEmail')} 
+                          onClick={() => {
+                            trackEvent('profile_security_mode_change', { mode: 'email' }); // ✅ Analítica
+                            setViewMode('changeEmail');
+                          }} 
                           className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
                         >
                             <span>Cambiar Correo</span>
@@ -560,7 +577,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                         </button>
                         {onLogout && (
                             <button 
-                              onClick={onLogout} 
+                              onClick={() => {
+                                trackEvent('profile_logout_click'); // ✅ Analítica
+                                onLogout();
+                              }} 
                               className="w-full mt-4 py-3 text-red-500 font-bold text-sm hover:bg-red-50 rounded-xl transition-colors active:scale-95"
                             >
                                 Cerrar Sesión
@@ -588,7 +608,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
             </div>
             {viewMode === 'view' && (
                 <button 
-                  onClick={() => setViewMode('edit')} 
+                  onClick={() => {
+                    trackEvent('profile_edit_start'); // ✅ Analítica
+                    setViewMode('edit');
+                  }} 
                   className="text-xs bg-bocado-green/10 text-bocado-green font-bold px-3 py-1.5 rounded-full hover:bg-bocado-green/20 active:scale-95 transition-all"
                 >
                     Editar

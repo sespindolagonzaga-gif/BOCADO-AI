@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { RestaurantIcon } from './icons/RestaurantIcon';
 import { BookIcon } from './icons/BookIcon';
 import { UserIcon } from './icons/UserIcon';
 import { LocationIcon } from './icons/LocationIcon';
 import { HomeIcon } from './icons/HomeIcon';
 import BocadoLogo from './BocadoLogo';
+import { trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 
 interface TutorialModalProps {
   onClose: () => void;
@@ -20,51 +21,85 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
       description: "Tu asistente inteligente de nutrición. Te mostramos cómo usar la app en 5 pasos.",
       icon: <div className="w-32 h-20"><BocadoLogo className="w-full h-full" /></div>,
       color: "bg-white",
-      textColor: "text-bocado-green"
+      textColor: "text-bocado-green",
+      id: "welcome"
     },
     {
       title: "1. Inicio",
       description: "Elige si comes en casa o fuera. La IA genera tu plan personalizado al instante.",
       icon: <HomeIcon className="w-16 h-16" />,
       color: "bg-bocado-green",
-      textColor: "text-white"
+      textColor: "text-white",
+      id: "home"
     },
     {
       title: "2. Mi Cocina",
-      description: "Gestiona tu inventario. Toca ingredientes para cambiar frescura: 🟢🟡🔴",
+      description: "Gestiona tu inventario. Toca ingredientes para su estado de frescura: 🟢 fresco, 🟡 por caducar, y 🔴 urgente.",
       icon: <RestaurantIcon className="w-16 h-16" />,
       color: "bg-bocado-dark-green",
-      textColor: "text-white"
+      textColor: "text-white",
+      id: "pantry"
     },
     {
       title: "3. Mis Recetas",
       description: "Guarda recetas con ❤️ para cocinarlas cuando quieras.",
       icon: <BookIcon className="w-16 h-16" />,
       color: "bg-bocado-green-light",
-      textColor: "text-white"
+      textColor: "text-white",
+      id: "recipes"
     },
     {
       title: "4. Mis Lugares",
       description: "Guarda restaurantes saludables recomendados al comer fuera.",
       icon: <LocationIcon className="w-16 h-16" />,
       color: "bg-bocado-dark-gray",
-      textColor: "text-white"
+      textColor: "text-white",
+      id: "restaurants"
     },
     {
       title: "5. Perfil",
       description: "Mantén tus datos actualizados para mejores recomendaciones.",
       icon: <UserIcon className="w-16 h-16" />,
       color: "bg-bocado-background",
-      textColor: "text-bocado-dark-green"
+      textColor: "text-bocado-dark-green",
+      id: "profile"
     }
   ];
+
+  // ✅ ANALÍTICA: Trackeo de inicio y progreso de pasos
+  useEffect(() => {
+    trackEvent('tutorial_step_view', {
+      step_index: currentStep,
+      step_id: steps[currentStep].id
+    });
+  }, [currentStep]);
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
+      // ✅ ANALÍTICA: Tutorial completado hasta el final
+      trackEvent('tutorial_finished');
       onClose();
     }
+  };
+
+  const handleSkip = () => {
+    // ✅ ANALÍTICA: Usuario saltó el tutorial
+    trackEvent('tutorial_skipped', {
+      at_step: currentStep,
+      step_id: steps[currentStep].id
+    });
+    onClose();
+  };
+
+  const handleDotClick = (index: number) => {
+    // ✅ ANALÍTICA: Navegación manual por puntos
+    trackEvent('tutorial_dot_navigation', {
+      from_step: currentStep,
+      to_step: index
+    });
+    setCurrentStep(index);
   };
 
   const content = steps[currentStep];
@@ -95,7 +130,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
               {steps.map((_, index) => (
                 <button
                   key={index}
-                  onClick={() => setCurrentStep(index)}
+                  onClick={() => handleDotClick(index)}
                   className={`h-2 rounded-full transition-all duration-200 ${index === currentStep ? 'w-6 bg-bocado-green' : 'w-2 bg-bocado-border hover:bg-bocado-gray'}`}
                 />
               ))}
@@ -110,7 +145,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
             
             {currentStep < steps.length - 1 && (
               <button 
-                onClick={onClose}
+                onClick={handleSkip}
                 className="mt-3 text-xs text-bocado-gray font-medium hover:text-bocado-dark-gray transition-colors"
               >
                 Saltar tutorial

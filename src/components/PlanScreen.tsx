@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { db, auth } from '../firebaseConfig';
+import { db, auth, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { collection, query, where, onSnapshot, DocumentSnapshot } from 'firebase/firestore';
 import { Plan, Meal } from '../types';
 import MealCard from './MealCard';
@@ -55,7 +55,7 @@ const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
   } catch (e) { return null; }
 };
 
-// --- PROCESAMIENTO DE RESTAURANTES (FUERA) - CAMBIO CLAVE AQUÍ ---
+// --- PROCESAMIENTO DE RESTAURANTES (FUERA) ---
 const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
@@ -63,7 +63,6 @@ const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
     const interactionId = data.interaction_id || data.user_interactions;
     const rawDate = data.fecha_creacion || data.createdAt;
     
-    // Gemini puede devolverlo como recomendaciones o recomendaciones.recomendaciones
     let items = data.recomendaciones?.recomendaciones || data.recomendaciones || [];
     let greeting = data.saludo_personalizado || "Opciones fuera de casa";
     if (!Array.isArray(items) || items.length === 0) return null;
@@ -72,7 +71,6 @@ const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
       mealType: `Sugerencia ${index + 1}`,
       recipe: {
         title: rec.nombre_restaurante || rec.nombre || 'Restaurante',
-        // MAPEO ELÁSTICO PARA LA ETIQUETA:
         cuisine: rec.tipo_comida || rec.cuisine || rec.tipo || 'Gastronomía', 
         time: 'N/A', 
         difficulty: 'Restaurante', 
@@ -121,6 +119,27 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
   const { data: selectedPlan, isLoading, isError, error, refetch } = usePlanQuery(planId, user?.uid);
   const toggleMutation = useToggleSavedItem();
 
+  // ✅ ANALÍTICA: Trackeo cuando el plan se carga con éxito
+  useEffect(() => {
+    if (selectedPlan) {
+      trackEvent('plan_viewed', {
+        plan_id: planId,
+        plan_type: selectedPlan.planTitle,
+        userId: user?.uid
+      });
+    }
+  }, [selectedPlan, planId, user]);
+
+  // ✅ ANALÍTICA: Trackeo si hay un error
+  useEffect(() => {
+    if (isError) {
+      trackEvent('plan_error', {
+        plan_id: planId,
+        error_message: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }, [isError, error, planId]);
+
   useEffect(() => {
     if (!isLoading) return;
     const intervalId = setInterval(() => {
@@ -135,6 +154,13 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
   const handleToggleSave = (meal: Meal) => {
     if (!user) return;
     const isRestaurant = meal.recipe.difficulty === 'Restaurante';
+    
+    // ✅ ANALÍTICA: Guardar receta/restaurante
+    trackEvent('plan_item_saved', {
+        item_title: meal.recipe.title,
+        type: isRestaurant ? 'restaurant' : 'recipe'
+    });
+
     toggleMutation.mutate({
       userId: user.uid,
       type: isRestaurant ? 'restaurant' : 'recipe',
@@ -142,6 +168,11 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
       mealType: meal.mealType,
       isSaved: false, 
     });
+  };
+
+  const handleStartNew = () => {
+    trackEvent('plan_return_home'); // ✅ Analítica
+    onStartNewPlan();
   };
 
   if (isLoading) {
@@ -196,7 +227,7 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
       
       <div className="px-4 py-4 border-t border-bocado-border bg-white">
         <button 
-          onClick={onStartNewPlan} 
+          onClick={handleStartNew} // ✅ Handler con analítica
           className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
         >
           Volver al inicio

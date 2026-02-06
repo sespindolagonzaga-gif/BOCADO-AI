@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { db } from '../firebaseConfig';
+import { db, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuthStore } from '../stores/authStore';
 
@@ -25,7 +25,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
 
-  // ✅ ZUSTAND: Obtenemos usuario del store en lugar de auth.currentUser
   const { user, isAuthenticated } = useAuthStore();
 
   if (!isOpen) return null;
@@ -33,7 +32,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
   const handleSubmit = async () => {
     if (rating === 0) return;
     
-    // ✅ Validación usando el store
     if (!isAuthenticated || !user) {
       setError('Debes iniciar sesión para enviar feedback');
       return;
@@ -44,7 +42,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
     
     try {
       const feedbackData = {
-        userId: user.uid, // Ahora viene del store tipado
+        userId: user.uid,
         itemId: itemTitle,
         type: type,
         rating: rating,
@@ -58,6 +56,15 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
 
       await addDoc(collection(db, 'user_history'), feedbackData);
       
+      // ✅ ANALÍTICA: Evento de feedback enviado
+      trackEvent('submit_feedback', {
+        item_title: itemTitle,
+        rating: rating,
+        type: type,
+        has_comment: comment.trim().length > 0,
+        userId: user.uid
+      });
+
       setIsSuccess(true);
       
       setTimeout(() => {
@@ -67,12 +74,26 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
     } catch (error) {
       console.error("Error guardando feedback:", error);
       setError("No se pudo guardar la calificación. Inténtalo de nuevo.");
+      
+      // ✅ ANALÍTICA: Error al guardar
+      trackEvent('feedback_error', {
+        item_title: itemTitle,
+        error: 'firestore_save_failed'
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
+    // ✅ ANALÍTICA: Si el usuario cierra sin calificar, trackeamos que lo omitió
+    if (!isSuccess && rating === 0) {
+      trackEvent('skip_feedback', {
+        item_title: itemTitle,
+        type: type
+      });
+    }
+
     setRating(0);
     setComment("");
     setIsSuccess(false);
@@ -91,7 +112,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
     <div className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
       <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-transform duration-300 translate-y-0">
         
-        {/* Indicador de arrastre en móvil */}
         <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden"></div>
         
         {!isSuccess ? (
@@ -111,7 +131,6 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
               </p>
             )}
             
-            {/* Estrellas más grandes en móvil para touch */}
             <div className="flex justify-center gap-3 sm:gap-2 mb-6">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button

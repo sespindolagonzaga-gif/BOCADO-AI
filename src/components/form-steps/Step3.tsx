@@ -10,6 +10,7 @@ import { FruitIcon } from '../icons/FruitIcon';
 import { GrainsIcon } from '../icons/GrainsIcon';
 import { NutsIcon } from '../icons/NutsIcon';
 import { SpicesIcon } from '../icons/SpicesIcon';
+import { trackEvent } from '../../firebaseConfig'; // ✅ Importado trackEvent
 
 const categoryIcons: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
   'Carnes y Aves': MeatIcon,
@@ -32,6 +33,9 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
     .filter((item): item is string => typeof item === 'string');
 
   const handleSelect = (field: keyof FormData, value: string) => {
+    // ✅ ANALÍTICA: Tracking de actividad física
+    trackEvent(`registration_${field}_select`, { value });
+    
     updateData(field, value);
     if (field === 'activityLevel') {
       if (value === '🪑 Sedentario') {
@@ -44,15 +48,26 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
   };
 
   const handleToggleDislike = (food: string) => {
-    const newDislikes = dislikedFoods.includes(food)
-      ? dislikedFoods.filter(item => item !== food)
-      : [...dislikedFoods, food];
+    const isAdding = !dislikedFoods.includes(food);
+    
+    // ✅ ANALÍTICA: Tracking de alimentos rechazados
+    trackEvent('registration_disliked_food_toggle', { 
+      food, 
+      action: isAdding ? 'add' : 'remove' 
+    });
+
+    const newDislikes = isAdding
+      ? [...dislikedFoods, food]
+      : dislikedFoods.filter(item => item !== food);
     updateData('dislikedFoods', newDislikes);
   };
   
   const handleAddCustomFood = () => {
     const trimmedInput = customFoodInput.trim();
     if (trimmedInput && !dislikedFoods.find(food => food.toLowerCase() === trimmedInput.toLowerCase())) {
+      // ✅ ANALÍTICA: Tracking de alimentos añadidos manualmente
+      trackEvent('registration_custom_dislike_added', { food: trimmedInput });
+      
       handleToggleDislike(trimmedInput);
       setCustomFoodInput('');
       setShowCustomInput(false);
@@ -108,6 +123,7 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
               type="text"
               value={data.otherActivityLevel || ''}
               onChange={(e) => updateData('otherActivityLevel', e.target.value)}
+              onBlur={() => trackEvent('registration_custom_activity_input')} // ✅ Analítica
               placeholder="Yoga, Crossfit..."
               className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
                 errors.otherActivityLevel ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'
@@ -157,6 +173,7 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
             placeholder="Buscar alimento..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => trackEvent('registration_dislike_search_focus')} // ✅ Analítica
             className="w-full px-4 py-2.5 rounded-xl border-2 border-bocado-border text-sm focus:outline-none focus:border-bocado-green"
           />
         </div>
@@ -171,7 +188,10 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
               <button
                 key={category}
                 type="button"
-                onClick={() => setModalCategory(category)}
+                onClick={() => {
+                  trackEvent('registration_dislike_category_open', { category }); // ✅ Analítica
+                  setModalCategory(category);
+                }}
                 className="relative flex flex-col items-center justify-center p-3 text-center bg-white border-2 border-bocado-border rounded-xl hover:border-bocado-green active:scale-95 transition-all duration-200 aspect-[4/3]"
               >
                 {Icon && <Icon className="w-8 h-8 text-bocado-green mb-1"/>}
@@ -226,7 +246,10 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
           ) : (
             <button 
               type="button" 
-              onClick={() => setShowCustomInput(true)} 
+              onClick={() => {
+                trackEvent('registration_custom_dislike_click'); // ✅ Analítica
+                setShowCustomInput(true);
+              }} 
               className="text-xs text-bocado-green font-bold hover:text-bocado-dark-green transition-colors"
             >
               + Añadir otro ingrediente

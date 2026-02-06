@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import BocadoLogo from './BocadoLogo';
-import { db, auth } from '../firebaseConfig';
+import { db, auth, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { EMAIL_DOMAINS } from '../constants';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { 
@@ -29,7 +29,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   const [needsVerification, setNeedsVerification] = useState(false);
   const [unverifiedUser, setUnverifiedUser] = useState<any>(null);
 
-  // ✅ TANSTACK QUERY: Cliente para invalidar caché
   const queryClient = useQueryClient();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -50,6 +49,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
       const user = userCredential.user;
 
       if (!user.emailVerified) {
+        // ✅ ANALÍTICA: Intento de login con correo no verificado
+        trackEvent('login_unverified_attempt', { userId: user.uid });
+        
         setNeedsVerification(true);
         setUnverifiedUser(user);
         setIsLoading(false);
@@ -66,26 +68,31 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
           await updateDoc(userDocRef, { emailVerified: true });
         }
         
-        const displayName = user.displayName || '';
-        const nameParts = displayName.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-        
         const sanitizedProfile = sanitizeProfileData(firestoreData) as UserProfile;
-        
-        // ✅ TANSTACK QUERY: Precargar el perfil en caché
         queryClient.setQueryData(['userProfile', user.uid], sanitizedProfile);
+        
+        // ✅ ANALÍTICA: Login exitoso
+        trackEvent('login_success', { userId: user.uid });
         
         onLoginSuccess();
       } else {
+        // ✅ ANALÍTICA: Login exitoso pero sin perfil en Firestore (error de datos)
+        trackEvent('login_missing_profile', { userId: user.uid });
         setError('Perfil incompleto. Por favor contacta soporte.');
         auth.signOut();
       }
     } catch (err: any) {
       console.error("Error logging in:", err.code);
+      
+      // ✅ ANALÍTICA: Error en login
+      trackEvent('login_error', { 
+        error_code: err.code || 'unknown',
+        email_provided: email.includes('@') // Para saber si es error de formato o credenciales
+      });
+
       if (['auth/network-request-failed', 'auth/unavailable'].includes(err.code)) {
         setError('Error de red. No pudimos conectar con el servidor.');
-      } else if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(err.code)) {
+      } else if (['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
         setError('Correo electrónico o contraseña incorrectos.');
       } else {
         setError('Hubo un problema al iniciar sesión. Por favor, inténtalo de nuevo.');
@@ -101,8 +108,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     setIsLoading(true);
     try {
       await sendEmailVerification(unverifiedUser);
+      // ✅ ANALÍTICA: Reenvío de verificación
+      trackEvent('login_resend_verification_success');
       setSuccessMessage('Correo de verificación reenviado. Revisa tu bandeja de entrada.');
     } catch (err) {
+      // ✅ ANALÍTICA: Error al reenviar
+      trackEvent('login_resend_verification_error');
       setError('No se pudo reenviar el correo. Inténtalo más tarde.');
     } finally {
       setIsLoading(false);
@@ -110,6 +121,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   };
 
   const handleLogoutUnverified = () => {
+    trackEvent('login_unverified_switch_account'); // ✅ Analítica
     auth.signOut();
     setNeedsVerification(false);
     setUnverifiedUser(null);
@@ -129,9 +141,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
     setIsLoading(true);
     try {
       await sendPasswordResetEmail(auth, email);
+      // ✅ ANALÍTICA: Solicitud de reset exitosa
+      trackEvent('password_reset_requested', { success: true });
       setSuccessMessage(`Se ha enviado un correo a ${email} con instrucciones.`);
     } catch (err: any) {
       console.error("Error sending password reset email:", err.code);
+      // ✅ ANALÍTICA: Error en solicitud de reset
+      trackEvent('password_reset_requested', { success: false, error: err.code });
+      
       if (err.code === 'auth/user-not-found') {
         setError('No se encontró ningún usuario con este correo electrónico.');
       } else {
@@ -166,8 +183,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   };
 
   const handleEmailSuggestionClick = (suggestion: string) => {
+    // ✅ ANALÍTICA: Uso de sugerencia de dominio
+    trackEvent('login_email_suggestion_used');
     setEmail(suggestion);
     setShowEmailSuggestions(false);
+  };
+
+  const handleGoBack = () => {
+    trackEvent('login_go_home_click'); // ✅ Analítica
+    onGoHome();
   };
 
   if (needsVerification && unverifiedUser) {
@@ -285,7 +309,10 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         <div className="text-center">
           <button
             type="button"
-            onClick={() => setView('reset')}
+            onClick={() => {
+              trackEvent('login_forgot_password_click'); // ✅ Analítica
+              setView('reset');
+            }}
             className="text-xs text-bocado-green font-semibold hover:underline"
           >
             Olvidé mi contraseña
@@ -351,7 +378,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         {view === 'login' ? renderLoginView() : renderResetView()}
         <div className="mt-6 text-center pt-4 border-t border-bocado-border">
           <button 
-            onClick={onGoHome} 
+            onClick={handleGoBack} 
             className="text-xs text-bocado-gray hover:text-bocado-dark-gray transition-colors" 
             disabled={isLoading}
           >

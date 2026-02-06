@@ -5,6 +5,7 @@ import { HeartIcon } from './icons/HeartIcon';
 import FeedbackModal from './FeedbackModal';
 import { useToggleSavedItem, useIsItemSaved } from '../hooks/useSavedItems';
 import { useAuthStore } from '../stores/authStore';
+import { trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 
 interface MealCardProps {
   meal: Meal;
@@ -60,6 +61,13 @@ const MealCard: React.FC<MealCardProps> = ({
     e.stopPropagation();
     if (!user) return;
     
+    // ✅ ANALÍTICA: Guardar o quitar de guardados
+    trackEvent(saved ? 'recipe_unsaved' : 'recipe_saved', {
+      item_title: recipe.title,
+      type: type,
+      userId: user.uid
+    });
+
     toggleMutation.mutate({
       userId: user.uid,
       type,
@@ -79,11 +87,22 @@ const MealCard: React.FC<MealCardProps> = ({
     const newState = !isExpanded;
     setIsExpanded(newState);
     if (newState) {
+      // ✅ ANALÍTICA: Usuario expande detalles
+      trackEvent('recipe_expanded', {
+        item_title: recipe.title,
+        type: type,
+        is_restaurant: isRestaurant
+      });
       onInteraction?.('expand', { recipe: recipe.title });
     }
   };
 
   const handleFeedbackOpen = () => {
+    // ✅ ANALÍTICA: Intención de dar feedback (clic en el botón de acción)
+    trackEvent('feedback_button_click', {
+        item_title: recipe.title,
+        type: type
+    });
     setShowFeedback(true);
     onInteraction?.('feedback', { recipe: recipe.title });
   };

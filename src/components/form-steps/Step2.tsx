@@ -1,6 +1,7 @@
 import React from 'react';
 import { FormStepProps } from './FormStepProps';
 import { DISEASES, ALLERGIES, GOALS } from '../../constants';
+import { trackEvent } from '../../firebaseConfig'; // ✅ Importado trackEvent
 
 const MultiSelectButton: React.FC<{
   option: string;
@@ -23,9 +24,18 @@ const MultiSelectButton: React.FC<{
 const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
   const toggleSelection = (field: 'diseases' | 'allergies', value: string) => {
     const currentValues = data[field] as string[];
-    const newValues = currentValues.includes(value)
-      ? currentValues.filter(item => item !== value)
-      : [...currentValues, value];
+    const isSelecting = !currentValues.includes(value);
+
+    // ✅ ANALÍTICA: Tracking de selección de salud
+    trackEvent(`registration_${field}_toggle`, { 
+      value, 
+      action: isSelecting ? 'select' : 'deselect' 
+    });
+
+    const newValues = isSelecting
+      ? [...currentValues, value]
+      : currentValues.filter(item => item !== value);
+    
     updateData(field, newValues);
 
     if (field === 'allergies' && value === 'Otro' && !newValues.includes('Otro')) {
@@ -36,6 +46,12 @@ const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
   const toggleNutritionalGoal = (goal: string) => {
     let currentGoals = Array.isArray(data.nutritionalGoal) ? [...data.nutritionalGoal] : [];
     const isSelected = currentGoals.includes(goal);
+
+    // ✅ ANALÍTICA: Tracking de objetivos
+    trackEvent('registration_goal_toggle', { 
+      goal, 
+      action: !isSelected ? 'select' : 'deselect' 
+    });
     
     if (isSelected) {
       currentGoals = currentGoals.filter(item => item !== goal);
@@ -94,6 +110,7 @@ const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
               type="text"
               value={data.otherAllergies || ''}
               onChange={(e) => updateData('otherAllergies', e.target.value)}
+              onBlur={() => trackEvent('registration_other_allergies_input')} // ✅ Analítica
               placeholder="Mariscos, frutos secos..."
               className={`w-full px-3 py-2.5 rounded-xl border-2 text-sm transition-all ${
                 errors.otherAllergies ? 'border-red-300 bg-red-50' : 'border-bocado-border focus:border-bocado-green focus:outline-none'

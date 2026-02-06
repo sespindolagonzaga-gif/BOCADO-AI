@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { db, serverTimestamp } from '../firebaseConfig';
+import { db, serverTimestamp, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { KitchenItem, Zone, Freshness } from '../types';
 import { RestaurantIcon } from './icons/RestaurantIcon';
@@ -9,38 +9,17 @@ interface PantryScreenProps {
   userUid: string;
 }
 
+// ... (ZONES, ZONE_CATEGORIES, COMMON_INGREDIENTS_DB, EMOJI_MAP y getEmoji se mantienen igual)
 const ZONES: Record<Zone, { emoji: string; label: string; color: string }> = {
-  'Despensa': { 
-    emoji: '🧺', 
-    label: 'Despensa', 
-    color: 'bg-[#F5F2EB] border-[#E6E0D4]' 
-  },
-  'Nevera': { 
-    emoji: '❄️', 
-    label: 'Nevera', 
-    color: 'bg-[#EFF5F3] border-[#D8E6E2]' 
-  },
-  'Congelador': { 
-    emoji: '🧊', 
-    label: 'Congelador', 
-    color: 'bg-[#F0F4F6] border-[#DAE3E8]' 
-  },
+  'Despensa': { emoji: '🧺', label: 'Despensa', color: 'bg-[#F5F2EB] border-[#E6E0D4]' },
+  'Nevera': { emoji: '❄️', label: 'Nevera', color: 'bg-[#EFF5F3] border-[#D8E6E2]' },
+  'Congelador': { emoji: '🧊', label: 'Congelador', color: 'bg-[#F0F4F6] border-[#DAE3E8]' },
 };
 
-// ... (mantener ZONE_CATEGORIES, COMMON_INGREDIENTS_DB, EMOJI_MAP igual que antes)
 const ZONE_CATEGORIES: Record<Zone, string[]> = {
-  'Despensa': [
-    'Todos', 'Especias 🌶️', 'Latas 🥫', 'Granos 🍚', 'Bebidas 🥤', 'Snacks 🍪', 
-    'Verduras 🥦', 'Frutas 🍎', 'Proteínas 🥩', 'Lácteos 🧀'
-  ],
-  'Nevera': [
-    'Todos', 'Proteínas 🥩', 'Lácteos 🧀', 'Verduras 🥦', 'Frutas 🍎', 
-    'Bebidas 🥤', 'Snacks 🍪', 'Latas 🥫', 'Granos 🍚', 'Especias 🌶️'
-  ],
-  'Congelador': [
-    'Todos', 'Proteínas 🥩', 'Verduras 🥦', 'Frutas 🍎', 'Snacks 🍪', 
-    'Granos 🍚', 'Lácteos 🧀', 'Latas 🥫', 'Bebidas 🥤', 'Especias 🌶️'
-  ]
+  'Despensa': ['Todos', 'Especias 🌶️', 'Latas 🥫', 'Granos 🍚', 'Bebidas 🥤', 'Snacks 🍪', 'Verduras 🥦', 'Frutas 🍎', 'Proteínas 🥩', 'Lácteos 🧀'],
+  'Nevera': ['Todos', 'Proteínas 🥩', 'Lácteos 🧀', 'Verduras 🥦', 'Frutas 🍎', 'Bebidas 🥤', 'Snacks 🍪', 'Latas 🥫', 'Granos 🍚', 'Especias 🌶️'],
+  'Congelador': ['Todos', 'Proteínas 🥩', 'Verduras 🥦', 'Frutas 🍎', 'Snacks 🍪', 'Granos 🍚', 'Lácteos 🧀', 'Latas 🥫', 'Bebidas 🥤', 'Especias 🌶️']
 };
 
 const COMMON_INGREDIENTS_DB: Record<Zone, Record<string, { name: string; emoji: string }[]>> = {
@@ -98,13 +77,11 @@ const getEmoji = (name: string): string => {
 const usePantry = (userUid: string) => {
   const queryClient = useQueryClient();
   
-  // Query: Obtener datos
   const { data: inventory = [], isLoading } = useQuery({
     queryKey: ['pantry', userUid],
     queryFn: async () => {
       const docRef = doc(db, 'user_pantry', userUid);
       const docSnap = await getDoc(docRef);
-      
       if (docSnap.exists()) {
         const data = docSnap.data();
         return (data.items || []) as KitchenItem[];
@@ -115,7 +92,6 @@ const usePantry = (userUid: string) => {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Mutation: Guardar cambios
   const saveMutation = useMutation({
     mutationFn: async (newInventory: KitchenItem[]) => {
       const docRef = doc(db, 'user_pantry', userUid);
@@ -126,7 +102,6 @@ const usePantry = (userUid: string) => {
       return newInventory;
     },
     onSuccess: (newInventory) => {
-      // Actualizar caché inmediatamente
       queryClient.setQueryData(['pantry', userUid], newInventory);
     },
   });
@@ -140,6 +115,13 @@ const usePantry = (userUid: string) => {
     if (!exists) {
       const newInventory = [...inventory, item];
       saveMutation.mutate(newInventory);
+      
+      // ✅ ANALÍTICA: Item agregado
+      trackEvent('pantry_item_added', {
+        item_name: item.name,
+        zone: item.zone,
+        category: item.category
+      });
     }
   };
 
@@ -151,8 +133,17 @@ const usePantry = (userUid: string) => {
   };
 
   const deleteItem = (id: string) => {
+    const itemToDelete = inventory.find(i => i.id === id);
     const newInventory = inventory.filter(item => item.id !== id);
     saveMutation.mutate(newInventory);
+
+    // ✅ ANALÍTICA: Item eliminado
+    if (itemToDelete) {
+      trackEvent('pantry_item_removed', {
+        item_name: itemToDelete.name,
+        zone: itemToDelete.zone
+      });
+    }
   };
 
   const toggleFreshness = (id: string) => {
@@ -162,24 +153,24 @@ const usePantry = (userUid: string) => {
       'expired': 'fresh'
     };
     
+    let newStatus: Freshness = 'fresh';
     const newInventory = inventory.map(item => {
       if (item.id === id) {
-        return { ...item, freshness: nextStatus[item.freshness] };
+        newStatus = nextStatus[item.freshness];
+        return { ...item, freshness: newStatus };
       }
       return item;
     });
+
     saveMutation.mutate(newInventory);
+
+    // ✅ ANALÍTICA: Cambio de estado de frescura
+    trackEvent('pantry_item_freshness_toggle', {
+      new_status: newStatus
+    });
   };
 
-  return {
-    inventory,
-    isLoading,
-    addItem,
-    updateItem,
-    deleteItem,
-    toggleFreshness,
-    isSaving: saveMutation.isPending
-  };
+  return { inventory, isLoading, addItem, updateItem, deleteItem, toggleFreshness, isSaving: saveMutation.isPending };
 };
 
 const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
@@ -187,7 +178,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
   const [activeCategory, setActiveCategory] = useState('Todos');
   const [newItemName, setNewItemName] = useState('');
   
-  // ✅ TANSTACK QUERY: Hook personalizado
   const { inventory, isLoading, addItem, deleteItem, toggleFreshness, isSaving } = usePantry(userUid);
 
   const handleAddItem = (e: React.FormEvent) => {
@@ -211,7 +201,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
     setNewItemName('');
   };
 
-  // ... resto de helpers (getFreshnessColor, getFreshnessRing, etc.) igual que antes
   const getFreshnessColor = (status: Freshness) => {
     switch(status) {
       case 'fresh': return 'border-green-400/50 bg-green-50/30';
@@ -247,25 +236,25 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
 
   const suggestedItems = useMemo(() => {
     if (!activeZone) return [];
-    
     let candidates: { name: string; emoji: string }[] = [];
-    
     if (activeCategory === 'Todos') {
       const priorityCategories = ZONE_CATEGORIES[activeZone].filter(c => c !== 'Todos');
       priorityCategories.forEach(cat => {
         const items = COMMON_INGREDIENTS_DB[activeZone]?.[cat];
-        if (Array.isArray(items)) {
-          candidates.push(...items.slice(0, 2));
-        }
+        if (Array.isArray(items)) candidates.push(...items.slice(0, 2));
       });
     } else {
       candidates = COMMON_INGREDIENTS_DB[activeZone]?.[activeCategory] || [];
     }
-
-    return candidates.filter(c => 
-      !inventory.some(i => i.name.toLowerCase() === c.name.toLowerCase() && i.zone === activeZone)
-    );
+    return candidates.filter(c => !inventory.some(i => i.name.toLowerCase() === c.name.toLowerCase() && i.zone === activeZone));
   }, [activeZone, activeCategory, inventory]);
+
+  // ✅ ANALÍTICA: Selección de zona
+  const handleSelectZone = (zone: Zone) => {
+    trackEvent('pantry_zone_selected', { zone: zone });
+    setActiveZone(zone);
+    setActiveCategory('Todos');
+  };
 
   if (isLoading) {
     return (
@@ -291,7 +280,7 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
           {(Object.keys(ZONES) as Zone[]).map(zone => (
             <button
               key={zone}
-              onClick={() => { setActiveZone(zone); setActiveCategory('Todos'); }}
+              onClick={() => handleSelectZone(zone)}
               className={`w-full relative p-5 rounded-2xl border transition-all duration-200 active:scale-[0.98] shadow-sm ${ZONES[zone].color}`}
             >
               <div className="flex items-center justify-between">
@@ -301,7 +290,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
                 </div>
                 <div className="text-xl text-bocado-gray">›</div>
               </div>
-              
               {getBadgeCount(zone) > 0 && (
                 <div className="absolute top-3 right-3 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs shadow-md animate-pulse">
                   {getBadgeCount(zone)}
@@ -335,7 +323,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-white">
-      {/* Header sticky */}
       <div className="sticky top-0 bg-white z-20 border-b border-bocado-border/50 px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
           <button 
@@ -354,7 +341,10 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
           {ZONE_CATEGORIES[activeZone].map(cat => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => {
+                trackEvent('pantry_category_selected', { category: cat });
+                setActiveCategory(cat);
+              }}
               className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${
                 activeCategory === cat 
                   ? 'bg-bocado-green text-white shadow-sm' 
@@ -367,7 +357,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
         </div>
       </div>
 
-      {/* Contenido scrollable */}
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-24">
         {suggestedItems.length > 0 && (
           <div className="mb-4">
@@ -387,6 +376,8 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
                       addedAt: Date.now()
                     };
                     addItem(newItem);
+                    // ✅ ANALÍTICA: Item agregado desde sugerencias
+                    trackEvent('pantry_suggested_item_added', { item_name: item.name });
                   }}
                   className="flex items-center gap-1.5 bg-white border border-bocado-border hover:border-bocado-green hover:bg-bocado-green/5 rounded-full px-3 py-1.5 shadow-sm transition-all active:scale-95 whitespace-nowrap"
                 >
@@ -437,15 +428,8 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
                 >
                   <span className="text-xs">×</span>
                 </button>
-                
-                <span className="text-2xl select-none leading-none mt-1">
-                  {item.emoji}
-                </span>
-                
-                <span className="font-medium text-bocado-text text-[10px] text-center leading-tight line-clamp-2 w-full px-1">
-                  {item.name}
-                </span>
-                
+                <span className="text-2xl select-none leading-none mt-1">{item.emoji}</span>
+                <span className="font-medium text-bocado-text text-[10px] text-center leading-tight line-clamp-2 w-full px-1">{item.name}</span>
                 <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${getFreshnessRing(item.freshness)}`} />
               </div>
             ))}
@@ -453,7 +437,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
         )}
       </div>
 
-      {/* Banner urgente fijo abajo */}
       {urgentItems.length > 0 && (
         <div className="absolute bottom-20 left-4 right-4 bg-white border-t-2 border-red-400 rounded-xl p-3 shadow-bocado-lg z-30 flex items-center justify-between">
           <div className="flex flex-col">

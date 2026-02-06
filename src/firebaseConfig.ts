@@ -1,18 +1,31 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, serverTimestamp } from "firebase/firestore";
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  serverTimestamp // ✅ Añadido para resolver error 2304
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getAnalytics, logEvent, isSupported } from "firebase/analytics"; // ← Nuevo
+import { getAnalytics, isSupported, logEvent } from "firebase/analytics"; // ✅ Añadido logEvent para error 2552
 import { env } from './environment/env';
 
 const app = !getApps().length ? initializeApp(env.firebase) : getApp();
 
-const db = getFirestore(app);
+// ✅ CONFIGURACIÓN OFFLINE (Firestore Persistence)
+// Solo declaramos 'db' UNA vez (resuelve error 2451)
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
+
+// ✅ AUTH
+// Solo declaramos 'auth' UNA vez (resuelve error 2451)
 const auth = getAuth(app);
 
-// Analytics (solo si el navegador lo soporta y no hay adblockers)
+// ✅ ANALYTICS
 let analytics: ReturnType<typeof getAnalytics> | null = null;
 
-// Inicializar analytics de forma segura
 if (typeof window !== 'undefined') {
   isSupported().then((supported) => {
     if (supported) {
@@ -24,7 +37,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Helper para trackear eventos de forma segura
+// Helper para trackear eventos
 export const trackEvent = (eventName: string, params?: Record<string, any>) => {
   if (analytics) {
     logEvent(analytics, eventName, params);
