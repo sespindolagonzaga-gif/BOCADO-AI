@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { db, serverTimestamp } from '../firebaseConfig';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { KitchenItem, Zone, Freshness } from '../types';
@@ -26,6 +27,7 @@ const ZONES: Record<Zone, { emoji: string; label: string; color: string }> = {
   },
 };
 
+// ... (mantener ZONE_CATEGORIES, COMMON_INGREDIENTS_DB, EMOJI_MAP igual que antes)
 const ZONE_CATEGORIES: Record<Zone, string[]> = {
   'Despensa': [
     'Todos', 'Especias 🌶️', 'Latas 🥫', 'Granos 🍚', 'Bebidas 🥤', 'Snacks 🍪', 
@@ -92,47 +94,101 @@ const getEmoji = (name: string): string => {
   return found ? EMOJI_MAP[found] : '📦';
 };
 
-const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
-  const [inventory, setInventory] = useState<KitchenItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeZone, setActiveZone] = useState<Zone | null>(null);
-  const [activeCategory, setActiveCategory] = useState('Todos');
-  const [newItemName, setNewItemName] = useState('');
-
-  useEffect(() => {
-    const fetchPantry = async () => {
-      try {
-        const docRef = doc(db, 'user_pantry', userUid);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.items && Array.isArray(data.items)) {
-            setInventory(data.items);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching pantry:", error);
-      } finally {
-        setIsLoading(false);
+// Hook personalizado con TanStack Query
+const usePantry = (userUid: string) => {
+  const queryClient = useQueryClient();
+  
+  // Query: Obtener datos
+  const { data: inventory = [], isLoading } = useQuery({
+    queryKey: ['pantry', userUid],
+    queryFn: async () => {
+      const docRef = doc(db, 'user_pantry', userUid);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return (data.items || []) as KitchenItem[];
       }
-    };
+      return [];
+    },
+    enabled: !!userUid,
+    staleTime: 1000 * 60 * 5,
+  });
 
-    if (userUid) fetchPantry();
-  }, [userUid]);
-
-  const saveInventory = async (newInventory: KitchenItem[]) => {
-    setInventory(newInventory); 
-    try {
+  // Mutation: Guardar cambios
+  const saveMutation = useMutation({
+    mutationFn: async (newInventory: KitchenItem[]) => {
       const docRef = doc(db, 'user_pantry', userUid);
       await setDoc(docRef, {
         items: newInventory,
         lastUpdated: serverTimestamp()
       }, { merge: true });
-    } catch (error) {
-      console.error("Error saving inventory:", error);
+      return newInventory;
+    },
+    onSuccess: (newInventory) => {
+      // Actualizar caché inmediatamente
+      queryClient.setQueryData(['pantry', userUid], newInventory);
+    },
+  });
+
+  const addItem = (item: KitchenItem) => {
+    const exists = inventory.some(i => 
+      i.name.toLowerCase() === item.name.toLowerCase() && 
+      i.zone === item.zone
+    );
+    
+    if (!exists) {
+      const newInventory = [...inventory, item];
+      saveMutation.mutate(newInventory);
     }
   };
+
+  const updateItem = (id: string, updates: Partial<KitchenItem>) => {
+    const newInventory = inventory.map(item => 
+      item.id === id ? { ...item, ...updates } : item
+    );
+    saveMutation.mutate(newInventory);
+  };
+
+  const deleteItem = (id: string) => {
+    const newInventory = inventory.filter(item => item.id !== id);
+    saveMutation.mutate(newInventory);
+  };
+
+  const toggleFreshness = (id: string) => {
+    const nextStatus: Record<Freshness, Freshness> = {
+      'fresh': 'soon',
+      'soon': 'expired',
+      'expired': 'fresh'
+    };
+    
+    const newInventory = inventory.map(item => {
+      if (item.id === id) {
+        return { ...item, freshness: nextStatus[item.freshness] };
+      }
+      return item;
+    });
+    saveMutation.mutate(newInventory);
+  };
+
+  return {
+    inventory,
+    isLoading,
+    addItem,
+    updateItem,
+    deleteItem,
+    toggleFreshness,
+    isSaving: saveMutation.isPending
+  };
+};
+
+const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
+  const [activeZone, setActiveZone] = useState<Zone | null>(null);
+  const [activeCategory, setActiveCategory] = useState('Todos');
+  const [newItemName, setNewItemName] = useState('');
+  
+  // ✅ TANSTACK QUERY: Hook personalizado
+  const { inventory, isLoading, addItem, deleteItem, toggleFreshness, isSaving } = usePantry(userUid);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,51 +197,35 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
     const cleanName = newItemName.trim();
     const detectedEmoji = getEmoji(cleanName);
 
-    addKitchenItem(cleanName, detectedEmoji);
-    setNewItemName('');
-  };
-
-  const addKitchenItem = (name: string, emoji: string) => {
-    if (!activeZone) return;
-    
-    const exists = inventory.some(i => 
-      i.name.toLowerCase() === name.toLowerCase() && 
-      i.zone === activeZone
-    );
-    
-    if (exists) return; 
-
     const newItem: KitchenItem = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-      name: name,
-      emoji: emoji,
+      name: cleanName,
+      emoji: detectedEmoji,
       zone: activeZone,
       category: activeCategory === 'Todos' ? 'Varios' : activeCategory.split(' ')[0],
       freshness: 'fresh',
       addedAt: Date.now()
     };
 
-    saveInventory([...inventory, newItem]);
+    addItem(newItem);
+    setNewItemName('');
   };
 
-  const toggleFreshness = (id: string) => {
-    const newInv = inventory.map(item => {
-      if (item.id === id) {
-        const nextStatus: Record<Freshness, Freshness> = {
-          'fresh': 'soon',
-          'soon': 'expired',
-          'expired': 'fresh'
-        };
-        return { ...item, freshness: nextStatus[item.freshness] };
-      }
-      return item;
-    });
-    saveInventory(newInv);
+  // ... resto de helpers (getFreshnessColor, getFreshnessRing, etc.) igual que antes
+  const getFreshnessColor = (status: Freshness) => {
+    switch(status) {
+      case 'fresh': return 'border-green-400/50 bg-green-50/30';
+      case 'soon': return 'border-yellow-400/50 bg-yellow-50/30';
+      case 'expired': return 'border-red-500/50 bg-red-50/30';
+    }
   };
 
-  const deleteItem = (id: string) => {
-    const newInv = inventory.filter(item => item.id !== id);
-    saveInventory(newInv);
+  const getFreshnessRing = (status: Freshness) => {
+    switch(status) {
+      case 'fresh': return 'bg-green-400';
+      case 'soon': return 'bg-yellow-400';
+      case 'expired': return 'bg-red-500';
+    }
   };
 
   const urgentItems = useMemo(() => {
@@ -226,22 +266,6 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
       !inventory.some(i => i.name.toLowerCase() === c.name.toLowerCase() && i.zone === activeZone)
     );
   }, [activeZone, activeCategory, inventory]);
-
-  const getFreshnessColor = (status: Freshness) => {
-    switch(status) {
-      case 'fresh': return 'border-green-400/50 bg-green-50/30';
-      case 'soon': return 'border-yellow-400/50 bg-yellow-50/30';
-      case 'expired': return 'border-red-500/50 bg-red-50/30';
-    }
-  };
-
-  const getFreshnessRing = (status: Freshness) => {
-    switch(status) {
-      case 'fresh': return 'bg-green-400';
-      case 'soon': return 'bg-yellow-400';
-      case 'expired': return 'bg-red-500';
-    }
-  };
 
   if (isLoading) {
     return (
@@ -323,6 +347,7 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
           <h1 className="text-lg font-bold text-bocado-dark-green flex items-center gap-2">
             {ZONES[activeZone].emoji} {ZONES[activeZone].label}
           </h1>
+          {isSaving && <span className="text-xs text-bocado-gray animate-pulse">Guardando...</span>}
         </div>
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -351,7 +376,18 @@ const PantryScreen: React.FC<PantryScreenProps> = ({ userUid }) => {
               {suggestedItems.map(item => (
                 <button
                   key={item.name}
-                  onClick={() => addKitchenItem(item.name, item.emoji)}
+                  onClick={() => {
+                    const newItem: KitchenItem = {
+                      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                      name: item.name,
+                      emoji: item.emoji,
+                      zone: activeZone,
+                      category: activeCategory === 'Todos' ? 'Varios' : activeCategory.split(' ')[0],
+                      freshness: 'fresh',
+                      addedAt: Date.now()
+                    };
+                    addItem(newItem);
+                  }}
                   className="flex items-center gap-1.5 bg-white border border-bocado-border hover:border-bocado-green hover:bg-bocado-green/5 rounded-full px-3 py-1.5 shadow-sm transition-all active:scale-95 whitespace-nowrap"
                 >
                   <span className="text-base">{item.emoji}</span>

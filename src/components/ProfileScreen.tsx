@@ -16,6 +16,8 @@ import {
   updateProfile 
 } from 'firebase/auth';
 import { sanitizeProfileData, separateUserData } from '../utils/profileSanitizer';
+import { useUserProfileStore } from '../stores/userProfileStore'; // ✅ Nuevo
+import { useAuthStore } from '../stores/authStore'; // ✅ Nuevo
 import { env } from '../environment/env';
 
 interface ProfileScreenProps {
@@ -34,14 +36,35 @@ const stripEmoji = (str: string) => {
     return str;
 };
 
-const getProfileDataFromStorage = (): FormData => {
-  const savedData = localStorage.getItem('bocado-profile-data');
-  const parsedData = savedData ? JSON.parse(savedData) : {};
+// ✅ Helper para construir FormData desde Auth + Profile Store
+const buildFormData = (user: any, profile: UserProfile | null): FormData => {
+  const nameParts = user?.displayName?.split(' ') || ['', ''];
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+  
   return {
-    ...sanitizeProfileData(parsedData),
-    firstName: parsedData.firstName || '',
-    lastName: parsedData.lastName || '',
-    email: parsedData.email || '',
+    firstName,
+    lastName,
+    email: user?.email || '',
+    password: '',
+    confirmPassword: '',
+    // Datos del profile de Firestore (o defaults)
+    gender: profile?.gender || '',
+    age: profile?.age || '',
+    weight: profile?.weight || '',
+    height: profile?.height || '',
+    country: profile?.country || '',
+    city: profile?.city || '',
+    diseases: profile?.diseases || [],
+    allergies: profile?.allergies || [],
+    otherAllergies: profile?.otherAllergies || '',
+    eatingHabit: profile?.eatingHabit || '',
+    activityLevel: profile?.activityLevel || '',
+    otherActivityLevel: profile?.otherActivityLevel || '',
+    activityFrequency: profile?.activityFrequency || '',
+    nutritionalGoal: profile?.nutritionalGoal || [],
+    cookingAffinity: profile?.cookingAffinity || '',
+    dislikedFoods: profile?.dislikedFoods || [],
   } as FormData;
 };
 
@@ -65,9 +88,16 @@ const Badge: React.FC<{ text: string; color: 'green' | 'blue' | 'red' | 'gray' |
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate, userUid }) => {
   const [viewMode, setViewMode] = useState<'view' | 'edit' | 'changePassword' | 'changeEmail'>('view');
-  const [formData, setFormData] = useState<FormData>(getProfileDataFromStorage());
-  const [initialFormData, setInitialFormData] = useState<FormData>(getProfileDataFromStorage());
   
+  // ✅ ZUSTAND: Obtenemos datos del usuario y perfil
+  const { user } = useAuthStore();
+  const { profile, setProfile, fetchProfile } = useUserProfileStore();
+  
+  // Estado local del formulario (solo para edición)
+  const [formData, setFormData] = useState<FormData>(() => buildFormData(user, profile));
+  const [initialFormData, setInitialFormData] = useState<FormData>(() => buildFormData(user, profile));
+  
+  // Estados para cambio de password/email (locales, no persisten)
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -76,16 +106,23 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   
   const [cityOptions, setCityOptions] = useState<any[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   
+  // ✅ Cargar perfil de Firestore al montar (si no está en caché)
   useEffect(() => {
-    const data = getProfileDataFromStorage();
+    if (userUid && !profile) {
+      fetchProfile(userUid);
+    }
+  }, [userUid, profile, fetchProfile]);
+
+  // ✅ Sincronizar formData cuando cambia el store (ej: al cargar)
+  useEffect(() => {
+    const data = buildFormData(user, profile);
     setFormData(data);
     setInitialFormData(data);
-  }, []);
+  }, [user, profile]);
 
   const fetchCities = async (query: string) => {
     if (query.trim().length < 3) {
@@ -109,8 +146,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   };
 
   const handleSaveProfile = async () => {
-    const user = auth.currentUser;
-    if (!user || !userUid) {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !userUid) {
         setError("No se pudo verificar la sesión.");
         return;
     }
@@ -119,45 +156,45 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     setError('');
 
     try {
-      const { auth: authData, profile } = separateUserData(formData);
+      const { auth: authData, profile: profileData } = separateUserData(formData);
       
+      // Actualizar displayName en Auth
       const newDisplayName = `${authData.firstName} ${authData.lastName}`;
-      if (user.displayName !== newDisplayName) {
-        await updateProfile(user, { displayName: newDisplayName });
+      if (currentUser.displayName !== newDisplayName) {
+        await updateProfile(currentUser, { displayName: newDisplayName });
+        // Actualizar el store de auth
+        useAuthStore.getState().setUser({ ...currentUser, displayName: newDisplayName });
       }
 
+      // Construir objeto para Firestore
       const userProfile: UserProfile = {
         uid: userUid,
-        gender: profile.gender,
-        age: profile.age,
-        weight: profile.weight,
-        height: profile.height,
-        country: profile.country.toUpperCase(),
-        city: profile.city,
-        diseases: profile.diseases,
-        allergies: profile.allergies,
-        otherAllergies: profile.otherAllergies,
-        eatingHabit: profile.eatingHabit,
-        activityLevel: profile.activityLevel,
-        otherActivityLevel: profile.otherActivityLevel,
-        activityFrequency: profile.activityFrequency,
-        nutritionalGoal: profile.nutritionalGoal,
-        cookingAffinity: profile.cookingAffinity,
-        dislikedFoods: profile.dislikedFoods,
+        gender: profileData.gender,
+        age: profileData.age,
+        weight: profileData.weight,
+        height: profileData.height,
+        country: profileData.country.toUpperCase(),
+        city: profileData.city,
+        diseases: profileData.diseases,
+        allergies: profileData.allergies,
+        otherAllergies: profileData.otherAllergies,
+        eatingHabit: profileData.eatingHabit,
+        activityLevel: profileData.activityLevel,
+        otherActivityLevel: profileData.otherActivityLevel,
+        activityFrequency: profileData.activityFrequency,
+        nutritionalGoal: profileData.nutritionalGoal,
+        cookingAffinity: profileData.cookingAffinity,
+        dislikedFoods: profileData.dislikedFoods,
         updatedAt: serverTimestamp(),
       };
 
+      // Guardar en Firestore
       const userDocRef = doc(db, 'users', userUid);
       await setDoc(userDocRef, userProfile, { merge: true });
 
-      const fullProfileData = {
-        ...userProfile,
-        firstName: authData.firstName,
-        lastName: authData.lastName,
-        email: authData.email,
-      };
+      // ✅ Actualizar Zustand (ya no localStorage)
+      setProfile(userProfile);
       
-      localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
       setInitialFormData(formData);
       setViewMode('view');
       setSuccessMessage('¡Perfil actualizado!');
@@ -194,17 +231,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         return;
     }
 
-    const user = auth.currentUser;
-    if (!user || !user.email) {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
         setError('Sesión expirada. Vuelve a iniciar sesión.');
         return;
     }
 
     setIsLoading(true);
     try {
-        const credential = EmailAuthProvider.credential(user.email, currentPassword);
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, newPassword);
+        const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+        await reauthenticateWithCredential(currentUser, credential);
+        await updatePassword(currentUser, newPassword);
         
         setSuccessMessage('¡Contraseña actualizada!');
         setCurrentPassword('');
@@ -229,30 +266,30 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         return;
     }
     
-    const user = auth.currentUser;
-    if (!user || !user.email || !userUid) {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
         setError('Sesión expirada.');
         return;
     }
 
     const normalizedNewEmail = newEmail.toLowerCase().trim();
     
-    if (user.email.toLowerCase() === normalizedNewEmail) {
+    if (currentUser.email.toLowerCase() === normalizedNewEmail) {
         setError('El correo es igual al actual.');
         return;
     }
 
     setIsLoading(true);
     try {
-        const credential = EmailAuthProvider.credential(user.email, emailPassword);
-        await reauthenticateWithCredential(user, credential);
-        await updateEmail(user, normalizedNewEmail);
+        const credential = EmailAuthProvider.credential(currentUser.email, emailPassword);
+        await reauthenticateWithCredential(currentUser, credential);
+        await updateEmail(currentUser, normalizedNewEmail);
         
+        // Actualizar email en el form local
         const updatedFormData = { ...formData, email: normalizedNewEmail };
         setFormData(updatedFormData);
-        localStorage.setItem('bocado-profile-data', JSON.stringify(updatedFormData));
         
-        await sendEmailVerification(user);
+        await sendEmailVerification(currentUser);
         setSuccessMessage('¡Correo actualizado! Verifica tu email.');
         
         setEmailPassword('');
@@ -297,6 +334,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     );
   };
 
+  // ... (renderContent, renderViewMode, etc. permanecen igual)
   const renderContent = () => {
     switch(viewMode) {
       case 'edit':

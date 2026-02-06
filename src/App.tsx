@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { auth } from './firebaseConfig';
+import { useAuthStore } from './stores/authStore';
+
+// Screens
 import HomeScreen from './components/HomeScreen';
 import RegistrationFlow from './components/RegistrationFlow';
 import ConfirmationScreen from './components/ConfirmationScreen';
@@ -11,26 +15,39 @@ import MainApp from './components/MainApp';
 
 export type AppScreen = 'home' | 'register' | 'confirmation' | 'login' | 'recommendation' | 'permissions' | 'plan';
 
-function App() {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>('home');
-  const [planId, setPlanId] = useState<string | null>(null);
-  const [isNewUser, setIsNewUser] = useState(false);
-  const [initializing, setInitializing] = useState(true);
+// Configuración de TanStack Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+function AppContent() {
+  const [currentScreen, setCurrentScreen] = React.useState<AppScreen>('home');
+  const [planId, setPlanId] = React.useState<string | null>(null);
+  const [isNewUser, setIsNewUser] = React.useState(false);
+  
+  // Usamos Zustand en lugar de useState local
+  const { setUser, isLoading, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user); // Guarda en Zustand (y persiste lo seguro)
+      
       if (user) {
         setCurrentScreen('recommendation');
       } else {
         setCurrentScreen('home');
       }
-      setInitializing(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [setUser]);
 
-  if (initializing) {
+  if (isLoading) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-bocado-cream">
         <div className="text-center">
@@ -90,7 +107,6 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bocado-cream flex justify-center items-start md:items-center md:p-8">
-      {/* Contenedor que simula un móvil en desktop */}
       <div className="w-full min-h-screen bg-bocado-background 
                       md:max-w-[480px] md:max-h-[900px] md:min-h-[800px]
                       md:rounded-[2.5rem] md:shadow-bocado-lg 
@@ -99,6 +115,15 @@ function App() {
         {renderScreen()}
       </div>
     </div>
+  );
+}
+
+// Wrapper con Providers
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }
 

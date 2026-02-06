@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { EATING_HABITS, MEALS, CRAVINGS } from '../constants';
 import BocadoLogo from './BocadoLogo';
 import { auth, db, serverTimestamp } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
-import { sanitizeProfileData } from '../utils/profileSanitizer';
 import { CurrencyService } from '../data/budgets';
+import { useUserProfileStore } from '../stores/userProfileStore';
+import { useAuthStore } from '../stores/authStore';
 import { env } from '../environment/env';
 
 interface RecommendationScreenProps {
@@ -22,13 +23,7 @@ const stripEmoji = (str: string) => {
     return str;
 };
 
-const getProfileDataFromStorage = () => {
-  const savedData = localStorage.getItem('bocado-profile-data');
-  return savedData ? sanitizeProfileData(JSON.parse(savedData)) : null;
-};
-
 const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, onPlanGenerated }) => {
-  const [formData, setFormData] = useState<any>(null);
   const [recommendationType, setRecommendationType] = useState<'En casa' | 'Fuera' | null>(null); 
   const [selectedMeal, setSelectedMeal] = useState('');
   const [selectedCravings, setSelectedCravings] = useState<string[]>([]);
@@ -36,17 +31,11 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const [cookingTime, setCookingTime] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  useEffect(() => {
-    const loadProfileData = () => {
-      const data = getProfileDataFromStorage();
-      if (data) setFormData(data);
-    };
-    loadProfileData();
-    const timer = setTimeout(loadProfileData, 300);
-    return () => clearTimeout(timer);
-  }, []);
+  // ✅ ZUSTAND: Obtenemos perfil y usuario directamente de los stores
+  const { profile, isLoading: isProfileLoading } = useUserProfileStore();
+  const { user } = useAuthStore();
 
-  const countryCode = (formData?.country || 'MX').toUpperCase().trim(); 
+  const countryCode = (profile?.country || 'MX').toUpperCase().trim(); 
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
 
@@ -64,10 +53,11 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     const isHomeSelectionComplete = recommendationType === 'En casa' && selectedMeal;
     const isAwaySelectionComplete = recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget;
     
-    if (!formData || (!isHomeSelectionComplete && !isAwaySelectionComplete)) return;
-    
-    const user = auth.currentUser;
-    if (!user) return;
+    if (!profile || (!isHomeSelectionComplete && !isAwaySelectionComplete)) return;
+    if (!user) {
+      console.error("No hay usuario autenticado");
+      return;
+    }
 
     setIsGenerating(true);
 
@@ -83,7 +73,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       cravings: cravingsList,
       budget: selectedBudget, 
       currency: currencyConfig.code, 
-      dislikedFoods: formData.dislikedFoods || [],
+      dislikedFoods: profile.dislikedFoods || [],
       createdAt: serverTimestamp(),
       procesado: false,
     };
@@ -117,7 +107,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const isSelectionMade = (recommendationType === 'En casa' && selectedMeal) || 
                           (recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget);
 
-  if (!formData) {
+  if (isProfileLoading || !profile) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mb-4"></div>

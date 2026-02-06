@@ -3,17 +3,16 @@ import { Meal } from '../types';
 import { ChevronDownIcon } from './icons/ChevronDownIcon';
 import { HeartIcon } from './icons/HeartIcon';
 import FeedbackModal from './FeedbackModal';
+import { useSavedRecipesStore } from '../stores/savedRecipesStore';
+import { useAuthStore } from '../stores/authStore';
 
 interface MealCardProps {
   meal: Meal;
-  isSaved: boolean;
-  isSaving: boolean;
-  onToggleSave: () => void;
+  onInteraction?: (type: 'expand' | 'save' | 'feedback', data?: any) => void;
 }
 
-const getSmartEmoji = (title: string) => {
+const getSmartEmoji = (title: string): string => {
   const lower = title.toLowerCase();
-
   if (lower.includes('pollo')) return '🍗';
   if (lower.includes('pescado') || lower.includes('salmon')) return '🐟';
   if (lower.includes('carne') || lower.includes('res')) return '🥩';
@@ -22,11 +21,10 @@ const getSmartEmoji = (title: string) => {
   if (lower.includes('taco')) return '🌮';
   if (lower.includes('huevo')) return '🍳';
   if (lower.includes('sopa')) return '🍲';
-
   return '🍽️';
 };
 
-const getDifficultyStyle = (difficulty: string) => {
+const getDifficultyStyle = (difficulty: string): string => {
   switch (difficulty) {
     case 'Fácil':
       return 'bg-green-100 text-green-700';
@@ -39,23 +37,68 @@ const getDifficultyStyle = (difficulty: string) => {
   }
 };
 
+// Generar ID igual que en el store
+const generateRecipeId = (title: string): string => {
+  return title.toLowerCase().replace(/[^a-z0-9]/g, '-').substring(0, 50);
+};
+
 const MealCard: React.FC<MealCardProps> = ({
   meal,
-  isSaved,
-  isSaving,
-  onToggleSave,
+  onInteraction,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
+  // ✅ ZUSTAND: Obtenemos estado y acciones del store
+  const { 
+    isSaved, 
+    toggleRecipe, 
+    toggleRestaurant 
+  } = useSavedRecipesStore();
+  const { user } = useAuthStore();
+
   const { recipe } = meal;
+  const recipeId = generateRecipeId(recipe.title);
   const isRestaurant = recipe.difficulty === 'Restaurante';
+  
+  // ✅ Usamos isSaved con el tipo correcto (2 argumentos ahora)
+  const saved = isSaved(isRestaurant ? 'restaurant' : 'recipe', recipeId);
+  
   const emoji = getSmartEmoji(recipe.title);
   const showSavings = recipe.savingsMatch && recipe.savingsMatch !== 'Ninguno';
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onToggleSave();
+    
+    if (!user) return;
+    
+    // ✅ Usamos el toggle correcto según el tipo
+    let wasSaved: boolean;
+    if (isRestaurant) {
+      wasSaved = toggleRestaurant(recipe, meal.mealType, user.uid);
+    } else {
+      wasSaved = toggleRecipe(recipe, meal.mealType, user.uid);
+    }
+    
+    onInteraction?.('save', { 
+      recipe: recipe.title, 
+      isSaved: wasSaved,
+      recipeId,
+      isRestaurant 
+    });
+  };
+
+  const handleExpand = () => {
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    if (newState) {
+      onInteraction?.('expand', { recipe: recipe.title });
+    }
+  };
+
+  const handleFeedbackOpen = () => {
+    setShowFeedback(true);
+    onInteraction?.('feedback', { recipe: recipe.title });
   };
 
   return (
@@ -64,13 +107,15 @@ const MealCard: React.FC<MealCardProps> = ({
       {/* HEADER */}
       <div
         className="p-4 cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
+        onClick={handleExpand}
       >
         <div className="flex justify-between items-start gap-3">
           
           {/* Title Section */}
           <div className="flex gap-3 flex-1 min-w-0">
-            <span className="text-2xl shrink-0 leading-none">{emoji}</span>
+            <span className="text-2xl shrink-0 leading-none" role="img" aria-label="Tipo de comida">
+              {emoji}
+            </span>
 
             <div className="min-w-0 flex-1">
               <h3 className="text-lg font-semibold text-bocado-text leading-tight group-hover:text-bocado-green transition-colors line-clamp-2">
@@ -80,7 +125,7 @@ const MealCard: React.FC<MealCardProps> = ({
               <div className="flex flex-wrap gap-2 mt-2 text-xs">
                 {!isRestaurant && (
                   <span className="px-2 py-1 bg-bocado-background text-bocado-dark-gray rounded-lg font-medium">
-                    ⏱ {recipe.time}
+                    ⏱️ {recipe.time}
                   </span>
                 )}
 
@@ -109,18 +154,20 @@ const MealCard: React.FC<MealCardProps> = ({
           <div className="flex flex-col items-center gap-1 shrink-0">
             <button
               onClick={handleSaveClick}
-              disabled={isSaving}
-              className={`p-2 rounded-full transition-colors active:scale-90 ${
-                isSaved ? 'text-red-500' : 'text-bocado-gray hover:text-red-400'
+              className={`p-2 rounded-full transition-all active:scale-90 ${
+                saved ? 'text-red-500' : 'text-bocado-gray hover:text-red-400'
               }`}
+              aria-label={saved ? 'Quitar de guardados' : 'Guardar receta'}
+              aria-pressed={saved}
             >
-              <HeartIcon className="w-6 h-6" filled={isSaved} />
+              <HeartIcon className="w-6 h-6" filled={saved} />
             </button>
 
             <ChevronDownIcon
               className={`w-5 h-5 text-bocado-gray transition-transform duration-200 ${
                 isExpanded ? 'rotate-180' : ''
               }`}
+              aria-expanded={isExpanded}
             />
           </div>
         </div>
@@ -173,7 +220,7 @@ const MealCard: React.FC<MealCardProps> = ({
 
           {/* CTA */}
           <button
-            onClick={() => setShowFeedback(true)}
+            onClick={handleFeedbackOpen}
             className="w-full py-3 rounded-xl bg-bocado-dark-green text-white font-semibold text-sm shadow-bocado hover:bg-bocado-green active:scale-[0.98] transition-all"
           >
             {isRestaurant ? '📍 Fui al lugar' : '🍳 La preparé'}

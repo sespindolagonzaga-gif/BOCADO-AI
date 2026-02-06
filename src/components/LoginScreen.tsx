@@ -9,7 +9,8 @@ import {
   sendEmailVerification
 } from 'firebase/auth';
 import { sanitizeProfileData } from '../utils/profileSanitizer';
-import { FormData } from '../types';
+import { FormData, UserProfile } from '../types';
+import { useUserProfileStore } from '../stores/userProfileStore';
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -27,6 +28,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   const [view, setView] = useState<'login' | 'reset'>('login');
   const [needsVerification, setNeedsVerification] = useState(false);
   const [unverifiedUser, setUnverifiedUser] = useState<any>(null);
+
+  // ✅ ZUSTAND: Obtenemos función para guardar perfil
+  const setProfile = useUserProfileStore((state) => state.setProfile);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,21 +71,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         const firstName = nameParts[0] || '';
         const lastName = nameParts.slice(1).join(' ') || '';
         
-        const sanitizedProfile = sanitizeProfileData(firestoreData);
+        const sanitizedProfile = sanitizeProfileData(firestoreData) as UserProfile;
         
-        const fullProfileData: FormData = Object.assign(
-          {},
-          sanitizedProfile,
-          {
-            firstName,
-            lastName,
-            email: user.email || lowercasedEmail,
-            password: '',
-            confirmPassword: '',
-          }
-        );
-
-        localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
+        // ✅ ZUSTAND: Guardamos el perfil en el store global (reemplaza localStorage)
+        setProfile(sanitizedProfile);
+        
         onLoginSuccess();
       } else {
         setError('Perfil incompleto. Por favor contacta soporte.');
@@ -100,6 +94,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
       setIsLoading(false);
     }
   };
+
+  // ... resto del código permanece igual (handleResendVerification, handleLogoutUnverified, handlePasswordReset, etc.)
 
   const handleResendVerification = async () => {
     if (!unverifiedUser) return;

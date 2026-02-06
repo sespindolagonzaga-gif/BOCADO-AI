@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { db, auth } from '../firebaseConfig';
+import { db } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useAuthStore } from '../stores/authStore';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -24,13 +25,16 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
 
+  // ✅ ZUSTAND: Obtenemos usuario del store en lugar de auth.currentUser
+  const { user, isAuthenticated } = useAuthStore();
+
   if (!isOpen) return null;
 
   const handleSubmit = async () => {
     if (rating === 0) return;
     
-    const user = auth.currentUser;
-    if (!user) {
+    // ✅ Validación usando el store
+    if (!isAuthenticated || !user) {
       setError('Debes iniciar sesión para enviar feedback');
       return;
     }
@@ -40,7 +44,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose, itemTitl
     
     try {
       const feedbackData = {
-        userId: user.uid,
+        userId: user.uid, // Ahora viene del store tipado
         itemId: itemTitle,
         type: type,
         rating: rating,

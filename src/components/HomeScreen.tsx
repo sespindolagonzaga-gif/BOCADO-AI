@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import BocadoLogo from './BocadoLogo';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
+import { useAuthStore } from '../stores/authStore';
+import { useUserProfileStore } from '../stores/userProfileStore';
 
 interface HomeScreenProps {
   onStartRegistration: () => void;
@@ -10,35 +12,26 @@ interface HomeScreenProps {
 }
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp, onGoToLogin }) => {
-  const [profileExists, setProfileExists] = useState(false);
+  // ✅ ZUSTAND: Obtenemos estado de autenticación y perfil
+  const { isAuthenticated, user } = useAuthStore();
+  const { profile } = useUserProfileStore();
 
-  useEffect(() => {
-    const checkProfile = () => {
-      const profileData = localStorage.getItem('bocado-profile-data');
-      setProfileExists(!!profileData);
-    };
-    checkProfile();
-    
-    window.addEventListener('storage', checkProfile);
-    return () => {
-      window.removeEventListener('storage', checkProfile);
-    };
-  }, []);
+  // Determinamos si hay una sesión activa con perfil completo
+  const hasSession = isAuthenticated || !!profile;
 
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      // ✅ Limpiar stores de Zustand (el auth se limpia automáticamente por onAuthStateChanged en App.tsx)
+      useUserProfileStore.getState().clearProfile();
     } catch (error) {
       console.error("Error signing out: ", error);
-    } finally {
-      localStorage.removeItem('bocado-profile-data');
-      setProfileExists(false);
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 pt-safe">
-      {/* Logo: más pequeño en móvil, mediano en desktop */}
+      {/* Logo */}
       <div className="w-48 sm:w-64 md:w-80 mb-8">
         <BocadoLogo className="w-full h-auto" />
       </div>
@@ -56,9 +49,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
         </p>
       </div>
 
-      {/* Botones: apilados en móvil, lado a lado en desktop */}
+      {/* Botones: Condicionales basados en autenticación */}
       <div className="flex flex-col w-full max-w-xs gap-3">
-        {profileExists ? (
+        {hasSession ? (
           <>
             <button
               onClick={onGoToApp}

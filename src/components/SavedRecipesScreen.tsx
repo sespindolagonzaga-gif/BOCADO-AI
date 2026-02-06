@@ -1,78 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import { db, auth } from '../firebaseConfig';
-import { collection, query, where, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { useSavedRecipesStore } from '../stores/savedRecipesStore';
+import { useAuthStore } from '../stores/authStore';
 import { BookIcon } from './icons/BookIcon';
 import MealCard from './MealCard';
 import { Meal } from '../types';
 
 const SavedRecipesScreen: React.FC = () => {
-  const [savedMeals, setSavedMeals] = useState<Meal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [mealToConfirmDelete, setMealToConfirmDelete] = useState<Meal | null>(null);
+  
+  // ✅ ZUSTAND: Obtenemos datos y funciones del store
+  const { 
+    recipes, 
+    isLoading, 
+    removeRecipe,
+    syncWithFirebase 
+  } = useSavedRecipesStore();
+  
+  const { user } = useAuthStore();
 
+  // Sincronizar con Firebase al montar
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) {
-        setIsLoading(false);
-        return;
+    if (user?.uid) {
+      syncWithFirebase(user.uid);
     }
+  }, [user?.uid, syncWithFirebase]);
 
-    const q = query(
-        collection(db, 'saved_recipes'),
-        where('user_id', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-        const rawDocs = snapshot.docs.map(doc => doc.data());
-        
-        rawDocs.sort((a, b) => {
-            const timeA = a.savedAt?.seconds || 0;
-            const timeB = b.savedAt?.seconds || 0;
-            return timeB - timeA;
-        });
-
-        const meals: Meal[] = rawDocs.map(data => ({
-            mealType: data.mealType || 'Receta Guardada',
-            recipe: data.recipe
-        }));
-
-        setSavedMeals(meals);
-        setIsLoading(false);
-    }, (error) => {
-        console.error("Error fetching saved recipes:", error);
-        setIsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  // Convertir SavedRecipe[] a Meal[] para MealCard
+  const savedMeals: Meal[] = recipes.map(saved => ({
+    mealType: saved.mealType,
+    recipe: saved.recipe
+  }));
 
   const handleDeleteRequest = (meal: Meal) => {
     setMealToConfirmDelete(meal);
   };
 
   const confirmDelete = async () => {
-    if (!mealToConfirmDelete) return;
+    if (!mealToConfirmDelete || !user) return;
 
-    const { recipe } = mealToConfirmDelete;
-    const user = auth.currentUser;
-    if (!user) return;
+    // Generar ID igual que en el store
+    const recipeId = mealToConfirmDelete.recipe.title
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '-')
+      .substring(0, 50);
 
-    setIsDeleting(recipe.title);
+    // ✅ Eliminar via Zustand (actualiza local + Firebase)
+    removeRecipe(recipeId);
     
-    const sanitizedTitle = recipe.title.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
-    const docId = `${user.uid}_${sanitizedTitle}`;
-    const docRef = doc(db, 'saved_recipes', docId);
-
-    try {
-        await deleteDoc(docRef);
-    } catch (error) {
-        console.error("Error deleting recipe:", error);
-    } finally {
-        setIsDeleting(null);
-        setMealToConfirmDelete(null);
-    }
+    setMealToConfirmDelete(null);
   };
+
+  if (isLoading && recipes.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col animate-fade-in">
+        <div className="text-center mb-6 px-4 pt-2">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <BookIcon className="w-6 h-6 text-bocado-green" />
+            <h2 className="text-xl font-bold text-bocado-dark-green">Mis Recetas</h2>
+          </div>
+        </div>
+        <div className="flex justify-center items-center py-20">
+          <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col animate-fade-in">
@@ -83,15 +75,12 @@ const SavedRecipesScreen: React.FC = () => {
           <h2 className="text-xl font-bold text-bocado-dark-green">Mis Recetas</h2>
         </div>
         <p className="text-xs text-bocado-gray">Tus platos favoritos guardados</p>
+        {isLoading && <p className="text-[10px] text-bocado-green mt-1">Sincronizando...</p>}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 pb-24 no-scrollbar">
-        {isLoading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        ) : savedMeals.length === 0 ? (
+        {savedMeals.length === 0 ? (
           <div className="text-center py-12 px-6 bg-bocado-background rounded-2xl border-2 border-dashed border-bocado-border mx-4">
             <p className="text-bocado-gray text-base mb-2">Aún no has guardado recetas</p>
             <p className="text-xs text-bocado-gray/70">Dale ❤️ a las recetas para verlas aquí</p>
@@ -102,9 +91,9 @@ const SavedRecipesScreen: React.FC = () => {
               <MealCard 
                 key={index} 
                 meal={meal}
-                isSaved={true}
-                isSaving={isDeleting === meal.recipe.title}
-                onToggleSave={() => handleDeleteRequest(meal)}
+                onInteraction={(type) => {
+                  if (type === 'save') handleDeleteRequest(meal);
+                }}
               />
             ))}
           </div>
@@ -131,9 +120,10 @@ const SavedRecipesScreen: React.FC = () => {
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 bg-red-500 text-white font-bold py-3 rounded-full text-sm hover:bg-red-600 active:scale-95 transition-colors"
+                disabled={isLoading}
+                className="flex-1 bg-red-500 text-white font-bold py-3 rounded-full text-sm hover:bg-red-600 active:scale-95 transition-colors disabled:opacity-50"
               >
-                Eliminar
+                {isLoading ? '...' : 'Eliminar'}
               </button>
             </div>
           </div>

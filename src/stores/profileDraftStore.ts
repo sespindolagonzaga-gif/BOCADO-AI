@@ -2,30 +2,22 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { FormData } from '../types';
 
-// Tipo extendido del store
-interface ProfileState extends FormData {
-  isHydrated: boolean;
-  isDirty: boolean;
-  updateField: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
-  updateProfile: (data: Partial<FormData>) => void;
-  setProfile: (data: FormData) => void;
-  clearProfile: () => void;
-  markDirty: (dirty: boolean) => void;
-}
-
-// Solo los datos del formulario (sin estado del store)
+// Initial state basado exactamente en tu FormData
 const initialFormData: FormData = {
+  // AuthData
   firstName: '',
   lastName: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  
+  // UserProfile (sin uid, createdAt, updatedAt)
   gender: '',
   age: '',
   weight: '',
   height: '',
   country: '',
   city: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
   diseases: [],
   allergies: [],
   otherAllergies: '',
@@ -38,24 +30,35 @@ const initialFormData: FormData = {
   dislikedFoods: [],
 };
 
-export const useProfileStore = create<ProfileState>()(
+interface ProfileDraftState extends FormData {
+  isHydrated: boolean;
+  isDirty: boolean;
+  updateField: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+  updateProfile: (data: Partial<FormData>) => void;
+  clearDraft: () => void;
+  markDirty: (dirty: boolean) => void;
+}
+
+export const useProfileDraftStore = create<ProfileDraftState>()(
   persist(
     (set) => ({
       ...initialFormData,
       isHydrated: false,
       isDirty: false,
+      
       updateField: (field, value) => set((state) => ({ 
         ...state, 
         [field]: value,
         isDirty: true 
       })),
+      
       updateProfile: (data) => set((state) => ({ 
         ...state, 
         ...data,
         isDirty: true 
       })),
-      setProfile: (data) => set({ ...data, isHydrated: true, isDirty: false }),
-      clearProfile: () => set({ ...initialFormData, isHydrated: true, isDirty: false }),
+      
+      clearDraft: () => set({ ...initialFormData, isHydrated: true, isDirty: false }),
       markDirty: (dirty) => set({ isDirty: dirty }),
     }),
     {

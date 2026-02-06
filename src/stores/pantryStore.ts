@@ -1,3 +1,4 @@
+// stores/pantryStore.ts
 import { create } from 'zustand';
 import { KitchenItem, Freshness, Zone } from '../types';
 
@@ -6,6 +7,7 @@ interface PantryState {
   isLoading: boolean;
   lastUpdated: number | null;
   activeZone: Zone | null;
+  
   setItems: (items: KitchenItem[]) => void;
   addItem: (item: KitchenItem) => void;
   removeItem: (id: string) => void;
@@ -13,6 +15,8 @@ interface PantryState {
   toggleFreshness: (id: string) => void;
   setActiveZone: (zone: Zone | null) => void;
   setLoading: (loading: boolean) => void;
+  
+  // Selectores computados
   getItemsByZone: (zone: Zone) => KitchenItem[];
   getUrgentItems: () => KitchenItem[];
 }
@@ -62,7 +66,6 @@ export const usePantryStore = create<PantryState>((set, get) => ({
   setActiveZone: (zone) => set({ activeZone: zone }),
   setLoading: (loading) => set({ isLoading: loading }),
   
-  // Selectores computados (no persistidos, calculados on-demand)
   getItemsByZone: (zone) => get().items.filter(item => item.zone === zone),
   getUrgentItems: () => get().items.filter(item => 
     item.freshness === 'expired' || item.freshness === 'soon'

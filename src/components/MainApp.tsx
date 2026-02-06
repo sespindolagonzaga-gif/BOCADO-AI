@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import BottomTabBar, { Tab } from './BottomTabBar';
 import RecommendationScreen from './RecommendationScreen';
 import PantryScreen from './PantryScreen';
@@ -7,7 +7,8 @@ import SavedRecipesScreen from './SavedRecipesScreen';
 import SavedRestaurantsScreen from './SavedRestaurantsScreen';
 import TutorialModal from './TutorialModal';
 import { auth } from '../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
+import { updateProfile } from 'firebase/auth'; // ✅ Para actualizar nombre en Auth
+import { useAuthStore } from '../stores/authStore';
 
 interface MainAppProps {
   onPlanGenerated: (id: string) => void;
@@ -16,74 +17,63 @@ interface MainAppProps {
   onLogoutComplete: () => void;
 }
 
-const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false, onTutorialFinished, onLogoutComplete }) => {
+const MainApp: React.FC<MainAppProps> = ({ 
+  onPlanGenerated, 
+  showTutorial = false, 
+  onTutorialFinished, 
+  onLogoutComplete 
+}) => {
   const [activeTab, setActiveTab] = useState<Tab>('recommendation');
-  const [userUid, setUserUid] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>('');
   const [isTutorialOpen, setIsTutorialOpen] = useState(showTutorial);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // ✅ ZUSTAND: Solo usamos Auth (Firestore no tiene nombres por privacidad)
+  const { user, isLoading, isAuthenticated } = useAuthStore();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserUid(user.uid);
-        
-        let foundName = '';
-        if (user.displayName) {
-          foundName = user.displayName.split(' ')[0];
-        } else {
-          const savedData = localStorage.getItem('bocado-profile-data');
-          if (savedData) {
-            try {
-              const parsed = JSON.parse(savedData);
-              foundName = parsed.firstName || '';
-            } catch (e) {
-              console.error("Error al parsear datos locales", e);
-            }
-          }
-        }
-        
-        setUserName(foundName);
-        
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 150);
-
-      } else {
-        setUserUid(null); 
-        localStorage.removeItem('bocado-profile-data');
-        onLogoutComplete();
-      }
-    });
-
-    return () => unsubscribe();
-  }, [onLogoutComplete]);
+  // El nombre viene de Firebase Auth (displayName), no de Firestore
+  const userName = user?.displayName?.split(' ')[0] || '';
+  const userUid = user?.uid || null;
 
   const handleTutorialClose = () => {
     setIsTutorialOpen(false);
     onTutorialFinished(); 
   };
 
-  const handleLogout = () => {
-    auth.signOut();
+  const handleLogout = async () => {
+    try {
+      await auth.signOut();
+      onLogoutComplete();
+    } catch (error) {
+      console.error("Error al cerrar sesión:", error);
+    }
   };
   
-  const handleProfileUpdate = (newFirstName: string) => {
-      setUserName(newFirstName);
+  // ✅ Actualiza el nombre en Firebase Auth (no en Firestore por protección de datos)
+  const handleProfileUpdate = async (newFirstName: string) => {
+    if (user) {
+      try {
+        await updateProfile(user, {
+          displayName: `${newFirstName} ${user.displayName?.split(' ').slice(1).join(' ') || ''}`
+        });
+        // Forzamos actualización del store de auth
+        useAuthStore.getState().setUser(user);
+      } catch (error) {
+        console.error("Error actualizando nombre:", error);
+      }
+    }
   };
 
   if (isLoading) {
-      return (
-          <div className="flex-1 flex items-center justify-center bg-bocado-background">
-              <div className="text-center">
-                  <div className="w-12 h-12 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                  <p className="text-bocado-green font-bold animate-pulse">Sincronizando Bocado...</p>
-              </div>
-          </div>
-      );
+    return (
+      <div className="flex-1 flex items-center justify-center bg-bocado-background">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-bocado-green font-bold animate-pulse">Sincronizando Bocado...</p>
+        </div>
+      </div>
+    );
   }
   
-  if (!userUid) return null;
+  if (!isAuthenticated || !userUid) return null;
 
   return (
     <div className="flex-1 flex flex-col relative bg-bocado-background overflow-hidden">
@@ -92,7 +82,6 @@ const MainApp: React.FC<MainAppProps> = ({ onPlanGenerated, showTutorial = false
         <TutorialModal onClose={handleTutorialClose} userName={userName} />
       )}
 
-      {/* Contenido scrollable */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pb-20">
         <div className="max-w-md mx-auto">
           {activeTab === 'recommendation' && (

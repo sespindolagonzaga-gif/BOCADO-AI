@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useProfileDraftStore } from '../stores/profileDraftStore';
 import { FormData, UserProfile } from '../types';
 import ProgressBar from './ProgressBar';
 import Step1 from './form-steps/Step1';
@@ -16,43 +17,6 @@ import { env } from '../environment/env';
 
 const TOTAL_STEPS = 3;
 
-const getInitialState = (): FormData => {
-  const savedData = localStorage.getItem('bocado-form');
-  if (savedData) {
-    const data = JSON.parse(savedData);
-    return {
-      firstName: data.firstName || '',
-      lastName: data.lastName || '',
-      gender: data.gender || '',
-      age: data.age || '',
-      weight: data.weight || '',
-      height: data.height || '',
-      country: data.country || '',
-      city: data.city || '',
-      email: data.email || '',
-      password: '',
-      confirmPassword: '',
-      diseases: Array.isArray(data.diseases) ? data.diseases : [],
-      allergies: Array.isArray(data.allergies) ? data.allergies : [],
-      otherAllergies: data.otherAllergies || '',
-      eatingHabit: data.eatingHabit || '',
-      activityLevel: data.activityLevel || '',
-      otherActivityLevel: data.otherActivityLevel || '',
-      activityFrequency: data.activityFrequency || '',
-      nutritionalGoal: Array.isArray(data.nutritionalGoal) ? data.nutritionalGoal : [],
-      cookingAffinity: data.cookingAffinity || '',
-      dislikedFoods: Array.isArray(data.dislikedFoods) ? data.dislikedFoods : [],
-    };
-  }
-  return {
-    firstName: '', lastName: '', gender: '', age: '', weight: '', height: '',
-    country: '', city: '', email: '', password: '', confirmPassword: '', 
-    diseases: [], allergies: [], otherAllergies: '', eatingHabit: '', 
-    activityLevel: '', otherActivityLevel: '', activityFrequency: '',
-    nutritionalGoal: [], cookingAffinity: '', dislikedFoods: [],
-  };
-};
-
 interface RegistrationFlowProps {
   onRegistrationComplete: () => void;
   onGoHome: () => void;
@@ -60,7 +24,6 @@ interface RegistrationFlowProps {
 
 const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationComplete, onGoHome }) => {
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>(getInitialState());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submissionError, setSubmissionError] = useState('');
@@ -70,9 +33,13 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   const [cityOptions, setCityOptions] = useState<any[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('bocado-form', JSON.stringify(formData));
-  }, [formData]);
+  // ✅ ZUSTAND: Obtenemos datos y funciones del store
+  const formData = useProfileDraftStore((state) => state);
+  const updateField = useProfileDraftStore((state) => state.updateField);
+  const clearDraft = useProfileDraftStore((state) => state.clearDraft);
+  const isHydrated = useProfileDraftStore((state) => state.isHydrated);
+
+  // Ya NO necesitamos useEffect para localStorage, Zustand lo maneja automáticamente
   
   const validateStep = useCallback(async () => {
     const newErrors: Record<string, string> = {};
@@ -153,15 +120,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
 
       await sendEmailVerification(user);
       
-      const fullProfileData = {
-        ...userProfile,
-        firstName: authData.firstName,
-        lastName: authData.lastName,
-        email: authData.email,
-      };
-      
-      localStorage.setItem('bocado-profile-data', JSON.stringify(fullProfileData));
-      localStorage.removeItem('bocado-form');
+      // ✅ LIMPIAMOS DRAFT DE ZUSTAND (elimina de localStorage también)
+      clearDraft();
       
       setRegisteredEmail(authData.email);
       setShowVerificationModal(true);
@@ -206,8 +166,9 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     }
   };
 
+  // Wrapper para mantener compatibilidad con Steps existentes
   const updateFormData = (field: keyof FormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    updateField(field, value);
   };
 
   const handleSearchCity = async (query: string) => {
@@ -236,8 +197,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   };
 
   const handleCountryChange = (code: string) => {
-    updateFormData('country', code);
-    updateFormData('city', '');
+    updateField('country', code);
+    updateField('city', '');
   };
 
   const renderStep = () => {
@@ -264,7 +225,16 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
     }
   };
 
-  // Modal de verificación
+  // ✅ ESPERAR REHIDRATACIÓN: Evita que el formulario se resetee al recargar
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bocado-cream">
+        <div className="w-12 h-12 border-4 border-bocado-green border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  // Modal de verificación...
   if (showVerificationModal) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-6 pt-safe pb-safe">
