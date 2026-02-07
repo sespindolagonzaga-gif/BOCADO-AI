@@ -93,7 +93,7 @@ const usePlanQuery = (planId: string | undefined, userId: string | undefined) =>
       return new Promise<Plan>((resolve, reject) => {
         if (!planId || !userId) return reject(new Error('Faltan parámetros'));
         let resolved = false;
-        const timeoutId = setTimeout(() => { if (!resolved) reject(new Error('Timeout: No se encontró el plan')); }, 45000);
+        const timeoutId = setTimeout(() => { if (!resolved) reject(new Error('Timeout: No se encontró el plan')); }, 90000);
 
         const unsubRec = onSnapshot(query(collection(db, "historial_recetas"), where("user_id", "==", userId)), (snap) => {
           const found = snap.docs.map(processFirestoreDoc).find(p => p?.interaction_id === planId || p?._id === planId);
