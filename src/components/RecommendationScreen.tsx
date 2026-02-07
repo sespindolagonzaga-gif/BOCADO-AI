@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { EATING_HABITS, MEALS, CRAVINGS } from '../constants';
 import BocadoLogo from './BocadoLogo';
-import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEvent
+import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { CurrencyService } from '../data/budgets';
 import { useUserProfile } from '../hooks/useUser';
@@ -30,6 +30,12 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const [selectedBudget, setSelectedBudget] = useState('');
   const [cookingTime, setCookingTime] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  
+  // Prevenir clicks múltiples
+  const isProcessingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const { user } = useAuthStore();
   const { data: profile, isLoading: isProfileLoading } = useUserProfile(user?.uid);
@@ -38,12 +44,29 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
 
+  // Limpiar abort controller al desmontar
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  // Countdown para rate limit
+  useEffect(() => {
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [countdown]);
+
   const handleTypeChange = (type: 'En casa' | 'Fuera') => {
-      // ✅ ANALÍTICA: Selección de tipo de comida
       trackEvent('recommendation_type_selected', { type });
-      
       setRecommendationType(type);
       setSelectedBudget('');
+      setError(null); // Limpiar errores previos
+      
       if (type === 'En casa') setSelectedCravings([]);
       else {
           setSelectedMeal('');
@@ -52,6 +75,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   };
 
   const handleGenerateRecommendation = async () => {
+    // Prevenir ejecución si ya está procesando
+    if (isProcessingRef.current || isGenerating) return;
+    
     const isHomeSelectionComplete = recommendationType === 'En casa' && selectedMeal;
     const isAwaySelectionComplete = recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget;
     
@@ -61,7 +87,13 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       return;
     }
 
+    // Bloquear inmediatamente
+    isProcessingRef.current = true;
     setIsGenerating(true);
+    setError(null);
+    
+    // Crear nuevo abort controller
+    abortControllerRef.current = new AbortController();
 
     const cravingsList = recommendationType === 'Fuera' && selectedCravings.length > 0
       ? selectedCravings.map(stripEmoji)
@@ -80,7 +112,6 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       procesado: false,
     };
 
-    // ✅ ANALÍTICA: Inicio de generación
     trackEvent('recommendation_generation_start', {
       type: recommendationType,
       meal: interactionData.mealType,
@@ -89,38 +120,64 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     });
 
     try {
+      // 1. Guardar en Firestore
       const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
       
-      onPlanGenerated(newDoc.id);
-      
-      fetch(env.api.recommendationUrl, {
+      // 2. Llamar a la API con manejo de errores
+      const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...interactionData, _id: newDoc.id })
-      })
-      .then(() => {
-          // ✅ ANALÍTICA: Éxito en la llamada a la API
-          trackEvent('recommendation_api_success', { type: recommendationType });
-      })
-      .catch(error => {
-        console.error("Background fetch error:", error);
-        // ✅ ANALÍTICA: Error en la llamada a la API
-        trackEvent('recommendation_api_error', { error: 'fetch_failed' });
+        body: JSON.stringify({ ...interactionData, _id: newDoc.id }),
+        signal: abortControllerRef.current.signal
+      });
+
+      // Manejar específicamente el 429 (Rate Limit)
+      if (response.status === 429) {
+        const errorData = await response.json().catch(() => ({}));
+        const retryAfter = errorData.retryAfter || 30;
+        
+        setCountdown(retryAfter);
+        setError(`⏳ ${errorData.error || 'Por favor espera unos segundos'}`);
+        
+        trackEvent('recommendation_rate_limited', { 
+          retryAfter,
+          type: recommendationType 
+        });
+        
+        // No navegar, quedarse en la pantalla
+        setIsGenerating(false);
+        isProcessingRef.current = false;
+        return;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+
+      // Éxito: navegar a la siguiente pantalla
+      trackEvent('recommendation_api_success', { type: recommendationType });
+      onPlanGenerated(newDoc.id);
+      
+    } catch (error: any) {
+      // Ignorar errores de abort
+      if (error.name === 'AbortError') return;
+      
+      console.error("Error generating recommendation:", error);
+      
+      trackEvent('recommendation_generation_error', { 
+        error: error.message,
+        type: recommendationType 
       });
       
-    } catch (error) {
-      console.error("Error generating recommendation:", error);
-      // ✅ ANALÍTICA: Error guardando en Firestore
-      trackEvent('recommendation_generation_error', { error: 'firestore_save_failed' });
-      
-      alert('Tuvimos un problema. Por favor, intenta de nuevo.');
+      setError('Tuvimos un problema. Por favor, intenta de nuevo.');
       setIsGenerating(false);
+      isProcessingRef.current = false;
     }
   };
 
   const toggleCraving = (craving: string) => {
     const isSelecting = !selectedCravings.includes(craving);
-    // ✅ ANALÍTICA: Interacción con antojos
     trackEvent('recommendation_craving_toggle', { 
         craving: stripEmoji(craving),
         action: isSelecting ? 'select' : 'deselect'
@@ -132,9 +189,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   };
 
   const handleMealSelect = (meal: string) => {
-    // ✅ ANALÍTICA: Selección de platillo específico
     trackEvent('recommendation_meal_selected', { meal: stripEmoji(meal) });
     setSelectedMeal(meal);
+    setError(null);
   };
 
   const isSelectionMade = (recommendationType === 'En casa' && selectedMeal) || 
@@ -160,13 +217,26 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         <p className="text-sm text-bocado-gray mt-1">¿Dónde y qué quieres comer hoy?</p>
       </div>
 
+      {/* Mensaje de error */}
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl animate-fade-in">
+          <p className="text-red-600 text-sm font-medium text-center">{error}</p>
+          {countdown > 0 && (
+            <p className="text-red-500 text-xs text-center mt-1">
+              Reintentar en {countdown} segundos...
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Selector principal */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         {EATING_HABITS.map(habit => (
           <button 
             key={habit} 
             onClick={() => handleTypeChange(habit as any)} 
-            className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] ${
+            disabled={isGenerating}
+            className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 ${
               recommendationType === habit 
                 ? 'bg-bocado-green text-white border-bocado-green shadow-bocado' 
                 : 'bg-white text-bocado-text border-bocado-border hover:border-bocado-green/50'
@@ -189,7 +259,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                   <button 
                     key={meal} 
                     onClick={() => handleMealSelect(meal)} 
-                    className={`py-3 px-2 rounded-xl border-2 text-sm font-bold transition-all active:scale-[0.98] ${
+                    disabled={isGenerating}
+                    className={`py-3 px-2 rounded-xl border-2 text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${
                       selectedMeal === meal 
                         ? 'bg-bocado-green text-white border-bocado-green shadow-sm' 
                         : 'bg-white text-bocado-dark-gray border-bocado-border'
@@ -212,11 +283,12 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                     max="65" 
                     step="5" 
                     value={cookingTime} 
+                    disabled={isGenerating}
                     onChange={(e) => {
                         setCookingTime(Number(e.target.value));
                     }} 
                     onMouseUp={() => trackEvent('recommendation_time_adjusted', { time: cookingTime })}
-                    className="w-full h-2 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green" 
+                    className="w-full h-2 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50" 
                   />
                 </div>
               )}
@@ -230,7 +302,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                     <button 
                       key={craving} 
                       onClick={() => toggleCraving(craving)} 
-                      className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all active:scale-[0.98] ${
+                      disabled={isGenerating}
+                      className={`py-3 px-2 rounded-xl border-2 text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-50 ${
                         selectedCravings.includes(craving) 
                           ? 'bg-bocado-green text-white border-bocado-green shadow-sm' 
                           : 'bg-white text-bocado-dark-gray border-bocado-border'
@@ -253,8 +326,10 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                       onClick={() => {
                           trackEvent('recommendation_budget_selected', { budget: option.value });
                           setSelectedBudget(option.value);
+                          setError(null);
                       }} 
-                      className={`w-full py-3 px-4 rounded-xl border-2 text-sm font-bold transition-all flex justify-between items-center active:scale-[0.98] ${
+                      disabled={isGenerating}
+                      className={`w-full py-3 px-4 rounded-xl border-2 text-sm font-bold transition-all flex justify-between items-center active:scale-[0.98] disabled:opacity-50 ${
                         selectedBudget === option.value 
                           ? 'bg-bocado-green text-white border-bocado-green shadow-sm' 
                           : 'bg-white text-bocado-dark-gray border-bocado-border'
@@ -273,14 +348,16 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
           <div className={`mt-6 transition-all duration-300 ${isSelectionMade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
             <button 
               onClick={handleGenerateRecommendation} 
-              disabled={isGenerating} 
-              className="w-full bg-bocado-green text-white font-bold py-4 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray flex items-center justify-center gap-2"
+              disabled={isGenerating || countdown > 0} 
+              className="w-full bg-bocado-green text-white font-bold py-4 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isGenerating ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   <span>Cocinando...</span>
                 </>
+              ) : countdown > 0 ? (
+                <span>Espera {countdown}s...</span>
               ) : "¡A comer! 🍽️"}
             </button>
           </div>

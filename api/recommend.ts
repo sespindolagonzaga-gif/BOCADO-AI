@@ -198,7 +198,69 @@ const scoreIngredients = (
 };
 
 // ============================================
-// 6. HANDLER PRINCIPAL
+// 6. RATE LIMITING ROBUSTO (LIMPIA ATASCOS)
+// ============================================
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; secondsLeft?: number; error?: string }> {
+  try {
+    // Buscar interacciones de los últimos 10 minutos (sin ordenar para evitar índice obligatorio)
+    const recentSnap = await db.collection('user_interactions')
+      .where('userId', '==', userId)
+      .where('createdAt', '>', new Date(Date.now() - 10 * 60 * 1000))
+      .get();
+    
+    const now = Date.now();
+    const COOLDOWN = 30000; // 30 segundos entre requests
+    const STUCK_THRESHOLD = 120000; // 2 minutos para considerar atascado
+    
+    let hasActiveProcess = false;
+    let lastCompletedTime = 0;
+    
+    for (const doc of recentSnap.docs) {
+      const data = doc.data();
+      const status = data.status;
+      const createdAt = data.createdAt?.toMillis() || 0;
+      
+      // Limpiar procesos atascados automáticamente
+      if (status === 'processing') {
+        if (now - createdAt > STUCK_THRESHOLD) {
+          console.log(`🧹 Limpiando proceso atascado ${doc.id} (${Math.round((now - createdAt)/1000)}s)`);
+          await doc.ref.update({ 
+            status: 'timeout', 
+            error: 'Auto-cleanup: proceso atascado',
+            cleanedAt: FieldValue.serverTimestamp()
+          });
+        } else {
+          hasActiveProcess = true;
+        }
+      }
+      
+      if (status === 'completed' || status === 'error' || status === 'timeout') {
+        if (createdAt > lastCompletedTime) {
+          lastCompletedTime = createdAt;
+        }
+      }
+    }
+    
+    if (hasActiveProcess) {
+      return { allowed: false, secondsLeft: 30, error: 'Ya estás generando una recomendación. Espera un momento.' };
+    }
+    
+    if (lastCompletedTime > 0 && now - lastCompletedTime < COOLDOWN) {
+      const secondsLeft = Math.ceil((COOLDOWN - (now - lastCompletedTime)) / 1000);
+      return { allowed: false, secondsLeft, error: `Espera ${secondsLeft} segundos antes de generar otra recomendación.` };
+    }
+    
+    return { allowed: true };
+  } catch (error: any) {
+    console.error('Rate limit check error:', error);
+    // Si falla la verificación (ej: índice faltante), permitir el request (fail open)
+    return { allowed: true };
+  }
+}
+
+// ============================================
+// 7. HANDLER PRINCIPAL
 // ============================================
 
 export default async function handler(req: any, res: any) {
@@ -222,56 +284,28 @@ export default async function handler(req: any, res: any) {
     }
 
     // ============================================
-    // ✅ RATE LIMIT CON TRANSACCIÓN ATÓMICA
+    // ✅ NUEVO RATE LIMIT (LIMPIA ATASCOS)
     // ============================================
-    interactionRef = db.collection('user_interactions').doc(interactionId);
-    const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
-
-    try {
-      await db.runTransaction(async (transaction) => {
-        // 1. Buscar última interacción del usuario
-        const lastQuery = db.collection('user_interactions')
-          .where('userId', '==', userId)
-          .orderBy('createdAt', 'desc')
-          .limit(1);
-        
-        const lastSnap = await transaction.get(lastQuery);
-        
-        if (!lastSnap.empty) {
-          const lastData = lastSnap.docs[0].data();
-          const lastTime = lastData.createdAt?.toMillis() || 0;
-          const now = Date.now();
-          
-          // Bloquear si pasaron menos de 30 segundos
-          if (now - lastTime < 30000) {
-            const secondsLeft = Math.ceil((30000 - (now - lastTime)) / 1000);
-            throw new Error(`RATE_LIMIT:${secondsLeft}`);
-          }
-        }
-        
-        // 2. Crear documento INMEDIATAMENTE con status processing
-        // Esto bloquea cualquier otra request concurrente
-        transaction.set(interactionRef!, {
-          userId,
-          interaction_id: interactionId,
-          createdAt: FieldValue.serverTimestamp(),
-          status: 'processing',
-          tipo: type,
-          iniciado: true
-        });
+    const rateCheck = await checkRateLimit(userId);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({ 
+        error: rateCheck.error,
+        retryAfter: rateCheck.secondsLeft 
       });
-    } catch (txError: any) {
-      if (txError.message?.startsWith('RATE_LIMIT:')) {
-        const seconds = txError.message.split(':')[1];
-        return res.status(429).json({ 
-          error: `Espera ${seconds} segundos antes de generar otra recomendación.` 
-        });
-      }
-      throw txError;
     }
 
-    // Si llegamos aquí, tenemos el "lock" y podemos procesar seguro
-    
+    // Crear documento de interacción INMEDIATAMENTE (antes de cualquier await largo)
+    interactionRef = db.collection('user_interactions').doc(interactionId);
+    await interactionRef.set({
+      userId,
+      interaction_id: interactionId,
+      createdAt: FieldValue.serverTimestamp(),
+      status: 'processing',
+      tipo: type
+    });
+
+    const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
+
     // 1. Obtener Perfil de Usuario
     const userSnap = await db.collection('users').doc(userId).get();
     if (!userSnap.exists) {
@@ -281,26 +315,30 @@ export default async function handler(req: any, res: any) {
     const user = userSnap.data() as UserProfile;
 
     // 2. Obtener Historial para NO repetir
-    const historySnap = await db.collection(historyCol)
-      .where('user_id', '==', userId)
-      .orderBy('fecha_creacion', 'desc')
-      .limit(5)
-      .get();
-    
     let historyContext = "";
-    if (!historySnap.empty) {
-      const recent = historySnap.docs.map(doc => {
-        const d = doc.data();
-        return type === 'En casa' 
-          ? d.receta?.recetas?.map((r: any) => r.titulo)
-          : d.recomendaciones?.map((r: any) => r.nombre_restaurante);
-      }).flat().filter(Boolean);
-      if (recent.length > 0) {
-        historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}. INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.`;
+    try {
+      const historySnap = await db.collection(historyCol)
+        .where('user_id', '==', userId)
+        .orderBy('fecha_creacion', 'desc')
+        .limit(5)
+        .get();
+      
+      if (!historySnap.empty) {
+        const recent = historySnap.docs.map(doc => {
+          const d = doc.data();
+          return type === 'En casa' 
+            ? d.receta?.recetas?.map((r: any) => r.titulo)
+            : d.recomendaciones?.map((r: any) => r.nombre_restaurante);
+        }).flat().filter(Boolean);
+        if (recent.length > 0) {
+          historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}. INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.`;
+        }
       }
+    } catch (e) {
+      console.log("No se pudo obtener historial:", e);
     }
 
-    // 3. Obtener Feedback previo para aprender gustos
+    // 3. Obtener Feedback previo
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -310,11 +348,10 @@ export default async function handler(req: any, res: any) {
         
       if (!feedbackSnap.empty) {
         const logs = feedbackSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
+          .map(d => d.data())
           .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
-          .map((data: any) => {
-            return `- ${data.itemId}: ${data.rating}/5 estrellas${data.comment ? ` - "${data.comment}"` : ''}`;
-          }).join('\n');
+          .map((data: any) => `- ${data.itemId}: ${data.rating}/5${data.comment ? ` - "${data.comment}"` : ''}`)
+          .join('\n');
         feedbackContext = `### ⭐️ PREFERENCIAS BASADAS EN FEEDBACK PREVIO:\n${logs}\nUsa esto para entender qué le gusta o no al usuario.`;
       }
     } catch (e) {
@@ -499,10 +536,9 @@ Responde ÚNICAMENTE con este JSON exacto:
       }
     }
 
-    // 6. Guardar en Firestore (Historial principal + actualizar interacción)
+    // 6. Guardar en Firestore
     const batch = db.batch();
     
-    // Guardar en historial específico (recetas o restaurantes)
     const historyRef = db.collection(historyCol).doc();
     batch.set(historyRef, {
       user_id: userId,
@@ -512,7 +548,6 @@ Responde ÚNICAMENTE con este JSON exacto:
       ...parsedData
     });
     
-    // Actualizar interacción a completada
     batch.update(interactionRef, {
       procesado: true,
       status: 'completed',
@@ -527,7 +562,6 @@ Responde ÚNICAMENTE con este JSON exacto:
   } catch (error: any) {
     console.error("❌ Error completo:", error);
     
-    // Si tenemos referencia a la interacción, marcar como error
     if (interactionRef) {
       try {
         await interactionRef.update({
