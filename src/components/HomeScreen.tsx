@@ -46,13 +46,13 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 pt-safe">
       {/* Logo */}
-      <div className="w-48 sm:w-64 md:w-80 mb-8">
+      <div className="w-48 sm:w-72 md:w-84 mb-8">
         <BocadoLogo className="w-full h-auto" />
       </div>
 
       {/* Texto */}
       <div className="text-center max-w-sm mb-10">
-        <h1 className="text-2xl sm:text-3xl font-bold text-bocado-dark-gray mb-3">
+        <h1 className="text-xl sm:text-xl font-bold text-bocado-dark-gray mb-3">
           ¿Qué comer hoy?{' '}
           <span className="underline decoration-bocado-green decoration-4 underline-offset-4">
             Ya no es problema
