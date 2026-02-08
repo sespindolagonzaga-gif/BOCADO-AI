@@ -84,7 +84,7 @@ const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
         por_que_es_bueno: rec.por_que_es_bueno || null,
         hack_saludable: rec.hack_saludable || null,
         
-        // Arrays vacíos para restaurantes (no se usan pero evitan undefined)
+        // Arrays vacíos para restaurantes
         ingredients: [],
         instructions: []
       }
@@ -209,8 +209,10 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col animate-fade-in">
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 no-scrollbar">
+    // ✅ CORREGIDO: h-full y min-h-0 para forzar el scroll correcto
+    <div className="flex-1 flex flex-col h-full min-h-0 animate-fade-in">
+      {/* ✅ CORREGIDO: overflow-y-auto con flex-1 y min-h-0 */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 no-scrollbar min-h-0">
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold text-bocado-dark-green mb-3">¡Listo! 🥗</h1>
           <div className="p-4 bg-bocado-green/10 rounded-2xl">
@@ -218,7 +220,8 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
           </div>
         </div>
         
-        <div className="space-y-3">
+        {/* ✅ Agregado max-w-2xl mx-auto para mejor lectura en desktop */}
+        <div className="space-y-3 max-w-2xl mx-auto">
           {selectedPlan.meals.map((meal, index) => (
             <MealCard 
               key={index} 
@@ -229,15 +232,21 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
             />
           ))}
         </div>
+        
+        {/* Espacio adicional al final para asegurar que todo sea visible */}
+        <div className="h-20"></div>
       </div>
       
-      <div className="px-4 py-4 border-t border-bocado-border bg-white">
-        <button 
-          onClick={handleStartNew}
-          className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-        >
-          Volver al inicio
-        </button>
+      {/* ✅ Botón fijo abajo con z-index */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-4 border-t border-bocado-border bg-white z-10 md:relative md:bottom-auto md:border-t-0 md:bg-transparent md:px-4 md:py-2">
+        <div className="max-w-2xl mx-auto">
+          <button 
+            onClick={handleStartNew}
+            className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
+          >
+            Volver al inicio
+          </button>
+        </div>
       </div>
     </div>
   );
