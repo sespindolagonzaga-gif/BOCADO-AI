@@ -131,14 +131,12 @@ export const useSavedItems = (
     enabled: !!userId,
   });
 
-  // Query principal
+  // Query principal - Solo para la primera página
   const queryResult = useQuery<FetchSavedItemsResult>({
-    queryKey: [key, userId, 'page', paginationState.currentPage],
+    queryKey: [key, userId, 'page', 1],
     queryFn: async () => {
       if (!userId) return { items: [], hasMore: false };
-      
-      const cursor = paginationState.cursors[paginationState.currentPage - 1];
-      return fetchSavedItems(userId, type, cursor);
+      return fetchSavedItems(userId, type, undefined);
     },
     enabled: !!userId,
     staleTime: 1000 * 60 * 2,
@@ -148,63 +146,72 @@ export const useSavedItems = (
     placeholderData: (previousData: FetchSavedItemsResult | undefined) => previousData,
   });
 
-  // Acumular items de todas las páginas
+  // Acumular items de todas las páginas cargadas
   const [allItems, setAllItems] = useState<SavedItem[]>([]);
+  const [loadedPages, setLoadedPages] = useState<Set<number>>(new Set());
   
+  // Efecto para manejar la primera página
   useEffect(() => {
-    if (queryResult.data) {
-      setAllItems((prev: SavedItem[]) => {
-        const startIndex = (paginationState.currentPage - 1) * PAGE_SIZE;
-        const newItems = [...prev];
-        
-        // Reemplazar/agregar items de la página actual
-        queryResult.data.items.forEach((item: SavedItem, index: number) => {
-          newItems[startIndex + index] = item;
-        });
-        
-        return newItems.slice(0, startIndex + queryResult.data.items.length);
-      });
-      
+    if (queryResult.data && !loadedPages.has(1)) {
+      setAllItems(queryResult.data.items);
       setPaginationState(prev => ({
         ...prev,
         hasMore: queryResult.data.hasMore,
+        cursors: [undefined, queryResult.data.nextCursor].filter(Boolean) as (Timestamp | undefined)[],
       }));
+      setLoadedPages(new Set([1]));
     }
-  }, [queryResult.data, paginationState.currentPage]);
+  }, [queryResult.data, loadedPages]);
 
   // Función para cargar siguiente página
   const fetchNextPage = useCallback(async () => {
     if (!paginationState.hasMore || paginationState.isFetchingNextPage || !userId) return;
     
+    const nextPageNum = paginationState.currentPage + 1;
+    
+    // Verificar si ya cargamos esta página
+    if (loadedPages.has(nextPageNum)) return;
+    
     setPaginationState(prev => ({ ...prev, isFetchingNextPage: true }));
     
     try {
-      const nextPage = paginationState.currentPage + 1;
-      const cursor = paginationState.cursors[paginationState.currentPage - 1];
+      const cursor = paginationState.cursors[paginationState.currentPage];
       
       const result = await fetchSavedItems(userId, type, cursor);
       
-      // Guardar en cache
-      queryClient.setQueryData(
-        [key, userId, 'page', nextPage],
-        result
-      );
+      // Agregar nuevos items a la lista acumulada
+      setAllItems(prev => [...prev, ...result.items]);
       
       setPaginationState(prev => ({
-        ...prev,
-        currentPage: nextPage,
+        currentPage: nextPageNum,
         hasMore: result.hasMore,
         isFetchingNextPage: false,
         cursors: [...prev.cursors, result.nextCursor],
       }));
+      
+      setLoadedPages(prev => new Set([...prev, nextPageNum]));
+      
     } catch (error) {
+      console.error('Error fetching next page:', error);
       setPaginationState(prev => ({ ...prev, isFetchingNextPage: false }));
     }
-  }, [paginationState, userId, type, key, queryClient]);
+  }, [paginationState, userId, type, loadedPages]);
+
+  // Resetear estado cuando cambia el usuario o tipo
+  useEffect(() => {
+    setAllItems([]);
+    setLoadedPages(new Set());
+    setPaginationState({
+      currentPage: 1,
+      hasMore: true,
+      isFetchingNextPage: false,
+      cursors: [undefined],
+    });
+  }, [userId, type, key]);
 
   return {
     data: allItems,
-    isLoading: queryResult.isLoading,
+    isLoading: queryResult.isLoading && allItems.length === 0,
     isError: queryResult.isError,
     error: queryResult.error,
     fetchNextPage,
@@ -300,7 +307,7 @@ export const useToggleSavedItem = () => {
 };
 
 // ============================================
-// CHECK IF SAVED (helper)
+// CHECK IF SAVED (helper) - Usa el mismo caché que useSavedItems
 // ============================================
 
 export const useIsItemSaved = (
@@ -310,19 +317,19 @@ export const useIsItemSaved = (
 ): boolean => {
   const key = type === 'recipe' ? SAVED_RECIPES_KEY : SAVED_RESTAURANTS_KEY;
   
-  const { data: items } = useQuery<SavedItem[]>({
-    queryKey: [key, userId],
+  // Usar el mismo queryKey que useSavedItems para compartir el caché
+  const { data: result } = useQuery<FetchSavedItemsResult>({
+    queryKey: [key, userId, 'page', 1],
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
-    // Usar la misma función de fetch que el hook principal
+    gcTime: 1000 * 60 * 10,
     queryFn: async () => {
-      if (!userId) return [];
-      const result = await fetchSavedItems(userId, type, undefined, 100);
-      return result.items;
+      if (!userId) return { items: [], hasMore: false };
+      return fetchSavedItems(userId, type, undefined);
     },
   });
   
-  return (items || []).some((item: SavedItem) => item.recipe.title === title);
+  return (result?.items || []).some((item: SavedItem) => item.recipe.title === title);
 };
 
 // ============================================
@@ -337,9 +344,11 @@ export const useAllSavedItems = (
     refetchInterval: 60000,
     enabled: !!userId,
   });
+  
+  const key = type === 'recipe' ? SAVED_RECIPES_KEY : SAVED_RESTAURANTS_KEY;
 
   return useQuery<SavedItem[]>({
-    queryKey: [type === 'recipe' ? SAVED_RECIPES_KEY : SAVED_RESTAURANTS_KEY, userId, 'all'],
+    queryKey: [key, userId, 'all'],
     queryFn: async () => {
       if (!userId) return [];
       const result = await fetchSavedItems(userId, type, undefined, 1000);
