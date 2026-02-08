@@ -29,7 +29,7 @@ const SAVED_RESTAURANTS_KEY = 'savedRestaurants';
 const PAGE_SIZE = 20; // Número de items por página
 
 // ============================================
-// FETCH CON PAGINACIÓN
+// FETCH CON PAGINACIÓN (con fallback sin índice)
 // ============================================
 
 interface FetchSavedItemsResult {
@@ -46,46 +46,72 @@ const fetchSavedItems = async (
 ): Promise<FetchSavedItemsResult> => {
   const collectionName = type === 'recipe' ? 'saved_recipes' : 'saved_restaurants';
   
-  // Construir query base con ordenamiento
-  let q = query(
-    collection(db, collectionName),
-    where('user_id', '==', userId),
-    orderBy('savedAt', 'desc'),
-    limit(pageSize + 1) // +1 para detectar si hay más
-  );
-  
-  // Agregar cursor si existe (para paginación)
-  if (cursor) {
-    q = query(q, startAfter(cursor));
+  try {
+    // Intentar consulta optimizada con índice
+    let q = query(
+      collection(db, collectionName),
+      where('user_id', '==', userId),
+      orderBy('savedAt', 'desc'),
+      limit(pageSize + 1)
+    );
+    
+    if (cursor) {
+      q = query(q, startAfter(cursor));
+    }
+    
+    const snapshot = await getDocs(q);
+    
+    const docs = snapshot.docs;
+    const hasMore = docs.length > pageSize;
+    const itemsToReturn = hasMore ? docs.slice(0, pageSize) : docs;
+    
+    const items: SavedItem[] = itemsToReturn.map((docSnap): SavedItem => ({
+      id: docSnap.id,
+      type,
+      recipe: docSnap.data().recipe as Recipe,
+      mealType: docSnap.data().mealType || 'Guardado',
+      userId: docSnap.data().user_id,
+      savedAt: docSnap.data().savedAt?.toMillis?.() || Date.now(),
+    }));
+    
+    const nextCursor = hasMore && itemsToReturn.length > 0
+      ? docs[docs.length - 1].data().savedAt
+      : undefined;
+    
+    return { items, nextCursor, hasMore };
+    
+  } catch (error: any) {
+    // Si el error es por índice faltante, hacer fallback a consulta simple
+    if (error?.message?.includes('index') || error?.code === 'failed-precondition') {
+      console.warn(`⚠️ Índice faltante en ${collectionName}, usando fallback`);
+      
+      // Fallback: consulta sin orderBy (ordena en memoria)
+      const q = query(
+        collection(db, collectionName),
+        where('user_id', '==', userId),
+        limit(pageSize * 3) // Cargar más para compensar falta de orden
+      );
+      
+      const snapshot = await getDocs(q);
+      
+      // Ordenar en memoria por savedAt descendente
+      const items: SavedItem[] = snapshot.docs
+        .map((docSnap): SavedItem => ({
+          id: docSnap.id,
+          type,
+          recipe: docSnap.data().recipe as Recipe,
+          mealType: docSnap.data().mealType || 'Guardado',
+          userId: docSnap.data().user_id,
+          savedAt: docSnap.data().savedAt?.toMillis?.() || Date.now(),
+        }))
+        .sort((a, b) => b.savedAt - a.savedAt)
+        .slice(0, pageSize);
+      
+      return { items, hasMore: false }; // Sin paginación en fallback
+    }
+    
+    throw error;
   }
-  
-  const snapshot = await getDocs(q);
-  
-  const docs = snapshot.docs;
-  const hasMore = docs.length > pageSize;
-  
-  // Si hay más, quitar el último (era el +1)
-  const itemsToReturn = hasMore ? docs.slice(0, pageSize) : docs;
-  
-  const items: SavedItem[] = itemsToReturn.map((docSnap): SavedItem => ({
-    id: docSnap.id,
-    type,
-    recipe: docSnap.data().recipe as Recipe,
-    mealType: docSnap.data().mealType || 'Guardado',
-    userId: docSnap.data().user_id,
-    savedAt: docSnap.data().savedAt?.toMillis?.() || Date.now(),
-  }));
-  
-  // El cursor para la siguiente página es el último savedAt
-  const nextCursor = hasMore && itemsToReturn.length > 0
-    ? docs[docs.length - 1].data().savedAt
-    : undefined;
-  
-  return {
-    items,
-    nextCursor,
-    hasMore,
-  };
 };
 
 // ============================================

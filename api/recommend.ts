@@ -287,6 +287,8 @@ export default async function handler(req: any, res: any) {
     userId = request.userId;
     const { type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
+    
+    console.log(`🚀 Nueva solicitud: type=${type}, userId=${userId}, interactionId=${interactionId}`);
 
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
     if (!type || !['En casa', 'Fuera'].includes(type)) {
@@ -325,14 +327,46 @@ export default async function handler(req: any, res: any) {
 
     let historyContext = "";
     try {
-      const historySnap = await db.collection(historyCol)
-        .where('user_id', '==', userId)
-        .orderBy('fecha_creacion', 'desc')
-        .limit(5)
-        .get();
+      // Intentar consulta con índice
+      let historySnap;
+      try {
+        historySnap = await db.collection(historyCol)
+          .where('user_id', '==', userId)
+          .orderBy('fecha_creacion', 'desc')
+          .limit(5)
+          .get();
+      } catch (indexError: any) {
+        // Fallback sin orderBy si falta el índice
+        if (indexError?.message?.includes('index') || indexError?.code === 'failed-precondition') {
+          console.log('⚠️ Índice faltante en historial, usando fallback');
+          const allHistory = await db.collection(historyCol)
+            .where('user_id', '==', userId)
+            .limit(20)
+            .get();
+          // Ordenar manualmente
+          interface HistoryDoc {
+            id: string;
+            data: any;
+          }
+          const sortedDocs: HistoryDoc[] = allHistory.docs
+            .map((d: any) => ({ id: d.id, data: d.data() }))
+            .sort((a: HistoryDoc, b: HistoryDoc) => {
+              const aTime = a.data?.fecha_creacion?.toMillis?.() || 0;
+              const bTime = b.data?.fecha_creacion?.toMillis?.() || 0;
+              return bTime - aTime;
+            })
+            .slice(0, 5);
+          historySnap = { 
+            docs: sortedDocs.map(d => ({ ...d, data: () => d.data })), 
+            empty: sortedDocs.length === 0 
+          } as any;
+        } else {
+          throw indexError;
+        }
+      }
       
       if (!historySnap.empty) {
-        const recent = historySnap.docs.map(doc => {
+        const recent = historySnap.docs.map((doc: any) => {
           const d = doc.data();
           return type === 'En casa' 
             ? d.receta?.recetas?.map((r: any) => r.titulo)
@@ -342,8 +376,8 @@ export default async function handler(req: any, res: any) {
           historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}. INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.`;
         }
       }
-    } catch (e) {
-      console.log("No se pudo obtener historial:", e);
+    } catch (e: any) {
+      console.log("No se pudo obtener historial:", e?.message || e);
     }
 
     let feedbackContext = "";
@@ -598,12 +632,29 @@ IMPORTANTE:
 
   } catch (error: any) {
     console.error("❌ Error completo:", error);
+    console.error("Stack trace:", error.stack);
+    
+    // Identificar tipo de error para mejor diagnóstico
+    let errorMessage = error.message || "Error interno del servidor";
+    let statusCode = 500;
+    
+    if (error?.message?.includes('index') || error?.code === 'failed-precondition') {
+      errorMessage = "Error de configuración de base de datos. Contacta al administrador.";
+      statusCode = 500;
+    } else if (error?.message?.includes('timeout') || error?.code === 'deadline-exceeded') {
+      errorMessage = "La operación tomó demasiado tiempo. Intenta de nuevo.";
+      statusCode = 504;
+    }
     
     // ============================================
     // ERROR: Marcar proceso como fallido (no cuenta para rate limit)
     // ============================================
     if (userId) {
-      await rateLimiter.failProcess(userId, error.message);
+      try {
+        await rateLimiter.failProcess(userId, error.message);
+      } catch (rlError) {
+        console.error("Error actualizando rate limit:", rlError);
+      }
     }
     
     if (interactionRef) {
@@ -611,6 +662,7 @@ IMPORTANTE:
         await interactionRef.update({
           status: 'error',
           error: error.message,
+          errorDetails: error.stack?.substring(0, 1000) || '',
           errorAt: FieldValue.serverTimestamp()
         });
       } catch (e) {
@@ -618,8 +670,9 @@ IMPORTANTE:
       }
     }
     
-    return res.status(500).json({ 
-      error: error.message || "Error interno del servidor" 
+    return res.status(statusCode).json({ 
+      error: errorMessage,
+      code: error?.code || 'UNKNOWN_ERROR'
     });
   }
 }
