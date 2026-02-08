@@ -203,15 +203,14 @@ const scoreIngredients = (
 
 async function checkRateLimit(userId: string): Promise<{ allowed: boolean; secondsLeft?: number; error?: string }> {
   try {
-    // Buscar interacciones de los últimos 10 minutos (sin ordenar para evitar índice obligatorio)
     const recentSnap = await db.collection('user_interactions')
       .where('userId', '==', userId)
       .where('createdAt', '>', new Date(Date.now() - 10 * 60 * 1000))
       .get();
     
     const now = Date.now();
-    const COOLDOWN = 30000; // 30 segundos entre requests
-    const STUCK_THRESHOLD = 120000; // 2 minutos para considerar atascado
+    const COOLDOWN = 30000;
+    const STUCK_THRESHOLD = 120000;
     
     let hasActiveProcess = false;
     let lastCompletedTime = 0;
@@ -221,7 +220,6 @@ async function checkRateLimit(userId: string): Promise<{ allowed: boolean; secon
       const status = data.status;
       const createdAt = data.createdAt?.toMillis() || 0;
       
-      // Limpiar procesos atascados automáticamente
       if (status === 'processing') {
         if (now - createdAt > STUCK_THRESHOLD) {
           console.log(`🧹 Limpiando proceso atascado ${doc.id} (${Math.round((now - createdAt)/1000)}s)`);
@@ -254,13 +252,39 @@ async function checkRateLimit(userId: string): Promise<{ allowed: boolean; secon
     return { allowed: true };
   } catch (error: any) {
     console.error('Rate limit check error:', error);
-    // Si falla la verificación (ej: índice faltante), permitir el request (fail open)
     return { allowed: true };
   }
 }
 
 // ============================================
-// 7. HANDLER PRINCIPAL
+// 7. UTILIDAD PARA GENERAR LINKS DE MAPS
+// ============================================
+
+const generateMapsLink = (restaurantName: string, city: string): string => {
+  // Limpiar y codificar correctamente
+  const cleanName = restaurantName.replace(/[^\w\s-]/g, '').trim();
+  const cleanCity = (city || '').replace(/[^\w\s-]/g, '').trim();
+  const query = encodeURIComponent(`${cleanName} ${cleanCity}`.trim());
+  return `https://www.google.com/maps/search/?api=1&query=${query}`;
+};
+
+const sanitizeRecommendation = (rec: any, city: string) => {
+  // Asegurar que el link de Maps sea válido y no tenga espacios
+  if (rec.nombre_restaurante) {
+    rec.link_maps = generateMapsLink(rec.nombre_restaurante, city);
+  }
+  
+  // Asegurar que no haya campos undefined que rompan el frontend
+  rec.direccion_aproximada = rec.direccion_aproximada || `En ${city}`;
+  rec.por_que_es_bueno = rec.por_que_es_bueno || 'Opción saludable disponible';
+  rec.plato_sugerido = rec.plato_sugerido || 'Consulta el menú saludable';
+  rec.hack_saludable = rec.hack_saludable || 'Pide porciones pequeñas';
+  
+  return rec;
+};
+
+// ============================================
+// 8. HANDLER PRINCIPAL
 // ============================================
 
 export default async function handler(req: any, res: any) {
@@ -283,9 +307,6 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'type debe ser "En casa" o "Fuera"' });
     }
 
-    // ============================================
-    // ✅ NUEVO RATE LIMIT (LIMPIA ATASCOS)
-    // ============================================
     const rateCheck = await checkRateLimit(userId);
     if (!rateCheck.allowed) {
       return res.status(429).json({ 
@@ -294,7 +315,6 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Crear documento de interacción INMEDIATAMENTE (antes de cualquier await largo)
     interactionRef = db.collection('user_interactions').doc(interactionId);
     await interactionRef.set({
       userId,
@@ -306,7 +326,6 @@ export default async function handler(req: any, res: any) {
 
     const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
 
-    // 1. Obtener Perfil de Usuario
     const userSnap = await db.collection('users').doc(userId).get();
     if (!userSnap.exists) {
       await interactionRef.update({ status: 'error', error: 'Usuario no encontrado' });
@@ -314,7 +333,6 @@ export default async function handler(req: any, res: any) {
     }
     const user = userSnap.data() as UserProfile;
 
-    // 2. Obtener Historial para NO repetir
     let historyContext = "";
     try {
       const historySnap = await db.collection(historyCol)
@@ -338,7 +356,6 @@ export default async function handler(req: any, res: any) {
       console.log("No se pudo obtener historial:", e);
     }
 
-    // 3. Obtener Feedback previo
     let feedbackContext = "";
     try {
       const feedbackSnap = await db.collection('user_history')
@@ -358,7 +375,6 @@ export default async function handler(req: any, res: any) {
       console.log("No se pudo obtener feedback:", e);
     }
 
-    // 4. Configurar Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ 
       model: "gemini-2.0-flash",
@@ -372,7 +388,6 @@ export default async function handler(req: any, res: any) {
     let parsedData: any;
 
     if (type === 'En casa') {
-      // OBTENER DATOS DE AIRTABLE
       const formula = buildAirtableFormula(user);
       
       const baseId = process.env.AIRTABLE_BASE_ID?.trim();
@@ -383,6 +398,7 @@ export default async function handler(req: any, res: any) {
         throw new Error(`Missing Airtable config: BASE_ID=${!!baseId}, TABLE_NAME=${!!tableName}, API_KEY=${!!apiKey}`);
       }
       
+      // CORREGIDO: Eliminado el espacio después de v0/
       const airtableUrl = `https://api.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(tableName)}?filterByFormula=${encodeURIComponent(formula)}&maxRecords=100`;
       
       let airtableItems: AirtableIngredient[] = [];
@@ -408,14 +424,11 @@ export default async function handler(req: any, res: any) {
         airtableItems = [];
       }
 
-      // Obtener despensa del usuario
       const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
       const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
       
-      // Scoring
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
       
-      // Construir prompt completo
       finalPrompt = `Actúa como "Bocado", un asistente nutricional experto en medicina culinaria y ahorro.
 
 ### PERFIL CLÍNICO DEL USUARIO
@@ -469,7 +482,7 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
 }`;
 
     } else {
-      // Fuera: Restaurantes
+      // CORREGIDO: Prompt simplificado sin intentar ejecutar JS en el template
       finalPrompt = `Actúa como "Bocado", un experto en nutrición y guía gastronómico local en ${user.city || "su ciudad"}.
 
 ### PERFIL DEL USUARIO
@@ -488,10 +501,9 @@ ${historyContext}
 ${feedbackContext}
 
 ### TAREA
-Genera **5 RECOMENDACIONES** de restaurantes reales en ${user.city || "su ciudad"}.
-Si no conoces lugares específicos, sugiere tipos de restaurante con criterios de búsqueda.
+Genera **5 RECOMENDACIONES** de restaurantes reales o tipos de cocina específicos en ${user.city || "su ciudad"}.
 
-Responde ÚNICAMENTE con este JSON exacto:
+Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto adicional):
 
 {
   "saludo_personalizado": "Mensaje corto y motivador",
@@ -499,19 +511,22 @@ Responde ÚNICAMENTE con este JSON exacto:
   "recomendaciones": [
     {
       "id": 1,
-      "nombre_restaurante": "Nombre del lugar",
+      "nombre_restaurante": "Nombre exacto del lugar para búsqueda",
       "tipo_comida": "Ej: Italiana, Vegana, Mexicana",
-      "direccion_aproximada": "Zona o dirección en ${user.city}",
-      "link_maps": "https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('NombreRestaurante')}+${encodeURIComponent(user.city || '')}",
+      "direccion_aproximada": "Zona o dirección aproximada",
       "por_que_es_bueno": "Explicación de por qué encaja con su perfil",
       "plato_sugerido": "Nombre de un plato específico recomendado",
       "hack_saludable": "Consejo práctico para pedir más saludable"
     }
   ]
-}`;
+}
+
+IMPORTANTE: 
+- NO incluyas el campo "link_maps", se generará automáticamente
+- Usa nombres de restaurantes reales y específicos de ${user.city}
+- Si no conoces nombres exactos, sugiere tipos de restaurante muy específicos (ej: "Restaurante de comida india vegana en Zona Rosa")`;
     }
 
-    // 5. Generar con Gemini
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
       generationConfig: { 
@@ -523,7 +538,6 @@ Responde ÚNICAMENTE con este JSON exacto:
 
     const responseText = result.response.text();
     
-    // Parsear JSON
     try {
       parsedData = JSON.parse(responseText);
     } catch (e) {
@@ -536,7 +550,16 @@ Responde ÚNICAMENTE con este JSON exacto:
       }
     }
 
-    // 6. Guardar en Firestore
+    // ============================================
+    // POST-PROCESAMIENTO PARA LINKS CLICKEABLES
+    // ============================================
+    if (type === 'Fuera' && parsedData.recomendaciones) {
+      // Generar links válidos en el backend
+      parsedData.recomendaciones = parsedData.recomendaciones.map((rec: any) => 
+        sanitizeRecommendation(rec, user.city || "")
+      );
+    }
+
     const batch = db.batch();
     
     const historyRef = db.collection(historyCol).doc();

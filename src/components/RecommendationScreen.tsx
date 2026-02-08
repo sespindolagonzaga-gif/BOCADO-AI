@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { EATING_HABITS, MEALS, CRAVINGS } from '../constants';
 import BocadoLogo from './BocadoLogo';
 import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig';
@@ -14,13 +14,9 @@ interface RecommendationScreenProps {
 }
 
 const stripEmoji = (str: string) => {
-    if (!str) return str;
-    const emojiRegex = /^(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/;
-    const parts = str.split(' ');
-    if (parts.length > 0 && emojiRegex.test(parts[0])) {
-        return parts.slice(1).join(' ');
-    }
-    return str;
+  if (!str) return str;
+  // Regex mejorada para emoji
+  return str.replace(/(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\s)+/g, ' ').trim();
 };
 
 const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, onPlanGenerated }) => {
@@ -30,6 +26,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const [selectedBudget, setSelectedBudget] = useState('');
   const [cookingTime, setCookingTime] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null); // ✅ Nuevo: estado de error local
   
   // Prevenir clicks múltiples
   const isProcessingRef = useRef(false);
@@ -51,20 +48,34 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     };
   }, []);
 
+  // ✅ NUEVO: Resetear estados cuando cambia el tipo (evita quedar bloqueado)
+  useEffect(() => {
+    setError(null);
+    isProcessingRef.current = false;
+    setIsGenerating(false);
+  }, [recommendationType]);
+
   const handleTypeChange = (type: 'En casa' | 'Fuera') => {
-      trackEvent('recommendation_type_selected', { type });
-      setRecommendationType(type);
-      setSelectedBudget('');
-      
-      if (type === 'En casa') setSelectedCravings([]);
-      else {
-          setSelectedMeal('');
-          setCookingTime(30);
-      }
+    trackEvent('recommendation_type_selected', { type });
+    setRecommendationType(type);
+    setSelectedBudget('');
+    setError(null);
+    
+    if (type === 'En casa') {
+      setSelectedCravings([]);
+    } else {
+      setSelectedMeal('');
+      setCookingTime(30);
+    }
   };
 
+  const resetProcessingState = useCallback(() => {
+    isProcessingRef.current = false;
+    setIsGenerating(false);
+    abortControllerRef.current = null;
+  }, []);
+
   const handleGenerateRecommendation = async () => {
-    // Prevenir ejecución si ya está procesando
     if (isProcessingRef.current || isGenerating) return;
     
     const isHomeSelectionComplete = recommendationType === 'En casa' && selectedMeal;
@@ -79,8 +90,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     // Bloquear inmediatamente
     isProcessingRef.current = true;
     setIsGenerating(true);
+    setError(null);
     
-    // Crear nuevo abort controller
     abortControllerRef.current = new AbortController();
 
     const cravingsList = recommendationType === 'Fuera' && selectedCravings.length > 0
@@ -108,10 +119,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     });
 
     try {
-      // 1. Guardar en Firestore
       const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
       
-      // 2. Llamar a la API
       const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,8 +128,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         signal: abortControllerRef.current.signal
       });
 
-      // ✅ MANEJO ESPECIAL DEL 429: Navegar a PlanScreen igualmente
-      // para mostrar los mensajes de loading mientras se espera
+      // ✅ CORREGIDO: Manejar 429 sin quedar bloqueado
       if (response.status === 429) {
         const errorData = await response.json().catch(() => ({}));
         
@@ -129,8 +137,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
           type: recommendationType 
         });
         
-        // 🚀 NAVEGAR INMEDIATAMENTE a PlanScreen
-        // El usuario verá los mensajes de loading en lugar del error
+        // Navegar pero limpiar estados antes (por si el usuario vuelve atrás)
+        resetProcessingState();
         onPlanGenerated(newDoc.id);
         return;
       }
@@ -140,13 +148,16 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         throw new Error(`Error ${response.status}: ${errorText}`);
       }
 
-      // Éxito: navegar a la siguiente pantalla
+      // Éxito
       trackEvent('recommendation_api_success', { type: recommendationType });
+      resetProcessingState(); // ✅ Limpieza antes de navegar
       onPlanGenerated(newDoc.id);
       
     } catch (error: any) {
-      // Ignorar errores de abort
-      if (error.name === 'AbortError') return;
+      if (error.name === 'AbortError') {
+        resetProcessingState();
+        return;
+      }
       
       console.error("Error generating recommendation:", error);
       
@@ -155,19 +166,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         type: recommendationType 
       });
       
-      // Mostrar alerta simple pero navegar igual para no bloquear al usuario
-      // o quedarse en la pantalla si es un error grave (no 429)
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('Network')) {
-        alert('Error de conexión. Por favor verifica tu internet.');
-        setIsGenerating(false);
-        isProcessingRef.current = false;
-      } else {
-        // Para otros errores, navegar igual al plan (podría estar procesándose)
-        // o mostrar error
-        alert('Tuvimos un problema. Por favor, intenta de nuevo.');
-        setIsGenerating(false);
-        isProcessingRef.current = false;
-      }
+      // ✅ NUEVO: Mostrar error en UI en lugar de alert()
+      setError(error.message || 'Error de conexión. Intenta de nuevo.');
+      resetProcessingState();
     }
   };
 
@@ -210,6 +211,19 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         <h1 className="text-xl font-bold text-bocado-dark-green">¡Hola, {userName || 'Comensal'}! 👋</h1>
         <p className="text-sm text-bocado-gray mt-1">¿Dónde y qué quieres comer hoy?</p>
       </div>
+
+      {/* ✅ NUEVO: Mensaje de error */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm animate-fade-in">
+          <p className="font-medium">⚠️ {error}</p>
+          <button 
+            onClick={() => setError(null)} 
+            className="text-xs underline mt-1 hover:text-red-700"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
 
       {/* Selector principal */}
       <div className="grid grid-cols-2 gap-3 mb-6">

@@ -9,7 +9,7 @@ import { LockIcon } from '../icons/LockIcon';
 import { LocationIcon } from '../icons/LocationIcon';
 import { ScaleIcon } from '../icons/ScaleIcon';
 import { RulerIcon } from '../icons/RulerIcon';
-import { trackEvent } from '../../firebaseConfig'; // ✅ Importado trackEvent
+import { trackEvent } from '../../firebaseConfig';
 
 const COUNTRIES_LIST = [
   { name: 'México', code: 'MX' },
@@ -81,7 +81,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
   const handleCountrySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const code = e.target.value;
     const name = e.target.options[e.target.selectedIndex].text;
-    trackEvent('registration_country_select', { country_code: code }); // ✅ Analítica
+    trackEvent('registration_country_select', { country_code: code });
     setLocalCityQuery('');
     if (onCountryChange) {
       onCountryChange(code, name);
@@ -99,7 +99,7 @@ const Step1: React.FC<ExtendedStep1Props> = ({
 
   const handleSelectCity = (city: any) => {
     const cityName = city.name;
-    trackEvent('registration_city_suggestion_click', { city: cityName }); // ✅ Analítica
+    trackEvent('registration_city_suggestion_click', { city: cityName });
     setLocalCityQuery(cityName);
     updateData('city', cityName);
     if (onClearCityOptions) onClearCityOptions();
@@ -191,10 +191,10 @@ const Step1: React.FC<ExtendedStep1Props> = ({
         </div>
       </div>
 
-      {/* Género y Edad */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Género y Edad - Responsive: columna en móvil, grid en desktop */}
+      <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-[10px] font-bold text-bocado-dark-gray mb-2 uppercase tracking-wider text-center">Género *</label>
+          <label className="block text-[10px] font-bold text-bocado-dark-gray mb-2 uppercase tracking-wider text-center sm:text-left">Género *</label>
           <div className="flex gap-2">
             {['Mujer', 'Hombre', 'Otro'].map(gender => (
               <GenderButton 
@@ -203,13 +203,13 @@ const Step1: React.FC<ExtendedStep1Props> = ({
                 icon={gender === 'Mujer' ? <FemaleIcon className="w-4 h-4"/> : gender === 'Hombre' ? <MaleIcon className="w-4 h-4"/> : <OtherGenderIcon className="w-4 h-4"/>}
                 isSelected={data.gender === gender}
                 onClick={() => {
-                  trackEvent('registration_gender_select', { gender }); // ✅ Analítica
+                  trackEvent('registration_gender_select', { gender });
                   updateData('gender', gender);
                 }}
               />
             ))}
           </div>
-          {errors.gender && <p className="text-red-500 text-[10px] mt-1 text-center">{errors.gender}</p>}
+          {errors.gender && <p className="text-red-500 text-[10px] mt-1 text-center sm:text-left">{errors.gender}</p>}
         </div>
 
         <div>
