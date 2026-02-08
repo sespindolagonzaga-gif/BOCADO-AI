@@ -328,6 +328,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         <div className="w-32 mx-auto mb-2">
           <BocadoLogo className="w-full h-auto" />
         </div>
+
         <h1 className="text-xl font-bold text-bocado-dark-green">Restablecer Contraseña</h1>
         <p className="text-sm text-bocado-gray mt-1">Te enviaremos un enlace</p>
       </div>
