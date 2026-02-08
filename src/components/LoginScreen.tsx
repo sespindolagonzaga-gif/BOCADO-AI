@@ -325,7 +325,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   const renderResetView = () => (
     <>
       <div className="text-center mb-6">
-        <div className="w-32 h-32 mx-auto mb-2">
+        <div className="w-32 mx-auto mb-2">
           <BocadoLogo className="w-full h-auto" />
         </div>
         <h1 className="text-xl font-bold text-bocado-dark-green">Restablecer Contraseña</h1>
