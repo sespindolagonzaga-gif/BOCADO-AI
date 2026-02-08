@@ -1,7 +1,231 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { rateLimiter } from './utils/rateLimit';
+
+// ============================================
+// RATE LIMITING DISTRIBUIDO (INLINE para evitar problemas de importación en Vercel)
+// ============================================
+
+interface RateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  cooldownMs: number;
+  stuckThresholdMs: number;
+}
+
+interface RateLimitResult {
+  allowed: boolean;
+  secondsLeft?: number;
+  error?: string;
+  remainingRequests?: number;
+}
+
+interface RateLimitRecord {
+  requests: number[];
+  currentProcess?: {
+    startedAt: number;
+    interactionId: string;
+  };
+  updatedAt: FirebaseFirestore.Timestamp;
+}
+
+const DEFAULT_CONFIG: RateLimitConfig = {
+  windowMs: 10 * 60 * 1000,    // 10 minutos
+  maxRequests: 5,               // 5 requests por ventana
+  cooldownMs: 30 * 1000,        // 30 segundos entre requests
+  stuckThresholdMs: 2 * 60 * 1000, // 2 minutos para cleanup
+};
+
+class DistributedRateLimiter {
+  private db = getFirestore();
+  private config: RateLimitConfig;
+
+  constructor(config: Partial<RateLimitConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  async checkRateLimit(userId: string): Promise<RateLimitResult> {
+    const counterRef = this.db.collection('rate_limit_v2').doc(userId);
+    const now = Date.now();
+
+    try {
+      return await this.db.runTransaction<RateLimitResult>(async (t) => {
+        const doc = await t.get(counterRef);
+        const data = doc.exists ? doc.data() as RateLimitRecord : null;
+
+        if (data?.currentProcess) {
+          const processAge = now - data.currentProcess.startedAt;
+          
+          if (processAge > this.config.stuckThresholdMs) {
+            console.log(`🧹 Limpiando proceso atascado para ${userId} (${Math.round(processAge / 1000)}s)`);
+            t.update(counterRef, {
+              currentProcess: null,
+              'metadata.cleanedAt': FieldValue.serverTimestamp(),
+              'metadata.cleanReason': 'stuck_timeout',
+            });
+          } else {
+            const secondsLeft = Math.ceil((this.config.cooldownMs - (now - data.currentProcess.startedAt)) / 1000);
+            return {
+              allowed: false,
+              secondsLeft: Math.max(1, secondsLeft),
+              error: 'Ya estás generando una recomendación. Espera un momento.',
+              remainingRequests: 0,
+            };
+          }
+        }
+
+        const validRequests = data?.requests?.filter(
+          (ts) => now - ts < this.config.windowMs
+        ) || [];
+
+        if (validRequests.length >= this.config.maxRequests) {
+          const oldestRequest = Math.min(...validRequests);
+          const retryAfter = Math.ceil((oldestRequest + this.config.windowMs - now) / 1000);
+
+          return {
+            allowed: false,
+            secondsLeft: Math.max(1, retryAfter),
+            error: `Límite de ${this.config.maxRequests} recomendaciones cada ${this.config.windowMs / 60000} minutos. Espera ${retryAfter} segundos.`,
+            remainingRequests: 0,
+          };
+        }
+
+        if (validRequests.length > 0) {
+          const lastRequest = Math.max(...validRequests);
+          const timeSinceLastRequest = now - lastRequest;
+
+          if (timeSinceLastRequest < this.config.cooldownMs) {
+            const secondsLeft = Math.ceil((this.config.cooldownMs - timeSinceLastRequest) / 1000);
+
+            return {
+              allowed: false,
+              secondsLeft,
+              error: `Espera ${secondsLeft} segundos antes de generar otra recomendación.`,
+              remainingRequests: this.config.maxRequests - validRequests.length,
+            };
+          }
+        }
+
+        const newRecord: Partial<RateLimitRecord> = {
+          requests: validRequests,
+          currentProcess: {
+            startedAt: now,
+            interactionId: `proc_${now}`,
+          },
+          updatedAt: FieldValue.serverTimestamp() as any,
+        };
+
+        t.set(counterRef, newRecord, { merge: true });
+
+        return {
+          allowed: true,
+          remainingRequests: this.config.maxRequests - validRequests.length - 1,
+        };
+      });
+    } catch (error: any) {
+      console.error('❌ Error en rate limit transaction:', error);
+      return { allowed: true, remainingRequests: 1 };
+    }
+  }
+
+  async completeProcess(userId: string): Promise<void> {
+    const counterRef = this.db.collection('rate_limit_v2').doc(userId);
+    const now = Date.now();
+
+    try {
+      await this.db.runTransaction(async (t) => {
+        const doc = await t.get(counterRef);
+        
+        if (!doc.exists) {
+          t.set(counterRef, {
+            requests: [now],
+            currentProcess: null,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          return;
+        }
+
+        const data = doc.data() as RateLimitRecord;
+        const validRequests = (data.requests || [])
+          .filter((ts) => now - ts < this.config.windowMs)
+          .concat(now)
+          .slice(-this.config.maxRequests);
+
+        t.update(counterRef, {
+          requests: validRequests,
+          currentProcess: null,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (error) {
+      console.error('❌ Error marcando proceso como completado:', error);
+    }
+  }
+
+  async failProcess(userId: string, errorInfo?: string): Promise<void> {
+    const counterRef = this.db.collection('rate_limit_v2').doc(userId);
+
+    try {
+      await counterRef.update({
+        currentProcess: null,
+        lastError: {
+          message: errorInfo || 'Unknown error',
+          at: FieldValue.serverTimestamp(),
+        },
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('❌ Error marcando proceso como fallido:', error);
+    }
+  }
+
+  async getStatus(userId: string): Promise<{
+    requestsInWindow: number;
+    currentProcess?: { startedAt: number; interactionId: string };
+    canRequest: boolean;
+    nextAvailableAt?: number;
+  } | null> {
+    const counterRef = this.db.collection('rate_limit_v2').doc(userId);
+    const now = Date.now();
+
+    try {
+      const doc = await counterRef.get();
+      if (!doc.exists) return null;
+
+      const data = doc.data() as RateLimitRecord;
+      const validRequests = (data.requests || []).filter(
+        (ts) => now - ts < this.config.windowMs
+      );
+
+      let nextAvailableAt: number | undefined;
+
+      if (data.currentProcess) {
+        nextAvailableAt = data.currentProcess.startedAt + this.config.cooldownMs;
+      } else if (validRequests.length >= this.config.maxRequests) {
+        const oldestRequest = Math.min(...validRequests);
+        nextAvailableAt = oldestRequest + this.config.windowMs;
+      } else if (validRequests.length > 0) {
+        const lastRequest = Math.max(...validRequests);
+        const cooldownEnd = lastRequest + this.config.cooldownMs;
+        if (cooldownEnd > now) {
+          nextAvailableAt = cooldownEnd;
+        }
+      }
+
+      return {
+        requestsInWindow: validRequests.length,
+        currentProcess: data.currentProcess,
+        canRequest: !data.currentProcess && validRequests.length < this.config.maxRequests,
+        nextAvailableAt,
+      };
+    } catch (error) {
+      console.error('Error obteniendo status:', error);
+      return null;
+    }
+  }
+}
+
+const rateLimiter = new DistributedRateLimiter();
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
