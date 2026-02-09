@@ -93,7 +93,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
   const [localError, setLocalError] = useState('');
   
   // Refs para cleanup
-  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSubmittingRef = useRef(false);
 
   const { user, isAuthenticated } = useAuthStore();

@@ -413,7 +413,7 @@ interface FeedbackMutationContext {
  */
 export const useFeedbackMutation = () => {
   const queryClient = useQueryClient();
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Cleanup de timeouts pendientes
   const clearPendingTimeout = useCallback(() => {
