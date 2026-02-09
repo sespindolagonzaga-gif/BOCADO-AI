@@ -15,6 +15,9 @@ interface FeedbackModalProps {
 const MAX_COMMENT_LENGTH = 500;
 const SUCCESS_CLOSE_DELAY = 2000;
 
+// Track global modal state to prevent multiple instances
+let globalModalOpen = false;
+
 const sanitizeComment = (text: string): string => {
   return text
     .trim()
@@ -121,7 +124,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     };
   }, [isSuccess]);
 
-  // Resetear estado cuando se abre el modal
+  // Resetear estado cuando se abre el modal y manejar estado global
   useEffect(() => {
     if (isOpen) {
       setRating(0);
@@ -129,8 +132,26 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
       setLocalError('');
       reset();
       isSubmittingRef.current = false;
+      globalModalOpen = true;
+      
+      // Prevenir scroll en el body cuando el modal está abierto
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    } else {
+      globalModalOpen = false;
     }
   }, [isOpen, reset]);
+  
+  // Cleanup al desmontar
+  useEffect(() => {
+    return () => {
+      globalModalOpen = false;
+    };
+  }, []);
 
   // Handler de calificación - memoizado para prevenir re-renders
   const handleRatingClick = useCallback((selectedRating: number) => {
@@ -206,26 +227,66 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
     onClose();
   }, [onClose, rating, isSuccess, itemTitle, type]);
 
-  // No renderizar si no está abierto
+  // No renderizar si no está abierto o si ya hay otro modal abierto globalmente
   if (!isOpen) return null;
+  
+  // Validación para evitar múltiples instancias del modal
+  if (globalModalOpen && !isSuccess) {
+    // Ya hay un modal abierto, no renderizar este
+    return null;
+  }
 
   // Determinar mensaje de error a mostrar
   const errorMessage = localError || (isError && error instanceof Error ? error.message : '');
 
+  // Handler para absorber todos los eventos del backdrop
+  const handleBackdropPointerDown = useCallback((e: React.PointerEvent | React.TouchEvent | React.MouseEvent) => {
+    // Absorber el evento completamente
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Solo cerrar si es un click directo en el backdrop (no en el contenido)
+    if (e.target === e.currentTarget && !isPending && 'buttons' in e && e.buttons === 1) {
+      handleClose();
+    }
+  }, [handleClose, isPending]);
+  
+  // Handler específico para eventos táctiles
+  const handleBackdropTouch = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
   return (
-    <div 
-      className="fixed inset-0 z-[110] flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
-      onClick={(e) => {
-        // Cerrar solo si se hace clic directamente en el backdrop (fuera del modal)
-        if (e.target === e.currentTarget && !isPending) {
-          handleClose();
-        }
-      }}
-    >
+    <>
+      {/* Backdrop dedicado que bloquea todos los eventos */}
       <div 
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-transform duration-300 translate-y-0"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
+        style={{ 
+          touchAction: 'none',
+          pointerEvents: 'auto',
+        }}
+        onClick={handleBackdropPointerDown}
+        onPointerDown={handleBackdropPointerDown}
+        onTouchStart={handleBackdropTouch}
+        onTouchMove={handleBackdropTouch}
+        onTouchEnd={handleBackdropTouch}
+        aria-hidden="true"
+      />
+      
+      {/* Contenedor del modal con z-index superior */}
+      <div 
+        className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-4 animate-fade-in"
+        style={{ pointerEvents: 'none' }}
       >
+        <div 
+          className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center transform transition-transform duration-300 translate-y-0"
+          style={{ pointerEvents: 'auto' }}
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="feedback-title"
+        >
         
         {/* Indicador de arrastre (mobile) */}
         <div className="w-12 h-1 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden" />
@@ -327,8 +388,9 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
             </p>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
