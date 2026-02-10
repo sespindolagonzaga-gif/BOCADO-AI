@@ -16,8 +16,8 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
   const isActive = (id: Tab) => activeTab === id;
 
   return (
-    <nav className="absolute bottom-0 left-0 right-0 z-50 px-safe pb-safe">
-      <div className="mx-auto max-w-md md:max-w-lg bg-white/95 backdrop-blur-xl border border-white/60 shadow-[0_-4px-20px_rgba(0,0,0,0.1)] rounded-3xl mb-3 overflow-visible">
+    <nav className="flex-shrink-0 z-50 px-safe pb-safe bg-bocado-background border-t border-bocado-border/30">
+      <div className="mx-auto max-w-md md:max-w-lg bg-white/95 backdrop-blur-xl rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] overflow-visible">
         
         {/* Contenedor flex simple: 5 elementos, mismo tamaño, centrados verticalmente */}
         <div className="flex items-center justify-between h-16 px-2 relative">

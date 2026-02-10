@@ -86,14 +86,14 @@ const MainApp: React.FC<MainAppProps> = ({
   return (
     // ✅ relative es crucial para que los absolute children se contengan aquí
     // ✅ pt-safe para móviles con notch
-    <div className="h-full w-full flex flex-col bg-bocado-background overflow-hidden relative pt-safe">
+    <div className="h-full w-full flex flex-col bg-bocado-background overflow-hidden pt-safe">
       
       {isTutorialOpen && (
         <TutorialModal onClose={handleTutorialClose} userName={userName} />
       )}
 
       {/* Contenido scrolleable con padding bottom generoso para la barra flotante */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth pb-28">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth">
         <div className="max-w-md md:max-w-lg mx-auto min-h-full">
           <ErrorBoundary>
             {activeTab === 'recommendation' && (

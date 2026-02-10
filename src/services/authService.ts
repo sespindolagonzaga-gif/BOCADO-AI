@@ -25,8 +25,8 @@ export const registerUser = async (formData: FormData): Promise<{ uid: string }>
   const userProfile: UserProfile = {
     uid,
     ...profile,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp() as UserProfile['createdAt'],
+    updatedAt: serverTimestamp() as UserProfile['updatedAt'],
   };
 
   await setDoc(doc(db, 'users', uid), userProfile);

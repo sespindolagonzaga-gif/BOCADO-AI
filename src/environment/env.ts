@@ -16,6 +16,7 @@ const firebaseConfig = {
   storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET'),
   messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID'),
   appId: getEnvVar('VITE_FIREBASE_APP_ID'),
+  vapidKey: getEnvVar('VITE_FIREBASE_VAPID_KEY'),
 };
 
 const apiConfig = {

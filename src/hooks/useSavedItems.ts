@@ -106,7 +106,11 @@ const fetchSavedItems = async (
           userId: docSnap.data().user_id,
           savedAt: docSnap.data().savedAt?.toMillis?.() || Date.now(),
         }))
-        .sort((a, b) => b.savedAt - a.savedAt)
+        .sort((a, b) => {
+          const bTime = typeof b.savedAt === 'number' ? b.savedAt : b.savedAt.toMillis();
+          const aTime = typeof a.savedAt === 'number' ? a.savedAt : a.savedAt.toMillis();
+          return bTime - aTime;
+        })
         .slice(0, pageSize);
       
       return { items, hasMore: false }; // Sin paginación en fallback

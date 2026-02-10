@@ -13,6 +13,7 @@ export {
 export { usePantry } from './usePantry';
 export { useRateLimit } from './useRateLimit';
 export { useAnalyticsProperties } from './useAnalyticsProperties';
+export { useSmartNotifications } from './useSmartNotifications';
 
 // Nuevos hooks para escalabilidad
 export {
