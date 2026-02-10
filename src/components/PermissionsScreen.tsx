@@ -43,8 +43,8 @@ const PermissionsScreen: React.FC<PermissionsScreenProps> = ({ onAccept, onGoHom
   ];
 
   return (
-    <div className="min-h-full flex items-center justify-center px-4 py-8 pt-safe pb-safe bg-gradient-to-br from-bocado-cream/30 to-bocado-green/5">
-      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-bocado w-full max-w-md animate-fade-in">
+    <div className="min-h-full flex items-center justify-center px-4 py-8 pt-safe pb-safe">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-bocado w-full max-w-sm animate-fade-in">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-gradient-to-br from-bocado-green/20 to-bocado-green/5 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
