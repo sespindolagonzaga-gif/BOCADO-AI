@@ -9,6 +9,14 @@ export interface AuthData {
   confirmPassword?: string;
 }
 
+// Coordenadas de ubicación
+export interface GeoLocation {
+  lat: number;
+  lng: number;
+  accuracy?: number;
+  timestamp?: number;
+}
+
 // Datos que van a Firestore (perfil sanitizado, NO sensibles)
 export interface UserProfile {
   uid: string;                    // Referencia al UID de Auth
@@ -19,6 +27,9 @@ export interface UserProfile {
   height?: string;
   country: string;
   city: string;
+  // Coordenadas de ubicación del usuario (opcional, requiere permiso)
+  location?: GeoLocation;
+  locationEnabled?: boolean;
   diseases: string[];
   allergies: string[];
   otherAllergies: string;

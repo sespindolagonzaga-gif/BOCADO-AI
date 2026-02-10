@@ -4,11 +4,12 @@ import BocadoLogo from './BocadoLogo';
 import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { CurrencyService } from '../data/budgets';
-import { useUserProfile } from '../hooks/useUser';
+import { useUserProfile, useGeolocation } from '../hooks';
 import { useAuthStore } from '../stores/authStore';
 import { useRateLimit } from '../hooks/useRateLimit';
-import { env } from '../environment/env';
+import { env, SEARCH_RADIUS } from '../environment/env';
 import { logger } from '../utils/logger';
+import { LocationIcon } from './icons/LocationIcon';
 
 interface RecommendationScreenProps {
   userName: string;
@@ -36,6 +37,17 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
   const { user } = useAuthStore();
   const { data: profile, isLoading: isProfileLoading } = useUserProfile(user?.uid);
+  
+  // Geolocalización del usuario (solo para "Fuera")
+  const { 
+    position: userPosition, 
+    loading: locationLoading, 
+    error: locationError, 
+    permission: locationPermission,
+    requestLocation 
+  } = useGeolocation();
+  
+  const [locationRequested, setLocationRequested] = useState(false);
   
   // Rate limit status para mostrar al usuario
   const { 
@@ -77,6 +89,11 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     } else {
       setSelectedMeal('');
       setCookingTime(30);
+      // Solicitar ubicación automáticamente cuando selecciona "Fuera" (solo una vez)
+      if (!locationRequested && locationPermission !== 'granted' && locationPermission !== 'denied') {
+        requestLocation();
+        setLocationRequested(true);
+      }
     }
   };
 
@@ -133,13 +150,28 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       const newDoc = await addDoc(collection(db, 'user_interactions'), interactionData);
       
       const token = await user.getIdToken();
+      
+      // Preparar datos con ubicación si está disponible (solo para "Fuera")
+      const requestBody: any = { ...interactionData, _id: newDoc.id };
+      
+      if (recommendationType === 'Fuera' && userPosition) {
+        requestBody.userLocation = {
+          lat: userPosition.lat,
+          lng: userPosition.lng,
+          accuracy: userPosition.accuracy,
+        };
+        trackEvent('recommendation_using_geolocation', {
+          accuracy: userPosition.accuracy,
+        });
+      }
+      
       const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ ...interactionData, _id: newDoc.id }),
+        body: JSON.stringify(requestBody),
         signal: abortControllerRef.current.signal
       });
 
@@ -354,6 +386,45 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Indicador de ubicación */}
+              <div className="bg-bocado-background/50 p-3 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <LocationIcon className={`w-4 h-4 ${
+                      userPosition ? 'text-bocado-green' : 
+                      locationPermission === 'denied' ? 'text-red-400' : 
+                      'text-bocado-gray'
+                    }`} />
+                    <span className="text-xs text-bocado-dark-gray">
+                      {userPosition ? (
+                        <span className="text-bocado-green font-medium">📍 Ubicación activa</span>
+                      ) : locationPermission === 'denied' ? (
+                        <span className="text-red-400">Ubicación denegada</span>
+                      ) : locationLoading ? (
+                        <span className="text-bocado-gray">Obteniendo ubicación...</span>
+                      ) : (
+                        <span className="text-bocado-gray">Usando ciudad del perfil</span>
+                      )}
+                    </span>
+                  </div>
+                  {!userPosition && locationPermission !== 'denied' && (
+                    <button
+                      onClick={requestLocation}
+                      disabled={locationLoading || isGenerating}
+                      className="text-xs font-medium text-bocado-green hover:text-bocado-dark-green disabled:text-bocado-gray transition-colors"
+                    >
+                      {locationLoading ? '...' : 'Activar'}
+                    </button>
+                  )}
+                </div>
+                <p className="text-2xs text-bocado-gray mt-1 ml-6">
+                  {userPosition 
+                    ? `Buscando restaurantes en ${SEARCH_RADIUS.label}` 
+                    : `Las recomendaciones serán de ${profile?.city || 'tu ciudad'}`
+                  }
+                </p>
               </div>
             </div>
           )}

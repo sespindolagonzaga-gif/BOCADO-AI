@@ -13,8 +13,8 @@ import {
   sendEmailVerification 
 } from 'firebase/auth';
 import { separateUserData } from '../utils/profileSanitizer';
-import { env } from '../environment/env';
 import { logger } from '../utils/logger';
+import { searchCities, getPlaceDetails, PlacePrediction } from '../services/mapsService';
 
 // ✅ CORRECCIÓN ERRORES 2305: Asegúrate que en userSchema.ts 
 // los nombres coincidan exactamente (ej. userStep1Schema o step1Schema)
@@ -35,8 +35,9 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
 
-  const [cityOptions, setCityOptions] = useState<any[]>([]);
+  const [cityOptions, setCityOptions] = useState<PlacePrediction[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string>('');;
 
   // V2: Usar la estructura anidada del store
   const formData = useProfileDraftStore((state) => state.formData) as FormData;
@@ -116,6 +117,24 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
       const displayName = `${authData.firstName} ${authData.lastName}`;
       await updateProfile(user, { displayName });
 
+      // Obtener coordenadas de la ciudad si hay placeId
+      let location = undefined;
+      const cityPlaceId = (formData as any).cityPlaceId;
+      
+      if (cityPlaceId) {
+        try {
+          const placeDetails = await getPlaceDetails(cityPlaceId);
+          if (placeDetails) {
+            location = {
+              lat: placeDetails.lat,
+              lng: placeDetails.lng,
+            };
+          }
+        } catch (error) {
+          logger.warn('Error obteniendo coordenadas de la ciudad:', error);
+        }
+      }
+
       const userProfile: UserProfile = {
         uid: user.uid,
         gender: profile.gender,
@@ -124,6 +143,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
         height: profile.height,
         country: profile.country.toUpperCase(),
         city: profile.city,
+        location,
+        locationEnabled: false, // El usuario debe activarlo después
         diseases: profile.diseases,
         allergies: profile.allergies,
         otherAllergies: profile.otherAllergies,
@@ -197,17 +218,14 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   };
 
   const handleSearchCity = async (query: string) => {
-    if (!formData.country || query.length < 3) {
+    if (!formData.country || query.length < 2) {
       setCityOptions([]);
       return;
     }
     setIsSearchingCity(true);
     try {
-      const response = await fetch(
-        `https://secure.geonames.org/searchJSON?name_startsWith=${encodeURIComponent(query)}&country=${formData.country}&maxRows=10&username=${env.api.geonamesUsername}&lang=es`
-      );
-      const data = await response.json();
-      setCityOptions(data.geonames || []);
+      const predictions = await searchCities(query, formData.country);
+      setCityOptions(predictions);
     } catch (error) {
       logger.error('Error buscando ciudades:', error);
       setCityOptions([]);
@@ -221,6 +239,8 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
   const handleCountryChange = (code: string) => {
     updateField('country', code);
     updateField('city', '');
+    updateField('cityPlaceId', '');
+    setSelectedPlaceId('');
   };
 
   const renderStep = () => {

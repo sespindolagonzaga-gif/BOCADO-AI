@@ -22,7 +22,13 @@ const firebaseConfig = {
 const apiConfig = {
   recommendationUrl: '/api/recommend',
   registerUserUrl: getEnvVar('VITE_REGISTER_USER_URL'),
-  geonamesUsername: getEnvVar('VITE_GEONAMES_USERNAME'),
+  googleMapsApiKey: getEnvVar('VITE_GOOGLE_MAPS_API_KEY'),
+};
+
+// Rango de búsqueda de restaurantes en metros
+export const SEARCH_RADIUS = {
+  meters: 5000, // 5km por defecto
+  label: '5 km',
 };
 
 export const env = Object.freeze({

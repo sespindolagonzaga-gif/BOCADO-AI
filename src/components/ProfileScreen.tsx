@@ -27,6 +27,7 @@ import { useUserProfile, useUpdateUserProfile } from '../hooks/useUser';
 import { useAuthStore } from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { env } from '../environment/env';
+import { searchCities, getPlaceDetails, PlacePrediction } from '../services/mapsService';
 
 interface ProfileScreenProps {
   onLogout?: () => void;
@@ -116,8 +117,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportedData, setExportedData] = useState<any>(null);
   
-  const [cityOptions, setCityOptions] = useState<any[]>([]);
+  const [cityOptions, setCityOptions] = useState<PlacePrediction[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string>('');;
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   
@@ -164,12 +166,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     setIsSearchingCity(true);
     try {
         const countryCode = (formData.country || 'MX').toUpperCase(); 
-        const username = env.api.geonamesUsername; 
-        const res = await fetch(
-            `https://secure.geonames.org/searchJSON?name_startsWith=${encodeURIComponent(query)}&country=${countryCode}&maxRows=10&username=${username}&lang=es`
-        );
-        const data = await res.json();
-        setCityOptions(data.geonames || []);
+        const predictions = await searchCities(query, countryCode);
+        setCityOptions(predictions);
     } catch (error) {
         safeLog('error', "Error buscando ciudades", error);
     } finally {
@@ -200,6 +198,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         useAuthStore.getState().setUser({ ...currentUser, displayName: newDisplayName });
       }
 
+      // Obtener coordenadas de la ciudad si hay placeId seleccionado
+      let location = profile?.location;
+      if (selectedPlaceId) {
+        try {
+          const placeDetails = await getPlaceDetails(selectedPlaceId);
+          if (placeDetails) {
+            location = {
+              lat: placeDetails.lat,
+              lng: placeDetails.lng,
+            };
+          }
+        } catch (error) {
+          safeLog('warn', 'Error obteniendo coordenadas de la ciudad:', error);
+        }
+      }
+
       const userProfile: UserProfile = {
         uid: userUid,
         gender: profileData.gender,
@@ -208,6 +222,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         height: profileData.height,
         country: profileData.country.toUpperCase(),
         city: profileData.city,
+        location,
+        locationEnabled: profile?.locationEnabled || false,
         diseases: profileData.diseases,
         allergies: profileData.allergies,
         otherAllergies: profileData.otherAllergies,
@@ -246,6 +262,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
 
   const updateData = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Si cambia la ciudad, guardar el placeId para obtener coordenadas después
+    if (field === 'cityPlaceId') {
+      setSelectedPlaceId(value);
+    }
+    
+    // Si cambia el país, limpiar ciudad y placeId
+    if (field === 'country') {
+      setSelectedPlaceId('');
+    }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {

@@ -10,6 +10,7 @@ import { LocationIcon } from '../icons/LocationIcon';
 import { ScaleIcon } from '../icons/ScaleIcon';
 import { RulerIcon } from '../icons/RulerIcon';
 import { trackEvent } from '../../firebaseConfig';
+import type { PlacePrediction } from '../../services/mapsService';
 
 const COUNTRIES_LIST = [
   // América del Norte
@@ -109,11 +110,12 @@ const COUNTRIES_LIST = [
 ];
 
 interface ExtendedStep1Props extends FormStepProps {
-  cityOptions?: any[];
+  cityOptions?: PlacePrediction[];
   isSearchingCity?: boolean;
   onSearchCity?: (query: string) => void;
   onClearCityOptions?: () => void;
-  onCountryChange?: (code: string, name: string) => void; 
+  onCountryChange?: (code: string, name: string) => void;
+  selectedPlaceId?: string;
 }
 
 const GenderButton: React.FC<{
@@ -164,11 +166,12 @@ const Step1: React.FC<ExtendedStep1Props> = ({
     if (onSearchCity) onSearchCity(value);
   };
 
-  const handleSelectCity = (city: any) => {
-    const cityName = city.name;
-    trackEvent('registration_city_suggestion_click', { city: cityName });
-    setLocalCityQuery(cityName);
-    updateData('city', cityName);
+  const handleSelectCity = (city: PlacePrediction) => {
+    trackEvent('registration_city_suggestion_click', { city: city.mainText });
+    setLocalCityQuery(city.mainText);
+    // Guardar el placeId para obtener coordenadas después
+    updateData('city', city.mainText);
+    updateData('cityPlaceId', city.placeId);
     if (onClearCityOptions) onClearCityOptions();
   };
 
@@ -378,15 +381,15 @@ const Step1: React.FC<ExtendedStep1Props> = ({
 
           {cityOptions.length > 0 && (
             <div className="absolute z-50 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-bocado max-h-40 overflow-y-auto">
-              {cityOptions.map((city: any) => (
+              {cityOptions.map((city) => (
                 <button
-                  key={city.geonameId}
+                  key={city.placeId}
                   type="button"
                   onClick={() => handleSelectCity(city)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-bocado-background border-b border-bocado-border/50 last:border-0 flex justify-between items-center active:bg-bocado-green/10"
+                  className="w-full text-left px-3 py-2 text-sm hover:bg-bocado-background border-b border-bocado-border/50 last:border-0 flex flex-col active:bg-bocado-green/10"
                 >
-                  <span className="font-medium text-bocado-text">{city.name}</span>
-                  <span className="text-bocado-gray text-2xs">{city.adminName1}</span>
+                  <span className="font-medium text-bocado-text">{city.mainText}</span>
+                  <span className="text-bocado-gray text-2xs">{city.secondaryText}</span>
                 </button>
               ))}
             </div>

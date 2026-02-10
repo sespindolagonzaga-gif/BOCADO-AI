@@ -264,6 +264,12 @@ const RequestBodySchema = z.object({
   currency: z.string().max(10).optional().nullable(),
   dislikedFoods: z.array(z.string().max(100)).max(50).optional().default([]),
   _id: z.string().max(128).optional(),
+  // Ubicación del usuario (opcional - geolocalización del navegador)
+  userLocation: z.object({
+    lat: z.number(),
+    lng: z.number(),
+    accuracy: z.number().optional(),
+  }).optional().nullable(),
 });
 
 type RequestBody = z.infer<typeof RequestBodySchema>;
@@ -281,6 +287,12 @@ interface UserProfile {
   height?: string;
   activityLevel?: string;
   activityFrequency?: string;
+  // Coordenadas guardadas del perfil (de la ciudad registrada)
+  location?: {
+    lat: number;
+    lng: number;
+  };
+  locationEnabled?: boolean;
 }
 
 interface AirtableIngredient {
@@ -541,7 +553,50 @@ class IPRateLimiter {
 const ipRateLimiter = new IPRateLimiter();
 
 // ============================================
-// 7. UTILIDAD PARA GENERAR LINKS DE MAPS
+// 7. CONFIGURACIÓN DE BÚSQUEDA DE RESTAURANTES
+// ============================================
+
+// Rango de búsqueda en metros (5km)
+const SEARCH_RADIUS_METERS = 5000;
+
+interface Coordinates {
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Determina las coordenadas a usar para la búsqueda de restaurantes
+ * Prioridad: 1) userLocation del request, 2) location del perfil, 3) null
+ */
+function getSearchCoordinates(request: RequestBody, user: UserProfile): Coordinates | null {
+  // 1. Primero intentar usar la geolocalización del usuario (si dio permiso)
+  if (request.userLocation?.lat && request.userLocation?.lng) {
+    return {
+      lat: request.userLocation.lat,
+      lng: request.userLocation.lng,
+    };
+  }
+  
+  // 2. Fallback: usar la ubicación guardada del perfil (de la ciudad registrada)
+  if (user.location?.lat && user.location?.lng) {
+    return {
+      lat: user.location.lat,
+      lng: user.location.lng,
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Formatea las coordenadas para mostrar en el prompt
+ */
+function formatCoordinates(coords: Coordinates): string {
+  return `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
+}
+
+// ============================================
+// 8. UTILIDAD PARA GENERAR LINKS DE MAPS
 // ============================================
 
 const generateMapsLink = (restaurantName: string, address: string, city: string): string => {
@@ -910,14 +965,24 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto extra):
 }`;
 
     } else {
-      // CORREGIDO: Prompt mejorado para exigir direcciones específicas reales
-      finalPrompt = `Actúa como "Bocado", un experto en nutrición y guía gastronómico local en ${user.city || "su ciudad"}.
+      // Determinar coordenadas para búsqueda de restaurantes
+      const searchCoords = getSearchCoordinates(request, user);
+      const locationContext = searchCoords 
+        ? `Coordenadas de referencia: ${formatCoordinates(searchCoords)}`
+        : `Ciudad: ${user.city || "su ciudad"}, ${user.countryName || ""}`;
+      
+      const locationInstruction = searchCoords
+        ? `**IMPORTANTE - RANGO DE BÚSQUEDA**: Busca restaurantes DENTRO de un radio de ${SEARCH_RADIUS_METERS / 1000}km desde las coordenadas ${formatCoordinates(searchCoords)}. Prioriza lugares cercanos a esta ubicación.`
+        : `**IMPORTANTE**: Busca restaurantes en ${user.city || "su ciudad"} que sean accesibles y no muy alejados del centro.`;
+      
+      // CORREGIDO: Prompt mejorado para exigir direcciones específicas reales y usar coordenadas
+      finalPrompt = `Actúa como "Bocado", un experto en nutrición y guía gastronómico local.
 
 ### PERFIL DEL USUARIO
 * **Meta Nutricional**: ${user.nutritionalGoal || "Comer saludable"}
 * **Restricciones de Salud**: ${formatList(user.diseases)}, ${formatList(user.allergies)}
 * **Alimentos que NO le gustan**: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
-* **Ubicación**: ${user.city || "su ciudad"}, ${user.countryName || ""}
+* **Ubicación**: ${locationContext}
 
 ### SOLICITUD
 El usuario quiere comer fuera.
@@ -928,12 +993,15 @@ ${historyContext}
 
 ${feedbackContext}
 
+${locationInstruction}
+
 ### REQUISITOS CRÍTICOS PARA RESTAURANTES:
-1. USA NOMBRES REALES Y ESPECÍFICOS de restaurantes que existan en ${user.city}
+1. USA NOMBRES REALES Y ESPECÍFICOS de restaurantes que existan${searchCoords ? ` cerca de las coordenadas proporcionadas` : ` en ${user.city}`}
 2. PROPORCIONA DIRECCIONES EXACTAS: Calle, número y colonia/zona (ej: "Calle Arturo Soria 126, Chamartín")
 3. Si no conoces la dirección exacta, usa la zona/centro comercial específico (ej: "Plaza Norte, local 45")
 4. NO uses direcciones vagas como "Por el centro" o "Zona Rosa"
 5. Verifica que el nombre + dirección corresponda a un lugar real
+6. **RANGO MÁXIMO**: ${SEARCH_RADIUS_METERS / 1000}km desde el punto de referencia
 
 ### EJEMPLO CORRECTO:
 {
@@ -950,7 +1018,7 @@ ${feedbackContext}
 }
 
 ### TAREA
-Genera **5 RECOMENDACIONES** de restaurantes reales en ${user.city || "su ciudad"}.
+Genera **5 RECOMENDACIONES** de restaurantes reales${searchCoords ? ` dentro de ${SEARCH_RADIUS_METERS / 1000}km de las coordenadas proporcionadas` : ` en ${user.city || "su ciudad"}`}.
 
 Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto adicional):
 
@@ -972,7 +1040,8 @@ Responde ÚNICAMENTE con este JSON exacto (sin markdown, sin texto adicional):
 
 IMPORTANTE: 
 - NO incluyas el campo "link_maps", se generará automáticamente usando el nombre + dirección
-- Las direcciones deben ser específicas para que Google Maps pueda ubicarlas correctamente`;
+- Las direcciones deben ser específicas para que Google Maps pueda ubicarlas correctamente
+- Busca restaurantes dentro del rango de ${SEARCH_RADIUS_METERS / 1000}km especificado`;
     }
 
     const result = await model.generateContent({

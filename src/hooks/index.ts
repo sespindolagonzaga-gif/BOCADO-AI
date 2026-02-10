@@ -1,6 +1,7 @@
 // hooks/index.ts - Exportaciones centralizadas
 
 export { useUserProfile, useUpdateUserProfile } from './useUser';
+export { useGeolocation, type GeolocationPosition, type GeolocationState } from './useGeolocation';
 export { usePWA } from './usePWA';
 export { 
   useSavedItems, 
