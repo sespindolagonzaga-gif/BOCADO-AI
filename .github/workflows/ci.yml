@@ -39,9 +39,7 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    # Solo correr E2E en manual dispatch
-    # Para correr automaticamente, quitar esta condición y configurar los secrets
-    if: github.event_name == 'workflow_dispatch'
+    needs: test
     
     steps:
     - uses: actions/checkout@v4
