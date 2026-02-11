@@ -1040,7 +1040,7 @@ ${marketList ? `\nDISPONIBLE: ${marketList.slice(0, 150)}` : ''}
 
 REGLAS: 3 recetas creativas, tiempo ≤${request.cookingTime || '30'}min, usar despensa primero, respetar restricciones. Opcionales: básicos (aceite, sal, especias).
 
-JSON:{"saludo":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
+JSON:{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
 
     } else {
       // Determinar coordenadas para búsqueda de restaurantes
@@ -1069,7 +1069,7 @@ REGLAS CRÍTICAS:
 4. NO uses "por el centro" o direcciones vagas
 5. Rango máximo: ${SEARCH_RADIUS_METERS / 1000}km
 
-JSON:{"saludo":"msg corto","ubicacion":"${user.city || 'su ciudad'}","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicación perfil","hack_saludable":"consejo práctico"}]}`;
+JSON:{"saludo_personalizado":"msg corto","ubicacion_detectada":"${user.city || 'su ciudad'}","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicación perfil","hack_saludable":"consejo práctico"}]}`;
     }
 
     const result = await model.generateContent({
