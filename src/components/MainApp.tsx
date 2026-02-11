@@ -101,6 +101,7 @@ const MainApp: React.FC<MainAppProps> = ({
                 key={userUid}
                 userName={userName}
                 onPlanGenerated={onPlanGenerated}
+                isNewUser={showTutorial}
               />
             )}
             {activeTab === 'pantry' && (

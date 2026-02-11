@@ -11,13 +11,12 @@ import { captureError, setUserContext, addBreadcrumb } from './utils/sentry';
 // ✅ IMPORTACIÓN DINÁMICA (Lazy Loading)
 const HomeScreen = lazy(() => import('./components/HomeScreen'));
 const RegistrationFlow = lazy(() => import('./components/RegistrationFlow'));
-const ConfirmationScreen = lazy(() => import('./components/ConfirmationScreen'));
 const LoginScreen = lazy(() => import('./components/LoginScreen'));
 const PermissionsScreen = lazy(() => import('./components/PermissionsScreen'));
 const PlanScreen = lazy(() => import('./components/PlanScreen'));
 const MainApp = lazy(() => import('./components/MainApp'));
 
-export type AppScreen = 'home' | 'register' | 'confirmation' | 'login' | 'recommendation' | 'permissions' | 'plan';
+export type AppScreen = 'home' | 'register' | 'login' | 'recommendation' | 'permissions' | 'plan';
 
 // Configuración de TanStack Query
 const queryClient = new QueryClient({
@@ -105,8 +104,7 @@ function AppContent() {
         return <PermissionsScreen onAccept={() => setCurrentScreen('register')} onGoHome={() => setCurrentScreen('home')} />;
       case 'register':
         return <RegistrationFlow onRegistrationComplete={() => { setIsNewUser(true); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
-      case 'confirmation':
-        return <ConfirmationScreen onGoHome={() => setCurrentScreen('home')} />;
+
       case 'login':
         return <LoginScreen onLoginSuccess={() => { setIsNewUser(false); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
       case 'recommendation':

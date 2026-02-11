@@ -14,6 +14,7 @@ import { LocationIcon } from './icons/LocationIcon';
 interface RecommendationScreenProps {
   userName: string;
   onPlanGenerated: (interactionId: string) => void;
+  isNewUser?: boolean; // Nuevo prop para detectar usuarios recién registrados
 }
 
 const stripEmoji = (str: string) => {
@@ -22,7 +23,7 @@ const stripEmoji = (str: string) => {
   return str.replace(/(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff]|\s)+/g, ' ').trim();
 };
 
-const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, onPlanGenerated }) => {
+const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, onPlanGenerated, isNewUser = false }) => {
   const [recommendationType, setRecommendationType] = useState<'En casa' | 'Fuera' | null>(null); 
   const [selectedMeal, setSelectedMeal] = useState('');
   const [selectedCravings, setSelectedCravings] = useState<string[]>([]);
@@ -38,18 +39,19 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const { user } = useAuthStore();
   const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useUserProfile(user?.uid);
   
-  // Track si el perfil no se encuentra después de cargar (con timeout mayor para reintentos)
+  // Track si el perfil no se encuentra después de cargar
   const [profileNotFound, setProfileNotFound] = useState(false);
   
   useEffect(() => {
     if (!isProfileLoading && !profile && !isProfileError) {
-      // Esperar más tiempo para permitir reintentos del hook (5 reintentos ~ 15s max)
+      // Para usuarios nuevos, dar más tiempo (Firestore eventual consistency)
+      const timeoutMs = isNewUser ? 15000 : 8000;
       const timer = setTimeout(() => {
         setProfileNotFound(true);
-      }, 8000);
+      }, timeoutMs);
       return () => clearTimeout(timer);
     }
-  }, [isProfileLoading, profile, isProfileError]);
+  }, [isProfileLoading, profile, isProfileError, isNewUser]);
   
   // Geolocalización del usuario (solo para "Fuera")
   const { 
@@ -280,7 +282,14 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     return (
       <div className="flex-1 flex flex-col items-center justify-center px-4">
         <div className="w-10 h-10 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mb-4"></div>
-        <p className="text-bocado-gray text-sm animate-pulse font-medium">Sincronizando perfil...</p>
+        <p className="text-bocado-gray text-sm animate-pulse font-medium">
+          {isNewUser ? 'Preparando tu perfil...' : 'Sincronizando perfil...'}
+        </p>
+        {isNewUser && (
+          <p className="text-bocado-gray text-xs mt-2 text-center max-w-xs">
+            Esto puede tomar unos segundos la primera vez
+          </p>
+        )}
       </div>
     );
   }
