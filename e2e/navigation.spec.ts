@@ -31,7 +31,7 @@ test.describe('Navegación', () => {
     });
 
     test('navega a Despensa', async ({ page }) => {
-      await page.click(SELECTORS.pantry.pantry);
+      await page.click(SELECTORS.bottomNav.pantry);
       await expect(page).toHaveURL(/.*pantry.*/);
     });
 

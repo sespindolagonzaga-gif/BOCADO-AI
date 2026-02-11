@@ -4,6 +4,9 @@
 
 import { logger } from './logger';
 
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
 // Generate a key from the user's browser fingerprint + a salt
 // This makes it harder (but not impossible) to read the data from another browser
 const getEncryptionKey = (): string => {
