@@ -153,6 +153,8 @@ export const encryptedStorage = {
 // Storage wrapper that falls back to regular localStorage if encryption fails
 export const safeStorage = {
   getItem: (key: string): string | null => {
+    if (!isBrowser) return null;
+    
     try {
       return encryptedStorage.getItem(key);
     } catch {
@@ -160,6 +162,8 @@ export const safeStorage = {
     }
   },
   setItem: (key: string, value: string): void => {
+    if (!isBrowser) return;
+    
     try {
       encryptedStorage.setItem(key, value);
     } catch {
@@ -167,6 +171,8 @@ export const safeStorage = {
     }
   },
   removeItem: (key: string): void => {
+    if (!isBrowser) return;
+    
     try {
       encryptedStorage.removeItem(key);
     } catch {

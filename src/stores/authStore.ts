@@ -8,7 +8,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { User } from 'firebase/auth';
 import { setAnalyticsUser } from '../firebaseConfig';
-import { encryptedStorage } from '../utils/encryptedStorage';
+import { safeStorage } from '../utils/encryptedStorage';
 
 /**
  * Estado de autenticación - SOLO información de sesión
@@ -63,11 +63,20 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'bocado-auth-v2',
-      storage: createJSONStorage(() => encryptedStorage),
+      storage: createJSONStorage(() => safeStorage),
       // Solo persistir estado de sesión, NO datos del user
       partialize: (state) => ({ 
         isAuthenticated: state.isAuthenticated,
       }),
+      // Manejo de errores de persistencia
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.warn('[AuthStore] Error rehydrating storage:', error);
+        }
+        if (state) {
+          state.isLoading = false;
+        }
+      },
     }
   )
 );

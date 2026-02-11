@@ -133,10 +133,12 @@ function AppContent() {
           {/* Notificaciones de estado de red */}
           <NetworkStatusToast />
           
-          {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE */}
-          <Suspense fallback={<ScreenLoader />}>
-            {renderScreen()}
-          </Suspense>
+          {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE con Error Boundary */}
+          <SuspenseErrorBoundary>
+            <Suspense fallback={<ScreenLoader />}>
+              {renderScreen()}
+            </Suspense>
+          </SuspenseErrorBoundary>
         </div>
       </div>
     </SentryErrorBoundary>
