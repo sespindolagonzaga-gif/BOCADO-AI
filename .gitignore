@@ -5,6 +5,7 @@ node_modules/
 # Compilación (Archivos temporales de Vite)
 dist/
 dist-ssr/
+dev-dist/
 *.local
 
 # Secretos y Variables de Entorno (CRÍTICO: No subir)
@@ -26,6 +27,7 @@ pnpm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+*.code-workspace
 
 # Firebase
 .firebase/
