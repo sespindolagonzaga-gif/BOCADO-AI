@@ -68,15 +68,17 @@ interface RateLimitRecord {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
-// Límites más estrictos para usuarios no autenticados
+// Límites de rate limiting
+// Autenticados: más permisivos
+// No autenticados: más restrictivos pero suficientes para búsqueda
 const RATE_LIMITS = {
   authenticated: {
     windowMs: 60 * 1000, // 1 minuto
-    maxRequests: 30,     // 30 requests por minuto
+    maxRequests: 50,     // 50 requests por minuto
   },
   unauthenticated: {
     windowMs: 60 * 1000, // 1 minuto  
-    maxRequests: 10,     // 10 requests por minuto (más estricto)
+    maxRequests: 20,     // 20 requests por minuto (suficiente para typing)
   }
 };
 
@@ -304,8 +306,16 @@ async function handleAutocomplete(res: any, params: z.infer<typeof AutocompleteS
   const data = await response.json();
 
   if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-    console.error('Google Places API error:', data.status);
-    return res.status(500).json({ error: 'Maps API error', details: data.status });
+    console.error('Google Places API error:', {
+      status: data.status,
+      error_message: data.error_message,
+      query: params.query,
+    });
+    return res.status(500).json({ 
+      error: 'Maps API error', 
+      details: data.status,
+      debug: data.error_message || 'No additional info'
+    });
   }
 
   const result = {
