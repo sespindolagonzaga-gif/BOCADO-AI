@@ -1,4 +1,4 @@
-import React, { useEffect, lazy, Suspense } from 'react';
+import React, { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { auth, trackEvent } from './firebaseConfig';
@@ -10,13 +10,13 @@ import PWABanner from './components/PWABanner';
 import NetworkStatusToast from './components/NetworkStatusToast';
 import { captureError, setUserContext, addBreadcrumb } from './utils/sentry';
 
-// ✅ IMPORTACIÓN DINÁMICA (Lazy Loading)
-const HomeScreen = lazy(() => import('./components/HomeScreen'));
-const RegistrationFlow = lazy(() => import('./components/RegistrationFlow'));
-const LoginScreen = lazy(() => import('./components/LoginScreen'));
-const PermissionsScreen = lazy(() => import('./components/PermissionsScreen'));
-const PlanScreen = lazy(() => import('./components/PlanScreen'));
-const MainApp = lazy(() => import('./components/MainApp'));
+// ✅ IMPORTACIÓN ESTÁTICA (temporalmente para debugging)
+import HomeScreen from './components/HomeScreen';
+import RegistrationFlow from './components/RegistrationFlow';
+import LoginScreen from './components/LoginScreen';
+import PermissionsScreen from './components/PermissionsScreen';
+import PlanScreen from './components/PlanScreen';
+import MainApp from './components/MainApp';
 
 export type AppScreen = 'home' | 'register' | 'login' | 'recommendation' | 'permissions' | 'plan';
 
@@ -42,8 +42,15 @@ function AppContent() {
   const [planId, setPlanId] = React.useState<string | null>(null);
   const [isNewUser, setIsNewUser] = React.useState(false);
   const [authTimeout, setAuthTimeout] = React.useState(false);
+  const [renderError, setRenderError] = React.useState<Error | null>(null);
   
   const { setUser, isLoading, isAuthenticated } = useAuthStore();
+
+  // Log de renderizado para debugging
+  React.useEffect(() => {
+    console.log('[App] AppContent mounted, currentScreen:', currentScreen);
+    console.log('[App] isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+  }, []);
 
   // Timeout de seguridad: si Firebase no responde en 5s, forzar continuar
   React.useEffect(() => {
@@ -166,22 +173,56 @@ function AppContent() {
     );
   }
 
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'permissions':
-        return <PermissionsScreen onAccept={() => setCurrentScreen('register')} onGoHome={() => setCurrentScreen('home')} />;
-      case 'register':
-        return <RegistrationFlow onRegistrationComplete={() => { setIsNewUser(true); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
+  // Si hay error de renderizado
+  if (renderError) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-bocado-cream p-4">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">💥</div>
+          <h1 className="text-xl font-bold text-bocado-dark-green mb-2">
+            Error al renderizar
+          </h1>
+          <p className="text-bocado-gray mb-4">
+            {renderError.message}
+          </p>
+          <pre className="text-xs text-left bg-gray-100 p-2 rounded overflow-auto max-h-40">
+            {renderError.stack}
+          </pre>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 bg-bocado-green text-white px-6 py-3 rounded-full font-bold hover:bg-bocado-dark-green transition-colors"
+          >
+            Recargar
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-      case 'login':
-        return <LoginScreen onLoginSuccess={() => { setIsNewUser(false); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
-      case 'recommendation':
-        return <MainApp showTutorial={isNewUser} onPlanGenerated={(id) => { setPlanId(id); setCurrentScreen('plan'); }} onTutorialFinished={() => setIsNewUser(false)} onLogoutComplete={() => setCurrentScreen('home')} />;
-      case 'plan':
-        return <PlanScreen planId={planId!} onStartNewPlan={() => { setPlanId(null); setCurrentScreen('recommendation'); }} />;
-      case 'home':
-      default:
-        return <HomeScreen onStartRegistration={() => setCurrentScreen('permissions')} onGoToApp={() => setCurrentScreen('recommendation')} onGoToLogin={() => setCurrentScreen('login')} />;
+  const renderScreen = () => {
+    console.log('[App] Rendering screen:', currentScreen);
+    
+    try {
+      switch (currentScreen) {
+        case 'permissions':
+          return <PermissionsScreen onAccept={() => setCurrentScreen('register')} onGoHome={() => setCurrentScreen('home')} />;
+        case 'register':
+          return <RegistrationFlow onRegistrationComplete={() => { setIsNewUser(true); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
+        case 'login':
+          return <LoginScreen onLoginSuccess={() => { setIsNewUser(false); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
+        case 'recommendation':
+          return <MainApp showTutorial={isNewUser} onPlanGenerated={(id) => { setPlanId(id); setCurrentScreen('plan'); }} onTutorialFinished={() => setIsNewUser(false)} onLogoutComplete={() => setCurrentScreen('home')} />;
+        case 'plan':
+          return <PlanScreen planId={planId!} onStartNewPlan={() => { setPlanId(null); setCurrentScreen('recommendation'); }} />;
+        case 'home':
+        default:
+          console.log('[App] Rendering HomeScreen');
+          return <HomeScreen onStartRegistration={() => setCurrentScreen('permissions')} onGoToApp={() => setCurrentScreen('recommendation')} onGoToLogin={() => setCurrentScreen('login')} />;
+      }
+    } catch (error) {
+      console.error('[App] Error rendering screen:', error);
+      setRenderError(error as Error);
+      throw error;
     }
   };
 
@@ -200,11 +241,9 @@ function AppContent() {
           {/* Notificaciones de estado de red */}
           <NetworkStatusToast />
           
-          {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE con Error Boundary */}
+          {/* Renderizado sin lazy loading para debugging */}
           <ErrorBoundary>
-            <Suspense fallback={<ScreenLoader />}>
-              {renderScreen()}
-            </Suspense>
+            {renderScreen()}
           </ErrorBoundary>
         </div>
       </div>

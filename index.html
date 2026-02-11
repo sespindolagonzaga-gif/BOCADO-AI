@@ -30,6 +30,29 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Debugging: Verificar que el root se monta correctamente
+      window.addEventListener('DOMContentLoaded', function() {
+        console.log('[Debug] DOMContentLoaded');
+        var root = document.getElementById('root');
+        console.log('[Debug] Root element:', root);
+        
+        // Verificar después de un tiempo si React montó algo
+        setTimeout(function() {
+          var rootContent = document.getElementById('root').innerHTML;
+          console.log('[Debug] Root content length:', rootContent.length);
+          if (rootContent.length === 0) {
+            console.error('[Debug] ERROR: Root está vacío después de 3 segundos');
+            document.getElementById('root').innerHTML = 
+              '<div style="padding:20px;font-family:sans-serif;">' +
+              '<h1>⚠️ Error de carga</h1>' +
+              '<p>React no montó la aplicación. Revisa la consola para más detalles.</p>' +
+              '<button onclick="location.reload()">Recargar</button>' +
+              '</div>';
+          }
+        }, 3000);
+      });
+    </script>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>
