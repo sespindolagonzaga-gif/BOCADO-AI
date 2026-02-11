@@ -12,11 +12,22 @@ import { useEffect } from 'react';
 
 // Helper para convertir undefined a null antes de guardar en Firestore
 const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleanValue = (value: any): any => {
+    if (value === undefined) return null;
+    if (value === null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const cleanedObj: any = {};
+      Object.keys(value).forEach(k => {
+        cleanedObj[k] = cleanValue(value[k]);
+      });
+      return cleanedObj;
+    }
+    return value;
+  };
+
   const cleaned = { ...obj };
   Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === undefined) {
-      cleaned[key] = null;
-    }
+    cleaned[key] = cleanValue(cleaned[key]);
   });
   return cleaned;
 };
@@ -70,16 +81,18 @@ export const useUserProfile = (
   userId: string | undefined,
   options: UseUserProfileOptions = {}
 ): UseQueryResult<UserProfile | null, Error> => {
-  const { enabled = true, staleTime = 1000 * 60 * 5 } = options;
+  const { enabled = true, staleTime = 1000 * 30 } = options; // Reducido a 30s para detectar cambios rápido
   
   return useQuery({
     queryKey: [USER_PROFILE_KEY, userId],
     queryFn: () => fetchUserProfile(userId!),
     enabled: !!userId && enabled,
-    staleTime, // 5 minutos por defecto
-    gcTime: 1000 * 60 * 30, // 30 minutos en caché
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime, 
+    gcTime: 1000 * 60 * 5, // Reducido a 5 minutos
+    retry: 3, // Aumentado a 3 reintentos
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    // Si no hay perfil, no considerarlo como error, pero sí reintentar
+    select: (data) => data,
   });
 };
 

@@ -6,11 +6,22 @@ import { separateUserData } from '../utils/profileSanitizer';
 
 // Helper para convertir undefined a null antes de guardar en Firestore
 const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleanValue = (value: any): any => {
+    if (value === undefined) return null;
+    if (value === null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      const cleanedObj: any = {};
+      Object.keys(value).forEach(k => {
+        cleanedObj[k] = cleanValue(value[k]);
+      });
+      return cleanedObj;
+    }
+    return value;
+  };
+
   const cleaned = { ...obj };
   Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === undefined) {
-      cleaned[key] = null;
-    }
+    cleaned[key] = cleanValue(cleaned[key]);
   });
   return cleaned;
 };

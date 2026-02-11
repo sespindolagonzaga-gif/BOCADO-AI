@@ -19,11 +19,23 @@ import { searchCities, getPlaceDetails, PlacePrediction } from '../services/maps
 // Helper para convertir undefined a null antes de guardar en Firestore
 // Firestore no acepta undefined pero sí acepta null
 const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleanValue = (value: any): any => {
+    if (value === undefined) return null;
+    if (value === null) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      // Recursivamente limpiar objetos anidados
+      const cleanedObj: any = {};
+      Object.keys(value).forEach(k => {
+        cleanedObj[k] = cleanValue(value[k]);
+      });
+      return cleanedObj;
+    }
+    return value;
+  };
+
   const cleaned = { ...obj };
   Object.keys(cleaned).forEach(key => {
-    if (cleaned[key] === undefined) {
-      cleaned[key] = null;
-    }
+    cleaned[key] = cleanValue(cleaned[key]);
   });
   return cleaned;
 };
@@ -172,7 +184,11 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
         updatedAt: serverTimestamp() as UserProfile['updatedAt'],
       };
 
-      await setDoc(doc(db, 'users', user.uid), cleanForFirestore(userProfile));
+      console.log('💾 Guardando perfil en Firestore...', { uid: user.uid, profile: userProfile });
+      const cleanedProfile = cleanForFirestore(userProfile);
+      console.log('🧹 Perfil limpio:', cleanedProfile);
+      await setDoc(doc(db, 'users', user.uid), cleanedProfile);
+      console.log('✅ Perfil guardado exitosamente');
       await sendEmailVerification(user);
       
       trackEvent('registration_complete', {

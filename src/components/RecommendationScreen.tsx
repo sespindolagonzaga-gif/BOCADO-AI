@@ -36,7 +36,20 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const { user } = useAuthStore();
-  const { data: profile, isLoading: isProfileLoading } = useUserProfile(user?.uid);
+  const { data: profile, isLoading: isProfileLoading, isError: isProfileError } = useUserProfile(user?.uid);
+  
+  // Track si el perfil no se encuentra después de cargar
+  const [profileNotFound, setProfileNotFound] = useState(false);
+  
+  useEffect(() => {
+    if (!isProfileLoading && !profile && !isProfileError) {
+      // Esperar un poco y verificar si realmente no existe
+      const timer = setTimeout(() => {
+        setProfileNotFound(true);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isProfileLoading, profile, isProfileError]);
   
   // Geolocalización del usuario (solo para "Fuera")
   const { 
@@ -242,6 +255,26 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
   const isSelectionMade = (recommendationType === 'En casa' && selectedMeal) || 
                           (recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget);
+
+  // Mostrar error si el perfil no se encuentra
+  if (profileNotFound || isProfileError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div className="text-center max-w-sm">
+          <p className="text-red-500 text-lg mb-2">⚠️ No se encontró tu perfil</p>
+          <p className="text-bocado-gray text-sm mb-4">
+            Parece que hubo un problema al cargar tu perfil. Intenta recargar la página o contacta soporte.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-bocado-green text-white rounded-lg hover:bg-bocado-dark-green transition-colors"
+          >
+            Recargar página
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isProfileLoading || !profile) {
     return (

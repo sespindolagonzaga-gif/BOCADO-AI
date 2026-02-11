@@ -70,6 +70,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
         }
         
         const sanitizedProfile = sanitizeProfileData(firestoreData) as UserProfile;
+        // Invalidar y actualizar cache del perfil
+        queryClient.invalidateQueries({ queryKey: ['userProfile', user.uid] });
         queryClient.setQueryData(['userProfile', user.uid], sanitizedProfile);
         
         // ✅ ANALÍTICA: Login exitoso
