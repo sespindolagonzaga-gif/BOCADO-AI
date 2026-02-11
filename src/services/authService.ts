@@ -4,6 +4,17 @@ import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { FormData, UserProfile } from '../types';
 import { separateUserData } from '../utils/profileSanitizer';
 
+// Helper para convertir undefined a null antes de guardar en Firestore
+const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleaned = { ...obj };
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined) {
+      cleaned[key] = null;
+    }
+  });
+  return cleaned;
+};
+
 export const registerUser = async (formData: FormData): Promise<{ uid: string }> => {
   const { auth: authData, profile } = separateUserData(formData);
   
@@ -29,7 +40,7 @@ export const registerUser = async (formData: FormData): Promise<{ uid: string }>
     updatedAt: serverTimestamp() as UserProfile['updatedAt'],
   };
 
-  await setDoc(doc(db, 'users', uid), userProfile);
+  await setDoc(doc(db, 'users', uid), cleanForFirestore(userProfile));
 
   return { uid };
 };

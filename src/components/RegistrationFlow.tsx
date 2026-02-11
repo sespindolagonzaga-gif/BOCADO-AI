@@ -16,6 +16,18 @@ import { separateUserData } from '../utils/profileSanitizer';
 import { logger } from '../utils/logger';
 import { searchCities, getPlaceDetails, PlacePrediction } from '../services/mapsService';
 
+// Helper para convertir undefined a null antes de guardar en Firestore
+// Firestore no acepta undefined pero sí acepta null
+const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleaned = { ...obj };
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined) {
+      cleaned[key] = null;
+    }
+  });
+  return cleaned;
+};
+
 // ✅ CORRECCIÓN ERRORES 2305: Asegúrate que en userSchema.ts 
 // los nombres coincidan exactamente (ej. userStep1Schema o step1Schema)
 import { step1Schema, step2Schema, step3Schema } from '../schemas/userSchema';
@@ -160,7 +172,7 @@ const RegistrationFlow: React.FC<RegistrationFlowProps> = ({ onRegistrationCompl
         updatedAt: serverTimestamp() as UserProfile['updatedAt'],
       };
 
-      await setDoc(doc(db, 'users', user.uid), userProfile);
+      await setDoc(doc(db, 'users', user.uid), cleanForFirestore(userProfile));
       await sendEmailVerification(user);
       
       trackEvent('registration_complete', {
