@@ -23,22 +23,33 @@ export interface GeocodingResult {
 }
 
 /**
- * Helper para hacer requests autenticados al proxy
+ * Helper para hacer requests al proxy
+ * Algunas acciones (autocomplete) funcionan sin auth para permitir registro
  */
 async function proxyRequest(action: string, params: Record<string, any>): Promise<any> {
   const user = auth.currentUser;
-  if (!user) {
+  
+  // Autocomplete funciona sin auth (para flujo de registro)
+  // Las demás acciones requieren autenticación
+  const requiresAuth = action !== 'autocomplete';
+  
+  if (requiresAuth && !user) {
     throw new Error('Usuario no autenticado');
   }
 
-  const token = await user.getIdToken();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  
+  // Agregar token si hay usuario autenticado
+  if (user) {
+    const token = await user.getIdToken();
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   
   const response = await fetch(MAPS_PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
+    headers,
     body: JSON.stringify({ action, ...params }),
   });
 

@@ -68,9 +68,24 @@ interface RateLimitRecord {
   updatedAt: FirebaseFirestore.Timestamp;
 }
 
-async function checkRateLimit(ip: string): Promise<{ allowed: boolean; retryAfter?: number }> {
+// Límites más estrictos para usuarios no autenticados
+const RATE_LIMITS = {
+  authenticated: {
+    windowMs: 60 * 1000, // 1 minuto
+    maxRequests: 30,     // 30 requests por minuto
+  },
+  unauthenticated: {
+    windowMs: 60 * 1000, // 1 minuto  
+    maxRequests: 10,     // 10 requests por minuto (más estricto)
+  }
+};
+
+async function checkRateLimit(ip: string, isAuthenticated: boolean = false): Promise<{ allowed: boolean; retryAfter?: number }> {
   const docRef = db.collection('maps_proxy_rate_limits').doc(ip);
   const now = Date.now();
+  
+  // Usar colección diferente para autenticados vs no autenticados
+  const limits = isAuthenticated ? RATE_LIMITS.authenticated : RATE_LIMITS.unauthenticated;
 
   try {
     return await db.runTransaction(async (t) => {
@@ -78,23 +93,25 @@ async function checkRateLimit(ip: string): Promise<{ allowed: boolean; retryAfte
       const data = doc.exists ? doc.data() as RateLimitRecord : null;
 
       const validRequests = (data?.requests || [])
-        .filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
+        .filter((ts) => now - ts < limits.windowMs);
 
-      if (validRequests.length >= RATE_LIMIT_MAX_REQUESTS) {
+      if (validRequests.length >= limits.maxRequests) {
         const oldestRequest = Math.min(...validRequests);
-        const retryAfter = Math.ceil((oldestRequest + RATE_LIMIT_WINDOW_MS - now) / 1000);
+        const retryAfter = Math.ceil((oldestRequest + limits.windowMs - now) / 1000);
         return { allowed: false, retryAfter };
       }
 
       t.set(docRef, {
         requests: [...validRequests, now],
         updatedAt: FieldValue.serverTimestamp(),
+        isAuthenticated, // Guardar estado para debugging
       });
 
       return { allowed: true };
     });
   } catch (error) {
     console.error('Error en rate limit:', error);
+    // Fail-closed: rechazar si hay error
     return { allowed: false, retryAfter: 60 };
   }
 }
@@ -198,31 +215,40 @@ export default async function handler(req: any, res: any) {
   const clientIP = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
     .toString().split(',')[0].trim();
   
-  const rateCheck = await checkRateLimit(clientIP);
+  // Obtener la acción antes del rate limiting para aplicar límites diferentes
+  const { action, ...params } = req.body;
+  
+  // Autocomplete puede funcionar sin auth (para flujo de registro)
+  // Pero con rate limiting más estricto
+  const isPublicAction = action === 'autocomplete';
+  
+  // Verificar autenticación (requerida para todo excepto autocomplete)
+  let isAuthenticated = false;
+  const authHeader = req.headers?.authorization || '';
+  const tokenMatch = typeof authHeader === 'string' ? authHeader.match(/^Bearer\s+(.+)$/i) : null;
+  const idToken = tokenMatch?.[1];
+
+  if (idToken) {
+    try {
+      await getAuth().verifyIdToken(idToken);
+      isAuthenticated = true;
+    } catch (err) {
+      if (!isPublicAction) {
+        return res.status(401).json({ error: 'Invalid auth token' });
+      }
+    }
+  } else if (!isPublicAction) {
+    return res.status(401).json({ error: 'Auth token required' });
+  }
+  
+  // Rate limiting: más estricto para requests públicos
+  const rateCheck = await checkRateLimit(clientIP, isAuthenticated);
   if (!rateCheck.allowed) {
     return res.status(429).json({
       error: 'Rate limit exceeded',
       retryAfter: rateCheck.retryAfter,
     });
   }
-
-  // Autenticación
-  const authHeader = req.headers?.authorization || '';
-  const tokenMatch = typeof authHeader === 'string' ? authHeader.match(/^Bearer\s+(.+)$/i) : null;
-  const idToken = tokenMatch?.[1];
-
-  if (!idToken) {
-    return res.status(401).json({ error: 'Auth token required' });
-  }
-
-  try {
-    await getAuth().verifyIdToken(idToken);
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid auth token' });
-  }
-
-  // Routing según acción
-  const { action, ...params } = req.body;
 
   try {
     switch (action) {
