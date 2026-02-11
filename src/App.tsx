@@ -2,6 +2,7 @@ import React, { useEffect, lazy, Suspense } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { auth, trackEvent } from './firebaseConfig';
+import { env } from './environment/env';
 import { useAuthStore } from './stores/authStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import { SentryErrorBoundary } from './components/SentryErrorBoundary';
@@ -40,8 +41,22 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = React.useState<AppScreen>('home');
   const [planId, setPlanId] = React.useState<string | null>(null);
   const [isNewUser, setIsNewUser] = React.useState(false);
+  const [authTimeout, setAuthTimeout] = React.useState(false);
   
   const { setUser, isLoading, isAuthenticated } = useAuthStore();
+
+  // Timeout de seguridad: si Firebase no responde en 5s, forzar continuar
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (isLoading) {
+        console.warn('[App] Auth timeout - Firebase no respondió, forzando continuar');
+        setAuthTimeout(true);
+        // Forzar el estado de carga a falso
+        useAuthStore.getState().setLoading(false);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
@@ -73,27 +88,79 @@ function AppContent() {
   }, [currentScreen]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      // Sincronizar usuario con Sentry para tracking de errores
-      setUserContext(user?.uid || null, user?.email || undefined);
-      if (user) {
-        addBreadcrumb('User authenticated', 'auth');
-        setCurrentScreen('recommendation');
-      } else {
-        addBreadcrumb('User logged out', 'auth');
-        setCurrentScreen('home');
-      }
-    });
-    return () => unsubscribe();
+    console.log('[App] Iniciando onAuthStateChanged...');
+    
+    // Verificar que Firebase esté configurado
+    if (!env.firebase.apiKey || env.firebase.apiKey === '') {
+      console.error('[App] ERROR: Firebase API Key no configurada');
+      setAuthTimeout(true);
+      useAuthStore.getState().setLoading(false);
+      return;
+    }
+    
+    let unsubscribe: (() => void) | null = null;
+    
+    try {
+      unsubscribe = onAuthStateChanged(auth, (user) => {
+        console.log('[App] Auth state changed:', user ? 'authenticated' : 'not authenticated');
+        setUser(user);
+        // Sincronizar usuario con Sentry para tracking de errores
+        setUserContext(user?.uid || null, user?.email || undefined);
+        if (user) {
+          addBreadcrumb('User authenticated', 'auth');
+          setCurrentScreen('recommendation');
+        } else {
+          addBreadcrumb('User logged out', 'auth');
+          setCurrentScreen('home');
+        }
+      }, (error) => {
+        console.error('[App] Auth state error:', error);
+        captureError(error, { type: 'auth_state_change_error' });
+        setAuthTimeout(true);
+        useAuthStore.getState().setLoading(false);
+      });
+    } catch (error) {
+      console.error('[App] Error setting up auth listener:', error);
+      captureError(error as Error, { type: 'auth_setup_error' });
+      setAuthTimeout(true);
+      useAuthStore.getState().setLoading(false);
+      return;
+    }
+    
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [setUser]);
 
-  if (isLoading) {
+  if (isLoading && !authTimeout) {
     return (
       <div className="min-h-screen w-full flex items-center justify-center bg-bocado-cream">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-bocado-green border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-bocado-green font-bold animate-pulse">Cargando Bocado...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si hay timeout, mostrar error de configuración
+  if (authTimeout) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-bocado-cream p-4">
+        <div className="text-center max-w-md">
+          <div className="text-6xl mb-4">⚙️</div>
+          <h1 className="text-xl font-bold text-bocado-dark-green mb-2">
+            Error de configuración
+          </h1>
+          <p className="text-bocado-gray mb-4">
+            No se pudieron cargar las credenciales de Firebase. Verifica que las variables de entorno estén configuradas en Vercel.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-bocado-green text-white px-6 py-3 rounded-full font-bold hover:bg-bocado-dark-green transition-colors"
+          >
+            Reintentar
+          </button>
         </div>
       </div>
     );
