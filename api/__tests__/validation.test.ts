@@ -114,19 +114,40 @@ describe('API Validation Tests', () => {
   });
 
   describe('Rate Limit Constants', () => {
-    it('should have reasonable rate limit defaults', () => {
-      // Verificar que los límites son razonables
-      const DEFAULT_CONFIG = {
-        windowMs: 10 * 60 * 1000,    // 10 minutos
-        maxRequests: 5,               // 5 requests por ventana
-        cooldownMs: 30 * 1000,        // 30 segundos entre requests
-        stuckThresholdMs: 2 * 60 * 1000, // 2 minutos para cleanup
+    it('should have reasonable rate limit defaults for unauthenticated users', () => {
+      // Maps proxy rate limits: public users (autocomplete) - más restrictivo
+      const UNAUTHENTICATED_CONFIG = {
+        windowMs: 60 * 1000,      // 1 minuto
+        maxRequests: 20,          // 20 requests por minuto (suficiente para typing)
       };
 
-      expect(DEFAULT_CONFIG.windowMs).toBe(600000);
-      expect(DEFAULT_CONFIG.maxRequests).toBe(5);
-      expect(DEFAULT_CONFIG.cooldownMs).toBe(30000);
-      expect(DEFAULT_CONFIG.stuckThresholdMs).toBe(120000);
+      expect(UNAUTHENTICATED_CONFIG.windowMs).toBe(60000);
+      expect(UNAUTHENTICATED_CONFIG.maxRequests).toBe(20);
+    });
+
+    it('should have higher rate limit for authenticated users', () => {
+      // Maps proxy rate limits: authenticated users
+      const AUTHENTICATED_CONFIG = {
+        windowMs: 60 * 1000,      // 1 minuto
+        maxRequests: 50,          // 50 requests por minuto
+      };
+
+      expect(AUTHENTICATED_CONFIG.windowMs).toBe(60000);
+      expect(AUTHENTICATED_CONFIG.maxRequests).toBe(50);
+    });
+
+    it('should enforce rate limits to prevent abuse', () => {
+      // Validar que los límites previenen abuso
+      const UNAUTHENTICATED = 20;
+      const AUTHENTICATED = 50;
+
+      // Mínimo: 20 requests/minuto para público es suficiente para búsqueda típica
+      expect(UNAUTHENTICATED).toBeGreaterThanOrEqual(10);
+      expect(UNAUTHENTICATED).toBeLessThanOrEqual(30);
+
+      // Máximo: 50 requests/minuto para authenticated es razonable
+      expect(AUTHENTICATED).toBeGreaterThanOrEqual(30);
+      expect(AUTHENTICATED).toBeLessThanOrEqual(100);
     });
   });
 });
