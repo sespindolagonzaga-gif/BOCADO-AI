@@ -154,24 +154,194 @@ exports.archiveOldUserHistory = functions.pubsub
   });
 
 /**
+ * Cleanup old historial_recetas documents
+ * Runs every day at 4:00 AM
+ * Deletes documents older than 90 days
+ */
+exports.cleanupOldHistorialRecetas = functions.pubsub
+  .schedule('0 4 * * *') // Every day at 4:00 AM
+  .timeZone('America/Mexico_City')
+  .onRun(async (context) => {
+    const cutoffDate = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
+    );
+
+    let deletedCount = 0;
+    let batchCount = 0;
+    const MAX_BATCHES = 10; // Safety limit
+
+    try {
+      // Process in multiple batches if needed
+      while (batchCount < MAX_BATCHES) {
+        const snapshot = await db.collection('historial_recetas')
+          .where('fecha_creacion', '<', cutoffDate)
+          .limit(500)
+          .get();
+
+        if (snapshot.empty) {
+          break;
+        }
+
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+
+        await batch.commit();
+        batchCount++;
+        
+        console.log(`Batch ${batchCount}: Deleted ${snapshot.size} documents from historial_recetas`);
+        
+        // Small delay between batches
+        if (batchCount < MAX_BATCHES) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`Total deleted from historial_recetas: ${deletedCount} in ${batchCount} batches`);
+      return { deleted: deletedCount, batches: batchCount };
+    } catch (error) {
+      console.error('Error cleaning up historial_recetas:', error);
+      throw error;
+    }
+  });
+
+/**
+ * Cleanup old historial_recomendaciones documents
+ * Runs every day at 4:30 AM
+ * Deletes documents older than 90 days
+ */
+exports.cleanupOldHistorialRecomendaciones = functions.pubsub
+  .schedule('30 4 * * *') // Every day at 4:30 AM
+  .timeZone('America/Mexico_City')
+  .onRun(async (context) => {
+    const cutoffDate = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
+    );
+
+    let deletedCount = 0;
+    let batchCount = 0;
+    const MAX_BATCHES = 10;
+
+    try {
+      while (batchCount < MAX_BATCHES) {
+        const snapshot = await db.collection('historial_recomendaciones')
+          .where('fecha_creacion', '<', cutoffDate)
+          .limit(500)
+          .get();
+
+        if (snapshot.empty) {
+          break;
+        }
+
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+          deletedCount++;
+        });
+
+        await batch.commit();
+        batchCount++;
+        
+        console.log(`Batch ${batchCount}: Deleted ${snapshot.size} documents from historial_recomendaciones`);
+        
+        if (batchCount < MAX_BATCHES) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      console.log(`Total deleted from historial_recomendaciones: ${deletedCount} in ${batchCount} batches`);
+      return { deleted: deletedCount, batches: batchCount };
+    } catch (error) {
+      console.error('Error cleaning up historial_recomendaciones:', error);
+      throw error;
+    }
+  });
+
+/**
+ * Cleanup old maps proxy cache
+ * Runs every hour
+ * Deletes expired cache entries
+ */
+exports.cleanupMapsProxyCache = functions.pubsub
+  .schedule('0 * * * *') // Every hour
+  .timeZone('America/Mexico_City')
+  .onRun(async (context) => {
+    const now = admin.firestore.Timestamp.now();
+    let deletedCount = 0;
+
+    try {
+      // Note: This requires an index on expiresAt
+      // For now, we'll query without ordering and check in code
+      const snapshot = await db.collection('maps_proxy_cache')
+        .limit(500)
+        .get();
+
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        const expiresAt = data?.expiresAt?.toMillis?.() || 0;
+        
+        if (Date.now() > expiresAt) {
+          batch.delete(doc.ref);
+          deletedCount++;
+        }
+      });
+
+      if (deletedCount > 0) {
+        await batch.commit();
+      }
+
+      console.log(`Deleted ${deletedCount} expired cache entries`);
+      return { deleted: deletedCount };
+    } catch (error) {
+      console.error('Error cleaning up maps proxy cache:', error);
+      throw error;
+    }
+  });
+
+/**
  * HTTP function to manually trigger cleanup (for admin use)
- * Requires authentication
+ * Requires authentication + admin claim
  */
 exports.manualCleanup = functions.https.onCall(async (data, context) => {
-  // Verify admin user
+  // Verify authenticated user
   if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be authenticated');
   }
 
-  // Check if user is admin (you'll need to implement this check)
-  // const isAdmin = await checkIfAdmin(context.auth.uid);
-  // if (!isAdmin) {
-  //   throw new functions.https.HttpsError('permission-denied', 'Must be admin');
-  // }
+  // Enforce admin claim (set via Firebase Auth custom claims)
+  const isAdmin = Boolean(context.auth.token?.admin);
+  if (!isAdmin) {
+    throw new functions.https.HttpsError('permission-denied', 'Must be admin');
+  }
 
-  const { collection, days } = data;
+  const { collection, days } = data || {};
+
+  // Validate inputs to prevent abuse
+  const allowedCollections = new Set([
+    'user_interactions',
+    'ip_rate_limits',
+    'user_history',
+    'user_history_archive',
+    'historial_recetas',
+    'historial_recomendaciones',
+    'maps_proxy_cache',
+    'maps_proxy_rate_limits',
+  ]);
+
+  if (!collection || typeof collection !== 'string' || !allowedCollections.has(collection)) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid collection');
+  }
+
+  const daysNumber = Number(days);
+  if (!Number.isFinite(daysNumber) || daysNumber < 1 || daysNumber > 365) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid days range');
+  }
+
   const cutoffDate = admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    new Date(Date.now() - daysNumber * 24 * 60 * 60 * 1000)
   );
 
   try {
@@ -191,7 +361,7 @@ exports.manualCleanup = functions.https.onCall(async (data, context) => {
       success: true, 
       deleted: snapshot.size,
       collection,
-      olderThan: `${days} days`
+      olderThan: `${daysNumber} days`
     };
   } catch (error) {
     console.error('Error in manual cleanup:', error);

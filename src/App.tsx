@@ -4,7 +4,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { auth, trackEvent } from './firebaseConfig';
 import { useAuthStore } from './stores/authStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { SentryErrorBoundary } from './components/SentryErrorBoundary';
 import PWABanner from './components/PWABanner';
+import { captureError, setUserContext, addBreadcrumb } from './utils/sentry';
 
 // ✅ IMPORTACIÓN DINÁMICA (Lazy Loading)
 const HomeScreen = lazy(() => import('./components/HomeScreen'));
@@ -44,9 +46,19 @@ function AppContent() {
   useEffect(() => {
     const handleGlobalError = (event: ErrorEvent) => {
       trackEvent('exception', { description: event.message, fatal: true });
+      captureError(event.error || new Error(event.message), {
+        type: 'global_error',
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      });
     };
     const handlePromiseError = (event: PromiseRejectionEvent) => {
       trackEvent('promise_error', { reason: String(event.reason) });
+      const error = event.reason instanceof Error 
+        ? event.reason 
+        : new Error(String(event.reason));
+      captureError(error, { type: 'unhandled_promise_rejection' });
     };
     window.addEventListener('error', handleGlobalError);
     window.addEventListener('unhandledrejection', handlePromiseError);
@@ -63,8 +75,15 @@ function AppContent() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
-      if (user) setCurrentScreen('recommendation');
-      else setCurrentScreen('home');
+      // Sincronizar usuario con Sentry para tracking de errores
+      setUserContext(user?.uid || null, user?.email || undefined);
+      if (user) {
+        addBreadcrumb('User authenticated', 'auth');
+        setCurrentScreen('recommendation');
+      } else {
+        addBreadcrumb('User logged out', 'auth');
+        setCurrentScreen('home');
+      }
     });
     return () => unsubscribe();
   }, [setUser]);
@@ -101,22 +120,24 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-bocado-cream flex justify-center items-start md:items-center md:p-8 lg:p-10 2xl:p-12">
-      <div className="w-full min-h-full bg-bocado-background 
-                      md:max-w-app lg:max-w-app-lg xl:max-w-app-xl
-                      md:h-[min(900px,calc(100vh-4rem))] md:min-h-[640px]
-                      md:rounded-4xl md:shadow-bocado-lg 
-                      md:border-8 md:border-white
-                      overflow-hidden relative flex flex-col">
-        {/* PWA Banner dentro del contenedor del teléfono */}
-        <PWABanner />
-        
-        {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE */}
-        <Suspense fallback={<ScreenLoader />}>
-          {renderScreen()}
-        </Suspense>
+    <SentryErrorBoundary>
+      <div className="min-h-screen bg-bocado-cream flex justify-center items-start md:items-center md:p-8 lg:p-10 2xl:p-12">
+        <div className="w-full min-h-full bg-bocado-background 
+                        md:max-w-app lg:max-w-app-lg xl:max-w-app-xl
+                        md:h-[min(900px,calc(100vh-4rem))] md:min-h-[640px]
+                        md:rounded-4xl md:shadow-bocado-lg 
+                        md:border-8 md:border-white
+                        overflow-hidden relative flex flex-col">
+          {/* PWA Banner dentro del contenedor del teléfono */}
+          <PWABanner />
+          
+          {/* ✅ ENVOLVEMOS EL RENDER EN SUSPENSE */}
+          <Suspense fallback={<ScreenLoader />}>
+            {renderScreen()}
+          </Suspense>
+        </div>
       </div>
-    </div>
+    </SentryErrorBoundary>
   );
 }
 

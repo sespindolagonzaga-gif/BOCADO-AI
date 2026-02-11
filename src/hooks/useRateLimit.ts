@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { env } from '../environment/env';
 
 interface RateLimitStatus {
@@ -62,7 +62,7 @@ export const useRateLimit = (userId: string | undefined) => {
   /**
    * Formatea el tiempo restante para mostrar al usuario
    */
-  const formattedTimeLeft = useCallback((seconds: number): string => {
+  const formatTimeLeft = useCallback((seconds: number): string => {
     if (seconds <= 0) return 'Ahora';
     if (seconds < 60) return `${seconds}s`;
     const minutes = Math.floor(seconds / 60);
@@ -70,17 +70,29 @@ export const useRateLimit = (userId: string | undefined) => {
     return `${minutes}m ${remainingSeconds}s`;
   }, []);
 
+  // Memoizar el tiempo formateado para evitar cálculos innecesarios
+  const formattedTimeLeft = useMemo(() => 
+    formatTimeLeft(status.nextAvailableIn),
+    [formatTimeLeft, status.nextAvailableIn]
+  );
+
+  // Memoizar el mensaje
+  const message = useMemo(() => 
+    status.canRequest 
+      ? '' 
+      : `Espera ${formatTimeLeft(status.nextAvailableIn)}`,
+    [formatTimeLeft, status.canRequest, status.nextAvailableIn]
+  );
+
   return {
     ...status,
     isLoading,
     refreshStatus,
-    formattedTimeLeft: formattedTimeLeft(status.nextAvailableIn),
+    formattedTimeLeft,
     // Helper para deshabilitar botón
     isDisabled: !status.canRequest || isLoading,
     // Mensaje para mostrar al usuario
-    message: status.canRequest 
-      ? '' 
-      : `Espera ${formattedTimeLeft(status.nextAvailableIn)}`,
+    message,
   };
 };
 

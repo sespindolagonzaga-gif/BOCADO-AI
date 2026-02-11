@@ -6,6 +6,10 @@ import { logger } from '../utils/logger';
 // PAGINACIÓN INTELIGENTE PARA FIRESTORE
 // ============================================
 
+// Límite máximo de items para prevenir memory leaks
+// Si un usuario tiene miles de items, limitamos a este número
+const MAX_ITEMS = 500;
+
 export interface PaginationState {
   currentPage: number;
   hasMore: boolean;
@@ -97,7 +101,7 @@ export function usePaginatedFirestoreQuery<T>({
         ...allItemsRef.current.slice(0, startIndex),
         ...newItems,
         ...allItemsRef.current.slice(endIndex),
-      ];
+      ].slice(0, MAX_ITEMS); // Prevenir memory leaks
       
       setPagination(prev => ({
         ...prev,
@@ -128,7 +132,7 @@ export function usePaginatedFirestoreQuery<T>({
         cursorsRef.current.set(nextPage, result.nextCursor);
       }
       
-      allItemsRef.current = [...allItemsRef.current, ...result.items];
+      allItemsRef.current = [...allItemsRef.current, ...result.items].slice(0, MAX_ITEMS);
       
       setPagination({
         currentPage: nextPage,
@@ -154,13 +158,21 @@ export function usePaginatedFirestoreQuery<T>({
     queryClient.invalidateQueries({ queryKey });
   }, [queryClient, queryKey]);
 
+  // Verificar si se alcanzó el límite máximo
+  const hasReachedMaxItems = allItemsRef.current.length >= MAX_ITEMS;
+
   return {
     ...query,
     items: allItemsRef.current,
-    pagination,
+    pagination: {
+      ...pagination,
+      hasMore: pagination.hasMore && !hasReachedMaxItems,
+    },
     fetchNextPage,
     reset,
     totalLoaded: allItemsRef.current.length,
+    hasReachedMaxItems,
+    maxItems: MAX_ITEMS,
   };
 }
 

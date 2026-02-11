@@ -22,7 +22,8 @@ const firebaseConfig = {
 const apiConfig = {
   recommendationUrl: '/api/recommend',
   registerUserUrl: getEnvVar('VITE_REGISTER_USER_URL'),
-  googleMapsApiKey: getEnvVar('VITE_GOOGLE_MAPS_API_KEY'),
+  // ✅ REMOVED: googleMapsApiKey ya no se usa en frontend
+  // Las llamadas a Maps ahora van al proxy protegido: /api/maps-proxy
 };
 
 // Rango de búsqueda de restaurantes en metros

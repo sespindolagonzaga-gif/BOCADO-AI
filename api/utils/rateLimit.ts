@@ -1,6 +1,10 @@
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 // ============================================
+// ⚠️ DEPRECATED: Este archivo ya no se usa
+// La implementación está inline en api/recommend.ts
+// Se mantiene como referencia pero debe eliminarse en futura refactorización
+// ============================================
 // RATE LIMITING DISTRIBUIDO CON FIRESTORE
 // ============================================
 
@@ -134,7 +138,7 @@ export class DistributedRateLimiter {
           }
         }
 
-        // 5. TODO BIEN: Registrar inicio de proceso
+        // 5. Registrar inicio de proceso
         const newRecord: Partial<RateLimitRecord> = {
           requests: validRequests,
           currentProcess: {
@@ -153,8 +157,11 @@ export class DistributedRateLimiter {
       });
     } catch (error: any) {
       console.error('❌ Error en rate limit transaction:', error);
-      // Fail-open: permitir request si hay error de BD
-      return { allowed: true, remainingRequests: 1 };
+      // FAIL-CLOSED: Si no podemos verificar rate limit, rechazar por seguridad
+      return { 
+        allowed: false, 
+        error: 'Error de seguridad: no se pudo verificar el límite de uso. Intenta de nuevo en unos momentos.' 
+      };
     }
   }
 

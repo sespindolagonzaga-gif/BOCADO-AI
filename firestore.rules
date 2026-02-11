@@ -48,9 +48,22 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
     }
 
-    // Landing emails (public write only)
-    match /landing_mails/{document=**} {
-      allow create: if true;
+    // Landing emails (public write only) - CON VALIDACIÓN Y RATE LIMIT BÁSICO
+    match /landing_mails/{emailId} {
+      allow create: if 
+        // Validar que el emailId sea un hash válido (evita path traversal)
+        emailId.matches('^[a-zA-Z0-9_-]{10,128}$') &&
+        // Validar estructura del documento
+        request.resource.data.keys().hasAll(['email', 'createdAt', 'source']) &&
+        request.resource.data.keys().hasOnly(['email', 'createdAt', 'source', 'country', 'userAgent']) &&
+        // Validar formato de email
+        request.resource.data.email.matches('^[a-zA-Z0-9._%\\+-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$') &&
+        request.resource.data.email.size() >= 5 && 
+        request.resource.data.email.size() <= 254 &&
+        // Validar source
+        request.resource.data.source in ['landing_page', 'waitlist', 'popup'] &&
+        // Evitar datos excesivamente grandes
+        request.resource.data.email.size() < 300;
       allow read, update, delete: if false;
     }
 
@@ -59,6 +72,24 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow update, delete: if false;
+    }
+
+    // Rate limiting collections (solo backend via Admin SDK)
+    match /rate_limit_v2/{userId} {
+      allow read, write: if false; // Solo Admin SDK puede escribir
+    }
+
+    match /ip_rate_limits/{ip} {
+      allow read, write: if false; // Solo Admin SDK puede escribir
+    }
+
+    match /maps_proxy_rate_limits/{ip} {
+      allow read, write: if false; // Solo Admin SDK puede escribir
+    }
+
+    // Maps proxy cache (solo backend)
+    match /maps_proxy_cache/{docId} {
+      allow read, write: if false; // Solo Admin SDK puede escribir
     }
 
     // Default deny

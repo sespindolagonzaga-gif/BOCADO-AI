@@ -144,7 +144,11 @@ class DistributedRateLimiter {
       });
     } catch (error: any) {
       safeLog('error', '❌ Error en rate limit transaction', error);
-      return { allowed: true, remainingRequests: 1 };
+      // FAIL-CLOSED: Si no podemos verificar rate limit, rechazar la request
+      return { 
+        allowed: false, 
+        error: 'Error de seguridad: no se pudo verificar el límite de uso. Intenta de nuevo en unos momentos.' 
+      };
     }
   }
 
@@ -273,6 +277,48 @@ const RequestBodySchema = z.object({
 });
 
 type RequestBody = z.infer<typeof RequestBodySchema>;
+
+// Schemas para validar respuesta de Gemini
+const MacroSchema = z.object({
+  kcal: z.number().max(50000).default(0),
+  proteinas_g: z.number().max(5000).default(0),
+  carbohidratos_g: z.number().max(5000).default(0),
+  grasas_g: z.number().max(5000).default(0),
+});
+
+const RecipeSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  titulo: z.string().max(200),
+  tiempo_estimado: z.string().max(50).optional(),
+  dificultad: z.enum(['Fácil', 'Media', 'Difícil']).optional(),
+  coincidencia_despensa: z.string().max(100).optional(),
+  ingredientes: z.array(z.string().max(200)).max(50),
+  pasos_preparacion: z.array(z.string().max(1000)).max(50),
+  macros_por_porcion: MacroSchema.optional(),
+});
+
+const RecipeResponseSchema = z.object({
+  saludo_personalizado: z.string().max(1000),
+  receta: z.object({
+    recetas: z.array(RecipeSchema).max(10),
+  }),
+});
+
+const RestaurantSchema = z.object({
+  id: z.union([z.number(), z.string()]),
+  nombre_restaurante: z.string().max(200),
+  tipo_comida: z.string().max(100),
+  direccion_aproximada: z.string().max(500),
+  plato_sugerido: z.string().max(200),
+  por_que_es_bueno: z.string().max(1000),
+  hack_saludable: z.string().max(500),
+});
+
+const RestaurantResponseSchema = z.object({
+  saludo_personalizado: z.string().max(1000),
+  ubicacion_detectada: z.string().max(200).optional(),
+  recomendaciones: z.array(RestaurantSchema).max(10),
+});
 
 interface UserProfile {
   nutritionalGoal?: string;
@@ -544,8 +590,11 @@ class IPRateLimiter {
       });
     } catch (error) {
       safeLog('error', 'Error en IP rate limit', error);
-      // Fail open: permitir si hay error
-      return { allowed: true };
+      // FAIL-CLOSED: Si no podemos verificar IP rate limit, rechazar por seguridad
+      return { 
+        allowed: false, 
+        retryAfter: 60 // Bloquear 1 minuto como precaución
+      };
     }
   }
 }
@@ -751,7 +800,7 @@ export default async function handler(req: any, res: any) {
     const { type, _id } = request;
     const interactionId = _id || `int_${Date.now()}`;
     
-    console.log(`🚀 Nueva solicitud: type=${type}, userId=${userId?.substring(0, 8)}..., interactionId=${interactionId?.substring(0, 20)}...`);
+    safeLog('log', `🚀 Nueva solicitud: type=${type}, userId=${userId?.substring(0, 8)}...`);
 
     if (!userId) return res.status(400).json({ error: 'userId requerido' });
 
@@ -796,18 +845,19 @@ export default async function handler(req: any, res: any) {
           .limit(5)
           .get();
       } catch (indexError: any) {
-        // Fallback sin orderBy si falta el índice
+        // En producción: fallar fuerte si falta el índice
+        if (process.env.NODE_ENV === 'production') {
+          safeLog('error', '❌ Índice de Firestore faltante en producción', indexError);
+          throw new Error('Error de configuración: índice de base de datos requerido');
+        }
+        // En desarrollo: fallback sin orderBy (lento pero funcional)
         if (indexError?.message?.includes('index') || indexError?.code === 'failed-precondition') {
-          safeLog('log', '⚠️ Índice faltante en historial, usando fallback');
+          safeLog('warn', '⚠️ Índice faltante en desarrollo, usando fallback');
           const allHistory = await db.collection(historyCol)
             .where('user_id', '==', userId)
             .limit(20)
             .get();
-          // Ordenar manualmente
-          interface HistoryDoc {
-            id: string;
-            data: any;
-          }
+          interface HistoryDoc { id: string; data: any; }
           const sortedDocs: HistoryDoc[] = allHistory.docs
             .map((d: any) => ({ id: d.id, data: d.data() }))
             .sort((a: HistoryDoc, b: HistoryDoc) => {
@@ -907,8 +957,10 @@ export default async function handler(req: any, res: any) {
         airtableItems = [];
       }
 
-      const pantrySnap = await db.collection('user_pantry').where('userId', '==', userId).get();
-      const pantryItems = pantrySnap.docs.map(doc => doc.data().name || "").filter(Boolean);
+      // FIX: La despensa se guarda como un documento por usuario con array 'items'
+      const pantryDoc = await db.collection('user_pantry').doc(userId).get();
+      const pantryData = pantryDoc.exists ? pantryDoc.data() : null;
+      const pantryItems: string[] = pantryData?.items?.map((item: any) => item.name || "").filter(Boolean) || [];
       
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
       
@@ -1065,6 +1117,20 @@ IMPORTANTE:
       } else {
         throw new Error("No se pudo parsear la respuesta de Gemini");
       }
+    }
+
+    // ============================================
+    // VALIDACIÓN ESTRUCTURAL DE LA RESPUESTA
+    // ============================================
+    try {
+      if (type === 'En casa') {
+        parsedData = RecipeResponseSchema.parse(parsedData);
+      } else {
+        parsedData = RestaurantResponseSchema.parse(parsedData);
+      }
+    } catch (validationError: any) {
+      safeLog('error', '❌ Respuesta de Gemini inválida', validationError);
+      throw new Error('La respuesta del modelo no cumple con el formato esperado');
     }
 
     // ============================================

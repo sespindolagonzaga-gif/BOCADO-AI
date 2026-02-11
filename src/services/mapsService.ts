@@ -1,7 +1,9 @@
 import { env } from '../environment/env';
 import { logger } from '../utils/logger';
+import { auth } from '../firebaseConfig';
 
-const GOOGLE_MAPS_API_KEY = env.api.googleMapsApiKey;
+// ✅ NUEVO: Usar proxy en lugar de API key directa
+const MAPS_PROXY_URL = env.api.recommendationUrl.replace('/recommend', '/maps-proxy');
 
 export interface PlacePrediction {
   placeId: string;
@@ -21,7 +23,35 @@ export interface GeocodingResult {
 }
 
 /**
- * Busca ciudades usando Google Places Autocomplete API
+ * Helper para hacer requests autenticados al proxy
+ */
+async function proxyRequest(action: string, params: Record<string, any>): Promise<any> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Usuario no autenticado');
+  }
+
+  const token = await user.getIdToken();
+  
+  const response = await fetch(MAPS_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ action, ...params }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Busca ciudades usando Google Places Autocomplete API (vía proxy)
  */
 export async function searchCities(
   query: string,
@@ -32,26 +62,16 @@ export async function searchCities(
   }
 
   try {
-    // Construir component restrictions si se especifica país
-    const components = countryCode ? `&components=country:${countryCode.toLowerCase()}` : '';
-    
-    const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
-      query
-    )}&types=(cities)&language=es${components}&key=${GOOGLE_MAPS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
-      logger.error('Google Places API error:', data.status, data.error_message);
-      return [];
-    }
+    const data = await proxyRequest('autocomplete', {
+      query: query.trim(),
+      countryCode: countryCode?.toLowerCase(),
+    });
 
     return (data.predictions || []).map((prediction: any) => ({
-      placeId: prediction.place_id,
+      placeId: prediction.placeId,
       description: prediction.description,
-      mainText: prediction.structured_formatting?.main_text || prediction.terms?.[0]?.value || '',
-      secondaryText: prediction.structured_formatting?.secondary_text || '',
+      mainText: prediction.mainText,
+      secondaryText: prediction.secondaryText,
       types: prediction.types || [],
     }));
   } catch (error) {
@@ -61,51 +81,19 @@ export async function searchCities(
 }
 
 /**
- * Obtiene detalles de un lugar (incluyendo coordenadas)
+ * Obtiene detalles de un lugar (incluyendo coordenadas) (vía proxy)
  */
 export async function getPlaceDetails(placeId: string): Promise<GeocodingResult | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,formatted_address,address_components&language=es&key=${GOOGLE_MAPS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK' || !data.result) {
-      logger.error('Google Place Details API error:', data.status);
-      return null;
-    }
-
-    const result = data.result;
-    const location = result.geometry?.location;
-
-    if (!location) {
-      return null;
-    }
-
-    // Extraer ciudad y país de los componentes de dirección
-    let city = '';
-    let country = '';
-    let countryCode = '';
-
-    for (const component of result.address_components || []) {
-      const types = component.types;
-      
-      if (types.includes('locality') || types.includes('administrative_area_level_2')) {
-        city = component.long_name;
-      }
-      if (types.includes('country')) {
-        country = component.long_name;
-        countryCode = component.short_name;
-      }
-    }
+    const data = await proxyRequest('placeDetails', { placeId });
 
     return {
-      lat: location.lat,
-      lng: location.lng,
-      formattedAddress: result.formatted_address,
-      city: city || '',
-      country: country || '',
-      countryCode: countryCode || '',
+      lat: data.location.lat,
+      lng: data.location.lng,
+      formattedAddress: data.formattedAddress,
+      city: data.city || '',
+      country: data.country || '',
+      countryCode: data.countryCode || '',
     };
   } catch (error) {
     logger.error('Error getting place details:', error);
@@ -114,53 +102,19 @@ export async function getPlaceDetails(placeId: string): Promise<GeocodingResult 
 }
 
 /**
- * Geocodifica una dirección/cadena de búsqueda
+ * Geocodifica una dirección/cadena de búsqueda (vía proxy)
  */
 export async function geocodeAddress(address: string): Promise<GeocodingResult | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-      address
-    )}&language=es&key=${GOOGLE_MAPS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK' || !data.results?.[0]) {
-      logger.error('Google Geocoding API error:', data.status);
-      return null;
-    }
-
-    const result = data.results[0];
-    const location = result.geometry?.location;
-
-    if (!location) {
-      return null;
-    }
-
-    // Extraer ciudad y país
-    let city = '';
-    let country = '';
-    let countryCode = '';
-
-    for (const component of result.address_components) {
-      const types = component.types;
-      
-      if (types.includes('locality') || types.includes('administrative_area_level_2')) {
-        city = component.long_name;
-      }
-      if (types.includes('country')) {
-        country = component.long_name;
-        countryCode = component.short_name;
-      }
-    }
+    const data = await proxyRequest('geocode', { address: address.trim() });
 
     return {
-      lat: location.lat,
-      lng: location.lng,
-      formattedAddress: result.formatted_address,
-      city: city || '',
-      country: country || '',
-      countryCode: countryCode || '',
+      lat: data.location.lat,
+      lng: data.location.lng,
+      formattedAddress: data.formattedAddress,
+      city: data.city || '',
+      country: data.country || '',
+      countryCode: data.countryCode || '',
     };
   } catch (error) {
     logger.error('Error geocoding address:', error);
@@ -169,49 +123,32 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
 }
 
 /**
- * Geocodificación inversa: coordenadas a dirección
+ * Geocodificación inversa: coordenadas a dirección (vía proxy)
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<GeocodingResult | null> {
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&language=es&key=${GOOGLE_MAPS_API_KEY}`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status !== 'OK' || !data.results?.[0]) {
-      logger.error('Google Reverse Geocoding API error:', data.status);
-      return null;
-    }
-
-    const result = data.results[0];
-
-    // Extraer ciudad y país
-    let city = '';
-    let country = '';
-    let countryCode = '';
-
-    for (const component of result.address_components) {
-      const types = component.types;
-      
-      if (types.includes('locality') || types.includes('administrative_area_level_2')) {
-        city = component.long_name;
-      }
-      if (types.includes('country')) {
-        country = component.long_name;
-        countryCode = component.short_name;
-      }
-    }
+    const data = await proxyRequest('reverseGeocode', { lat, lng });
 
     return {
-      lat,
-      lng,
-      formattedAddress: result.formatted_address,
-      city: city || '',
-      country: country || '',
-      countryCode: countryCode || '',
+      lat: data.location.lat,
+      lng: data.location.lng,
+      formattedAddress: data.formattedAddress,
+      city: data.city || '',
+      country: data.country || '',
+      countryCode: data.countryCode || '',
     };
   } catch (error) {
     logger.error('Error reverse geocoding:', error);
     return null;
   }
+}
+
+/**
+ * @deprecated La API key ya no se usa en el frontend.
+ * Las llamadas ahora van al proxy protegido.
+ * Mantener esta función por compatibilidad si alguien la usa.
+ */
+export function getMapsApiKey(): null {
+  logger.warn('getMapsApiKey está deprecada. Usar las funciones del proxy.');
+  return null;
 }
