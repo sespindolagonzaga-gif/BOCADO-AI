@@ -10,6 +10,17 @@ import { db } from '../firebaseConfig';
 import { UserProfile } from '../types';
 import { useEffect } from 'react';
 
+// Helper para convertir undefined a null antes de guardar en Firestore
+const cleanForFirestore = <T extends Record<string, any>>(obj: T): T => {
+  const cleaned = { ...obj };
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key] === undefined) {
+      cleaned[key] = null;
+    }
+  });
+  return cleaned;
+};
+
 // ============================================
 // KEYS DE QUERY (centralizadas para consistencia)
 // ============================================
@@ -82,7 +93,7 @@ const updateUserProfile = async (
 ): Promise<void> => {
   const docRef = doc(db, 'users', userId);
   await setDoc(docRef, { 
-    ...data, 
+    ...cleanForFirestore(data), 
     updatedAt: serverTimestamp() 
   }, { merge: true });
 };

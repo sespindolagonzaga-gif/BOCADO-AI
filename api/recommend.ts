@@ -701,7 +701,8 @@ const ALLOWED_ORIGINS = [
 ];
 
 const isOriginAllowed = (origin: string | undefined): boolean => {
-  if (!origin) return false;
+  // Permitir peticiones sin origin (same-origin requests, mobile apps, etc.)
+  if (!origin) return true;
   // Permitir localhost en desarrollo
   if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
     return true;
@@ -721,7 +722,8 @@ export default async function handler(req: any, res: any) {
     return res.status(403).json({ error: 'Origin not allowed' });
   }
   
-  res.setHeader('Access-Control-Allow-Origin', origin || ALLOWED_ORIGINS[0]);
+  // Si no hay origin (same-origin), usar el primer origen permitido o wildcard
+  res.setHeader('Access-Control-Allow-Origin', origin || '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
