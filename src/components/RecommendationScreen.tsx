@@ -4,12 +4,12 @@ import BocadoLogo from './BocadoLogo';
 import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { CurrencyService } from '../data/budgets';
-import { useUserProfile, useGeolocation } from '../hooks';
+import { useUserProfile, useGeolocation, useSmartNotifications } from '../hooks';
 import { useAuthStore } from '../stores/authStore';
 import { useRateLimit } from '../hooks/useRateLimit';
 import { env, SEARCH_RADIUS } from '../environment/env';
 import { logger } from '../utils/logger';
-import { MapPin } from './icons';
+import { MapPin, Bell } from './icons';
 import { ProfileSkeleton } from './skeleton';
 
 interface RecommendationScreenProps {
@@ -57,11 +57,21 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   // Geolocalización del usuario (solo para "Fuera")
   const { 
     position: userPosition, 
+    detectedLocation,
     loading: locationLoading, 
     error: locationError, 
     permission: locationPermission,
-    requestLocation 
+    requestLocation,
+    getCountryCodeForCurrency,
   } = useGeolocation();
+
+  // Notificaciones - mostrar banner si no están activadas
+  const {
+    permission: notificationPermission,
+    requestPermission: requestNotificationPermission,
+  } = useSmartNotifications(user?.uid);
+  
+  const [showNotificationBanner, setShowNotificationBanner] = useState(true);
   
   const [locationRequested, setLocationRequested] = useState(false);
   
@@ -74,7 +84,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     refreshStatus 
   } = useRateLimit(user?.uid);
 
-  const countryCode = (profile?.country || 'MX').toUpperCase().trim(); 
+  // Usar país detectado por geolocalización si está disponible, sino el del perfil
+  const detectedCountryCode = getCountryCodeForCurrency(profile?.country);
+  const countryCode = detectedCountryCode.toUpperCase().trim();
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
 
@@ -307,6 +319,48 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         </div>
       )}
 
+      {/* Banner de notificaciones (solo si no están activadas y el usuario no lo cerró) */}
+      {showNotificationBanner && notificationPermission !== 'granted' && (
+        <div className="mb-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl animate-fade-in">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <Bell className="w-4 h-4 text-indigo-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-indigo-900">
+                ¡No olvides tus comidas!
+              </p>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                Activa recordatorios para desayuno, comida y cena.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={async () => {
+                  const granted = await requestNotificationPermission();
+                  if (granted) {
+                    trackEvent('notification_banner_activated');
+                    setShowNotificationBanner(false);
+                  }
+                }}
+                className="text-xs bg-indigo-600 text-white font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-700 transition-colors whitespace-nowrap"
+              >
+                Activar
+              </button>
+              <button
+                onClick={() => {
+                  setShowNotificationBanner(false);
+                  trackEvent('notification_banner_dismissed');
+                }}
+                className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+              >
+                Ahora no
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Selector principal */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         {EATING_HABITS.map(habit => (
@@ -452,7 +506,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                 </div>
                 <p className="text-2xs text-bocado-gray mt-1 ml-6">
                   {userPosition 
-                    ? `Buscando restaurantes en ${SEARCH_RADIUS.label}` 
+                    ? `Buscando restaurantes en ${SEARCH_RADIUS.label} de ${detectedLocation?.city || 'tu ubicación'}` 
                     : `Las recomendaciones serán de ${profile?.city || 'tu ciudad'}`
                   }
                 </p>

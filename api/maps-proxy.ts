@@ -38,6 +38,69 @@ const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minuto
 const RATE_LIMIT_MAX_REQUESTS = 30; // 30 requests por minuto
 
 // ============================================
+// DETECCIÓN DE UBICACIÓN POR IP
+// ============================================
+
+interface IPLocationResult {
+  country: string;
+  countryCode: string;
+  city: string;
+  lat: number;
+  lng: number;
+  timezone: string;
+  isp: string;
+}
+
+/**
+ * Detecta la ubicación aproximada del usuario basada en su IP.
+ * Usa ipapi.co como servicio gratuito (10,000 requests/mes gratis)
+ */
+async function detectLocationByIP(ip: string): Promise<IPLocationResult | null> {
+  // Ignorar IPs privadas/locales
+  if (ip === 'unknown' || ip.startsWith('127.') || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+    console.log('[IP Detection] IP local detectada, no se puede geolocalizar');
+    return null;
+  }
+
+  // Limpiar IP (quitar prefijo IPv6 si existe)
+  const cleanIP = ip.replace(/^::ffff:/, '');
+  
+  try {
+    // Usar ipapi.co (gratuito, no requiere API key para uso básico)
+    const response = await fetch(`https://ipapi.co/${cleanIP}/json/`, {
+      headers: {
+        'User-Agent': 'BocadoApp/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      console.warn(`[IP Detection] Error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      console.warn('[IP Detection] API error:', data.error);
+      return null;
+    }
+
+    return {
+      country: data.country_name || '',
+      countryCode: data.country_code || '',
+      city: data.city || '',
+      lat: data.latitude,
+      lng: data.longitude,
+      timezone: data.timezone || '',
+      isp: data.org || '',
+    };
+  } catch (error) {
+    console.error('[IP Detection] Error:', error);
+    return null;
+  }
+}
+
+// ============================================
 // SCHEMAS DE VALIDACIÓN
 // ============================================
 
@@ -277,6 +340,21 @@ export default async function handler(req: any, res: any) {
       case 'reverseGeocode': {
         const validated = ReverseGeocodeSchema.parse(params);
         return await handleReverseGeocode(res, validated);
+      }
+      case 'detectLocation': {
+        // Detectar ubicación por IP
+        const clientIP = (req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
+          .toString().split(',')[0].trim();
+        const location = await detectLocationByIP(clientIP);
+        
+        if (!location) {
+          return res.status(404).json({ 
+            error: 'No se pudo detectar la ubicación',
+            fallback: true 
+          });
+        }
+        
+        return res.status(200).json(location);
       }
       default:
         return res.status(400).json({ error: 'Invalid action' });

@@ -27,6 +27,16 @@ export interface GeocodingResult {
   countryCode: string;
 }
 
+export interface IPLocationResult {
+  country: string;
+  countryCode: string;
+  city: string;
+  lat: number;
+  lng: number;
+  timezone: string;
+  isp: string;
+}
+
 /**
  * Helper para hacer requests al proxy
  * Algunas acciones (autocomplete) funcionan sin auth para permitir registro
@@ -238,6 +248,28 @@ export async function reverseGeocode(lat: number, lng: number): Promise<Geocodin
     };
   } catch (error) {
     logger.error('Error reverse geocoding:', error);
+    return null;
+  }
+}
+
+/**
+ * Detecta la ubicación aproximada del usuario por IP.
+ * Útil como fallback cuando la geolocalización del navegador no está disponible.
+ */
+export async function detectLocationByIP(): Promise<IPLocationResult | null> {
+  try {
+    const data = await proxyRequest('detectLocation', {});
+    return {
+      country: data.country,
+      countryCode: data.countryCode,
+      city: data.city,
+      lat: data.lat,
+      lng: data.lng,
+      timezone: data.timezone,
+      isp: data.isp,
+    };
+  } catch (error) {
+    logger.error('Error detecting location by IP:', error);
     return null;
   }
 }

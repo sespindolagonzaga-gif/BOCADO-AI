@@ -28,8 +28,8 @@ const apiConfig = {
 
 // Rango de búsqueda de restaurantes en metros
 export const SEARCH_RADIUS = {
-  meters: 5000, // 5km por defecto
-  label: '5 km',
+  meters: 8000, // 8km por defecto
+  label: '8 km',
 };
 
 export const env = Object.freeze({

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useSmartNotifications, SmartReminder } from '../hooks/useSmartNotifications';
-import { Bell, BellOff, Clock, Home, Star } from './icons';
+import { Bell, BellOff, Clock, CheckCircle } from './icons';
 import { trackEvent } from '../firebaseConfig';
+import { logger } from '../utils/logger';
 
 interface NotificationSettingsProps {
   isOpen: boolean;
@@ -18,10 +19,13 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
     requestPermission,
     toggleReminder,
     updateReminder,
+    sendTestNotification,
     pendingRatingsCount,
     daysSinceLastPantryUpdate,
     daysSinceLastAppUse,
   } = useSmartNotifications(userUid);
+
+  const [testSent, setTestSent] = useState(false);
 
   const [editingSchedule, setEditingSchedule] = useState<string | null>(null);
   const [editTime, setEditTime] = useState('');
@@ -58,6 +62,20 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
     const granted = await requestPermission();
     if (granted) {
       trackEvent('notification_settings_permission_granted');
+      // Enviar notificación de bienvenida
+      setTimeout(async () => {
+        await sendTestNotification();
+        setTestSent(true);
+        setTimeout(() => setTestSent(false), 3000);
+      }, 500);
+    }
+  };
+
+  const handleTestNotification = async () => {
+    const sent = await sendTestNotification();
+    if (sent) {
+      setTestSent(true);
+      setTimeout(() => setTestSent(false), 3000);
     }
   };
 
@@ -161,25 +179,52 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
         {/* Content */}
         <div className="overflow-y-auto max-h-[60vh]">
           {/* Estado de permisos */}
-          {permission !== 'granted' && (
-            <div className="mx-6 mt-6 p-4 bg-blue-50 rounded-xl">
+          {permission !== 'granted' ? (
+            <div className="mx-6 mt-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
               <div className="flex items-start gap-3">
-                <Bell className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800 mb-1">
-                    Activa las notificaciones
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-blue-800 mb-1">
+                    Activa tus recordatorios
                   </p>
-                  <p className="text-xs text-blue-600 mb-3">
-                    Recibe recordatorios inteligentes sobre tu despensa, comidas y más.
+                  <p className="text-xs text-blue-600 mb-3 leading-relaxed">
+                    Te enviaremos sugerencias de comidas en tus horarios preferidos y recordatorios inteligentes sobre tu despensa.
                   </p>
                   <button
                     onClick={handleRequestPermission}
                     disabled={isLoading}
-                    className="text-xs bg-blue-600 text-white font-semibold px-4 py-2 rounded-full hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                    className="w-full text-xs bg-blue-600 text-white font-bold px-4 py-2.5 rounded-full hover:bg-blue-700 disabled:bg-blue-300 transition-colors shadow-sm"
                   >
-                    {isLoading ? 'Solicitando...' : 'Permitir notificaciones'}
+                    {isLoading ? 'Solicitando...' : '✓ Permitir notificaciones'}
                   </button>
                 </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mx-6 mt-6 p-4 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border border-green-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-green-800">
+                      Notificaciones activas
+                    </p>
+                    <p className="text-xs text-green-600">
+                      Recibirás {reminders.filter(r => r.enabled).length} recordatorios configurados
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleTestNotification}
+                  disabled={testSent}
+                  className="text-xs bg-white text-green-700 font-semibold px-3 py-2 rounded-lg border border-green-200 hover:bg-green-50 disabled:opacity-50 transition-colors"
+                >
+                  {testSent ? '✓ Enviada' : 'Probar'}
+                </button>
               </div>
             </div>
           )}
@@ -266,13 +311,14 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
                         {/* Toggle */}
                         <button
                           onClick={() => handleToggleReminder(reminder.id)}
-                          className={`w-12 h-6 rounded-full transition-colors relative ${
+                          className={`w-12 h-6 rounded-full transition-colors relative flex items-center ${
                             reminder.enabled ? 'bg-bocado-green' : 'bg-gray-300'
                           }`}
+                          aria-label={reminder.enabled ? 'Desactivar recordatorio' : 'Activar recordatorio'}
                         >
                           <span
-                            className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                              reminder.enabled ? 'translate-x-7' : 'translate-x-1'
+                            className={`absolute left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-out ${
+                              reminder.enabled ? 'translate-x-6' : 'translate-x-0'
                             }`}
                           />
                         </button>
@@ -315,13 +361,14 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
                       {/* Toggle */}
                       <button
                         onClick={() => handleToggleReminder(reminder.id)}
-                        className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ml-2 ${
+                        className={`w-12 h-6 rounded-full transition-colors relative flex items-center flex-shrink-0 ml-2 ${
                           reminder.enabled ? 'bg-bocado-green' : 'bg-gray-300'
                         }`}
+                        aria-label={reminder.enabled ? 'Desactivar recordatorio' : 'Activar recordatorio'}
                       >
                         <span
-                          className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                            reminder.enabled ? 'translate-x-7' : 'translate-x-1'
+                          className={`absolute left-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ease-out ${
+                            reminder.enabled ? 'translate-x-6' : 'translate-x-0'
                           }`}
                         />
                       </button>
@@ -348,9 +395,13 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
 
         {/* Footer */}
         <div className="p-4 border-t border-bocado-border bg-gray-50">
-          <p className="text-xs text-center text-bocado-gray">
-            💡 Las notificaciones se muestran localmente en tu dispositivo
-          </p>
+          <div className="flex items-start gap-2 text-xs text-bocado-gray">
+            <span className="flex-shrink-0">💡</span>
+            <p className="leading-relaxed">
+              Las notificaciones funcionan incluso cuando la app está cerrada. 
+              Asegúrate de no tener el modo "No molestar" activado en tu dispositivo.
+            </p>
+          </div>
         </div>
       </div>
     </div>

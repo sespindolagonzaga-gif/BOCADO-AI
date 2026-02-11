@@ -683,8 +683,8 @@ const ipRateLimiter = new IPRateLimiter();
 // 7. CONFIGURACIÓN DE BÚSQUEDA DE RESTAURANTES
 // ============================================
 
-// Rango de búsqueda en metros (5km)
-const SEARCH_RADIUS_METERS = 5000;
+// Rango de búsqueda en metros (8km)
+const SEARCH_RADIUS_METERS = 8000;
 
 interface Coordinates {
   lat: number;
@@ -1045,6 +1045,16 @@ JSON:{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titul
     } else {
       // Determinar coordenadas para búsqueda de restaurantes
       const searchCoords = getSearchCoordinates(request, user);
+      
+      // Logging detallado para debugging de ubicación
+      safeLog('log', `📍 Búsqueda de restaurantes:`, {
+        userLocationFromRequest: request.userLocation ? `${request.userLocation.lat},${request.userLocation.lng}` : 'no proporcionada',
+        userLocationFromProfile: user.location ? `${user.location.lat},${user.location.lng}` : 'no guardada',
+        profileCity: user.city,
+        profileCountry: user.countryName,
+        finalCoords: searchCoords ? `${searchCoords.lat},${searchCoords.lng}` : 'usando ciudad del perfil',
+      });
+      
       const locationContext = searchCoords 
         ? `Coordenadas de referencia: ${formatCoordinates(searchCoords)}`
         : `Ciudad: ${user.city || "su ciudad"}, ${user.countryName || ""}`;

@@ -32,6 +32,7 @@ interface UseSmartNotificationsReturn {
   updateReminder: (id: string, updates: Partial<SmartReminder>) => void;
   toggleReminder: (id: string) => void;
   checkAndShowReminders: () => void;
+  sendTestNotification: () => Promise<boolean>;
   pendingRatingsCount: number;
   daysSinceLastPantryUpdate: number | null;
   daysSinceLastAppUse: number;
@@ -234,13 +235,18 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
 
       const reminderTime = reminder.hour * 60 + reminder.minute;
       
-      // Si es el momento exacto
-      if (currentTime === reminderTime) {
+      // Ventana de tiempo para mostrar notificaciones (30 minutos después de la hora)
+      const WINDOW_MINUTES = 30;
+      const isWithinWindow = currentTime >= reminderTime && currentTime <= (reminderTime + WINDOW_MINUTES);
+      const isTimeExact = currentTime === reminderTime;
+      
+      // Mostrar si es el momento exacto O si estamos dentro de la ventana y no se ha mostrado hoy
+      if (isTimeExact || isWithinWindow) {
         // Verificar si ya se mostró hoy
         const lastShown = reminder.lastShown;
-        const today = now.toDateString();
+        const lastShownDate = lastShown ? new Date(lastShown).toDateString() : null;
         
-        if (lastShown === today) return;
+        if (lastShownDate === today) return;
 
         // Verificar condiciones especiales
         let shouldShow = true;
@@ -296,6 +302,7 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
             reminder_id: reminder.id,
             type: reminder.type,
             condition: reminder.condition,
+            is_within_window: isWithinWindow && !isTimeExact,
           });
         }
       }
@@ -369,11 +376,44 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
       if (r.id === id) {
         const newEnabled = !r.enabled;
         trackEvent('smart_reminder_toggled', { id, enabled: newEnabled });
+        
+        // Si se está activando, limpiar lastShown para permitir notificación hoy
+        if (newEnabled) {
+          return { ...r, enabled: newEnabled, lastShown: undefined };
+        }
+        
         return { ...r, enabled: newEnabled };
       }
       return r;
     }));
   }, []);
+
+  /**
+   * Envía una notificación de prueba inmediata
+   */
+  const sendTestNotification = useCallback(async (): Promise<boolean> => {
+    if (!isSupported || permission !== 'granted') {
+      logger.warn('No se puede enviar notificación de prueba: permiso no concedido');
+      return false;
+    }
+
+    try {
+      new Notification('🧪 Notificación de prueba', {
+        body: '¡Las notificaciones están funcionando correctamente!',
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-72x72.png',
+        tag: 'test',
+        requireInteraction: false,
+      });
+
+      trackEvent('notification_test_sent');
+      logger.info('Notificación de prueba enviada');
+      return true;
+    } catch (error) {
+      logger.error('Error enviando notificación de prueba:', error);
+      return false;
+    }
+  }, [isSupported, permission]);
 
   return {
     isSupported,
@@ -385,6 +425,7 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
     updateReminder,
     toggleReminder,
     checkAndShowReminders,
+    sendTestNotification,
     pendingRatingsCount,
     daysSinceLastPantryUpdate,
     daysSinceLastAppUse,
