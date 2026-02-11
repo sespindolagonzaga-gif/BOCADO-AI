@@ -8,8 +8,8 @@
 export const SELECTORS = {
   // Pantalla de inicio (Home)
   home: {
-    startButton: '[data-testid="start-button"], button:has-text("Empezar"), a:has-text("Empezar")',
-    loginButton: '[data-testid="login-button"], button:has-text("Iniciar sesión"), a:has-text("Iniciar sesión")',
+    startButton: '[data-testid="start-button"]',  // Sitúa data-testid primero para máxima fiabilidad
+    loginButton: '[data-testid="login-button"]',  // Sitúa data-testid primero
     appTitle: 'text=Bocado',
   },
 

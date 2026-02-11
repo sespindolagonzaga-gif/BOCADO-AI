@@ -43,10 +43,19 @@ export async function register(page: Page, user: TestUser): Promise<void> {
 
   // Esperar a que la página esté completamente cargada
   await page.waitForLoadState('networkidle');
-  
+
   // Click en "Empezar" - esperar a que el botón sea visible
-  await page.waitForSelector(SELECTORS.home.startButton, { state: 'visible', timeout: 5000 });
-  await page.click(SELECTORS.home.startButton);
+  // Usar timeout más largo (15s) para CI/headless environments
+  // Usar selector específico data-testid en lugar de múltiples alternativas
+  try {
+    await page.waitForSelector('[data-testid="start-button"]', { state: 'visible', timeout: 15000 });
+  } catch (error) {
+    // Si falla, tomar screenshot para debugging
+    await page.screenshot({ path: 'test-failure-start-button.png' });
+    throw new Error(`Start button not found. Screenshot saved. Error: ${error}`);
+  }
+
+  await page.click('[data-testid="start-button"]');
 
   // === Step 1: Datos personales ===
   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
@@ -118,8 +127,16 @@ export async function register(page: Page, user: TestUser): Promise<void> {
 export async function registerBasic(page: Page, user: TestUser): Promise<void> {
   await page.goto('/');
   await page.waitForLoadState('networkidle');
-  await page.waitForSelector(SELECTORS.home.startButton, { state: 'visible', timeout: 5000 });
-  await page.click(SELECTORS.home.startButton);
+
+  // Usar timeout más largo y selector específico
+  try {
+    await page.waitForSelector('[data-testid="start-button"]', { state: 'visible', timeout: 15000 });
+  } catch (error) {
+    await page.screenshot({ path: 'test-failure-start-button-basic.png' });
+    throw new Error(`Start button not found in registerBasic. Screenshot saved. Error: ${error}`);
+  }
+
+  await page.click('[data-testid="start-button"]');
 
   // Solo completar step 1
   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
