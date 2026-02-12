@@ -11,6 +11,7 @@ import { env, SEARCH_RADIUS } from '../environment/env';
 import { logger } from '../utils/logger';
 import { MapPin, Bell } from './icons';
 import { ProfileSkeleton } from './skeleton';
+import { Tooltip } from './ui/Tooltip';
 
 interface RecommendationScreenProps {
   userName: string;
@@ -412,23 +413,34 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
               
               {selectedMeal && (
                 <div className="bg-bocado-background p-4 rounded-2xl mt-2 animate-fade-in">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-2xs font-bold text-bocado-gray uppercase tracking-wide">Tiempo</label>
-                    <span className="text-lg font-bold text-bocado-green">{cookingTime >= 65 ? '60+' : cookingTime} min</span>
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="text-2xs font-bold text-bocado-gray uppercase tracking-wide">⏱️ Tiempo de cocina</label>
+                    <span className="text-lg font-bold text-bocado-green bg-white px-3 py-1 rounded-full">{cookingTime >= 65 ? '60+' : cookingTime} min</span>
                   </div>
-                  <input 
-                    type="range" 
-                    min="10" 
-                    max="65" 
-                    step="5" 
-                    value={cookingTime} 
-                    disabled={isGenerating}
-                    onChange={(e) => {
+
+                  {/* Slider con marcas visuales */}
+                  <div className="space-y-2">
+                    <input
+                      type="range"
+                      min="10"
+                      max="65"
+                      step="5"
+                      value={cookingTime}
+                      disabled={isGenerating}
+                      onChange={(e) => {
                         setCookingTime(Number(e.target.value));
-                    }} 
-                    onMouseUp={() => trackEvent('recommendation_time_adjusted', { time: cookingTime })}
-                    className="w-full h-2 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50" 
-                  />
+                      }}
+                      onMouseUp={() => trackEvent('recommendation_time_adjusted', { time: cookingTime })}
+                      className="w-full h-3 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50 slider-with-ticks"
+                    />
+
+                    {/* Marcas de referencia */}
+                    <div className="flex justify-between text-2xs text-bocado-gray font-medium px-1">
+                      <span>🚀 10m</span>
+                      <span>⚡ 30m</span>
+                      <span>🍽️ 60m</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -484,11 +496,13 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
               <div className="bg-bocado-background/50 p-3 rounded-xl border border-bocado-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 flex-1">
-                    <MapPin className={`w-4 h-4 flex-shrink-0 ${
-                      userPosition ? 'text-bocado-green' :
-                      locationPermission === 'denied' ? 'text-red-600' :
-                      'text-bocado-gray'
-                    }`} />
+                    <Tooltip text="Ubica restaurantes más cercanos" position="right">
+                      <MapPin className={`w-4 h-4 flex-shrink-0 ${
+                        userPosition ? 'text-bocado-green' :
+                        locationPermission === 'denied' ? 'text-red-600' :
+                        'text-bocado-gray'
+                      }`} />
+                    </Tooltip>
                     <span className="text-xs text-bocado-dark-gray">
                       {userPosition ? (
                         <span className="text-bocado-green font-medium">📍 Ubicación activa</span>

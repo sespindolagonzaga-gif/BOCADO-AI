@@ -85,4 +85,4 @@ Si aún hay fallos, busca `test-failure-*.png` en el directorio raíz para ver q
 
 ---
 
-**Actualizado:** Feb 11, 2025
+**Actualizado:** Feb 11, 2026

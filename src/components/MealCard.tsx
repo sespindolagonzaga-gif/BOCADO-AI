@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/authStore';
 import { trackEvent } from '../firebaseConfig';
 import { logger } from '../utils/logger';
 import { scaleIngredientsSimple, detectBaseServings } from '../utils/portionScaler';
+import { Tooltip } from './ui/Tooltip';
 
 interface MealCardProps {
   meal: Meal;
@@ -388,15 +389,17 @@ const MealCard: React.FC<MealCardProps> = memo(({
           </div>
 
           <div className="flex flex-col items-center gap-1 shrink-0">
-            <button
-              onClick={handleSaveClick}
-              disabled={toggleMutation.isPending}
-              className={`p-2 rounded-full transition-all active:scale-90 disabled:opacity-50 ${
-                saved ? 'text-red-500' : 'text-bocado-gray hover:text-red-400'
-              }`}
-            >
-              <Heart className="w-6 h-6" fill={saved ? "currentColor" : "none"} />
-            </button>
+            <Tooltip text={saved ? "Guardado ❤️" : "Guardar para después"} position="left">
+              <button
+                onClick={handleSaveClick}
+                disabled={toggleMutation.isPending}
+                className={`p-2 rounded-full transition-all active:scale-90 disabled:opacity-50 ${
+                  saved ? 'text-red-500' : 'text-bocado-gray hover:text-red-400'
+                }`}
+              >
+                <Heart className="w-6 h-6" fill={saved ? "currentColor" : "none"} />
+              </button>
+            </Tooltip>
 
             <ChevronDown
               className={`w-5 h-5 text-bocado-gray transition-transform duration-200 ${

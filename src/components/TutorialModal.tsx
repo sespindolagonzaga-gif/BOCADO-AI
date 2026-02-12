@@ -14,51 +14,35 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
   const steps = [
     {
       title: `¡Bienvenido${userName ? ', ' + userName : ''}!`,
-      description: "Tu asistente inteligente de nutrición. Te mostramos cómo usar la app en 5 pasos.",
+      description: "Tu asistente inteligente de nutrición. Te mostramos lo que necesitas saber.",
       icon: <div className="w-32 h-20"><BocadoLogo className="w-full h-full" /></div>,
       color: "bg-white",
       textColor: "text-bocado-green",
       id: "welcome"
     },
     {
-      title: "1. Inicio",
-      description: "Elige si comes en casa o fuera. La IA genera tu plan personalizado al instante.",
-      icon: <Home className="w-16 h-16" />,
-      color: "bg-bocado-green",
-      textColor: "text-white",
-      id: "home"
+      title: "⏱️ Rate Limiting",
+      description: "Puedes generar 5 recomendaciones cada 10 minutos. Cuando se acaben, debes esperar.",
+      icon: <div className="text-5xl">⏱️</div>,
+      color: "bg-amber-50",
+      textColor: "text-amber-900",
+      id: "ratelimit"
     },
     {
-      title: "2. Mi Cocina",
-      description: "Gestiona tu inventario. Toca ingredientes para su estado de frescura: 🟢 fresco, 🟡 por caducar, y 🔴 urgente.",
-      icon: <UtensilsCrossed className="w-16 h-16" />,
-      color: "bg-bocado-dark-green",
-      textColor: "text-white",
-      id: "pantry"
+      title: "💱 Presupuesto Dinámico",
+      description: "Los rangos de presupuesto cambian según tu país. Mira siempre las opciones disponibles.",
+      icon: <div className="text-5xl">💱</div>,
+      color: "bg-green-50",
+      textColor: "text-green-900",
+      id: "budget"
     },
     {
-      title: "3. Mis Recetas",
-      description: "Guarda recetas con ❤️ para cocinarlas cuando quieras.",
-      icon: <BookOpen className="w-16 h-16" />,
-      color: "bg-bocado-green-light",
-      textColor: "text-white",
-      id: "recipes"
-    },
-    {
-      title: "4. Mis Lugares",
-      description: "Guarda restaurantes saludables recomendados al comer fuera.",
-      icon: <MapPin className="w-16 h-16" />,
-      color: "bg-bocado-dark-gray",
-      textColor: "text-white",
-      id: "restaurants"
-    },
-    {
-      title: "5. Perfil",
-      description: "Mantén tus datos actualizados para mejores recomendaciones.",
-      icon: <User className="w-16 h-16" />,
-      color: "bg-bocado-background",
-      textColor: "text-bocado-dark-green",
-      id: "profile"
+      title: "❤️ Guardar Favoritos",
+      description: "Toca el corazón en cualquier receta o restaurante para guardarlo y usarlo después.",
+      icon: <div className="text-5xl">❤️</div>,
+      color: "bg-red-50",
+      textColor: "text-red-900",
+      id: "favorites"
     }
   ];
 

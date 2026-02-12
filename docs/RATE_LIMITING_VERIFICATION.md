@@ -151,7 +151,7 @@ Mantiene solo los últimos 60 segundos.
 
 ## ⚠️ Casos Edge / Debugging
 
-### Si ves muchos 429s sin razon:
+### Si ves muchos 429s sin razón:
 1. Verifica que la IP se detecta correctamente:
    - `req.headers['x-forwarded-for']` en Vercel
    - Si está en localhost, usará `127.0.0.1`
@@ -199,6 +199,6 @@ Mantiene solo los últimos 60 segundos.
 
 ## Última Actualización
 
-- **Fecha:** Feb 11, 2025
+- **Fecha:** Feb 11, 2026
 - **Verificado por:** Code Review
 - **Status:** ✅ LISTO PARA PRODUCCIÓN

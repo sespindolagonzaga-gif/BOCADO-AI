@@ -224,3 +224,107 @@
     transform: scale(1);
   }
 }
+
+/* ========================================
+   IMPROVED BUTTON & INTERACTION FEEDBACK
+   ======================================== */
+
+/* Botones con feedback más visible */
+@layer components {
+  .btn-feedback {
+    @apply active:scale-95 transition-all duration-150;
+  }
+
+  .btn-feedback:active {
+    filter: brightness(0.95);
+  }
+
+  /* Slider mejorado con marcas */
+  .slider-with-ticks {
+    -webkit-appearance: slider-horizontal;
+  }
+
+  .slider-with-ticks::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-bocado-green) 0%, var(--color-bocado-dark-green) 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 181, 89, 0.3);
+    border: 2px solid white;
+    transition: all 0.2s ease;
+  }
+
+  .slider-with-ticks::-webkit-slider-thumb:active {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0, 181, 89, 0.5);
+  }
+
+  .slider-with-ticks::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--color-bocado-green) 0%, var(--color-bocado-dark-green) 100%);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 181, 89, 0.3);
+    border: 2px solid white;
+    transition: all 0.2s ease;
+  }
+
+  .slider-with-ticks::-moz-range-thumb:active {
+    transform: scale(1.15);
+    box-shadow: 0 4px 12px rgba(0, 181, 89, 0.5);
+  }
+
+  /* Smooth pulse para loading */
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-subtle-pulse {
+    animation: subtle-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Glow effect para elementos destacados */
+  @keyframes glow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(0, 181, 89, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 15px rgba(0, 181, 89, 0.6);
+    }
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+
+  /* Entrada suave para iconos */
+  @keyframes float-in {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-float-in {
+    animation: float-in 0.3s ease-out;
+  }
+
+  /* Rating feedback visual */
+  @keyframes bounce-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  .animate-bounce-scale {
+    animation: bounce-scale 0.4s ease;
+  }
+}

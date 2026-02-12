@@ -12,12 +12,14 @@ interface PlanScreenProps {
 }
 
 const loadingMessages = [
-  "Contactando a nuestros chefs...",
-  "Buscando los mejores lugares cercanos...",
-  "Consultando tu perfil nutricional...",
-  "Analizando menús saludables...",
-  "Creando recomendaciones para ti...",
-  "¡Casi listo! Preparando la mesa...",
+  "🧑‍🍳 Contactando a nuestros chefs...",
+  "📍 Buscando los mejores lugares cercanos...",
+  "👤 Consultando tu perfil nutricional...",
+  "🥗 Analizando opciones saludables...",
+  "✨ Creando algo especial para ti...",
+  "🍽️ ¡Casi listo! Preparando la mesa...",
+  "⚡ Refinando selección...",
+  "💚 Ajustando a tus preferencias...",
 ];
 
 // --- PROCESAMIENTO DE RECETAS (EN CASA) ---
