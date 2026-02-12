@@ -436,9 +436,10 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                         value={cookingTime}
                         disabled={isGenerating}
                         onChange={(e) => {
-                          setCookingTime(Number(e.target.value));
+                          const newValue = Number(e.target.value);
+                          setCookingTime(newValue);
+                          trackEvent('recommendation_time_adjusted', { time: newValue });
                         }}
-                        onMouseUp={(e) => trackEvent('recommendation_time_adjusted', { time: Number((e.target as HTMLInputElement).value) })}
                         className="w-full h-3 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50 slider-with-ticks"
                       />
 
@@ -570,11 +571,11 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
             </div>
           )}
 
-          {/* Botón acción con rate limit */}
-          <div className={`mt-6 transition-all duration-300 ${isSelectionMade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          {/* Botón acción con rate limit - siempre visible */}
+          <div className="mt-6 transition-all duration-300">
             <button
               onClick={handleGenerateRecommendation}
-              disabled={isGenerating || isRateLimited}
+              disabled={!isSelectionMade || isGenerating || isRateLimited}
               className="w-full bg-bocado-green text-white font-bold py-4 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isGenerating ? (
@@ -588,13 +589,21 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                   <span>Espera {formattedTimeLeft}s</span>
                 </>
               ) : (
-                "¡A comer! 🍽️"
+                "Generar recomendación"
               )}
             </button>
 
+            {/* Microcopy cuando no está listo aún */}
+            {!isSelectionMade && (
+              <p className="text-center text-2xs text-bocado-gray mt-2">
+                {recommendationType === 'En casa'
+                  ? 'Elige un tipo de comida para continuar'
+                  : 'Elige qué se te antoja y presupuesto'}
+              </p>
+            )}
 
             {/* Contador de requests restantes */}
-            {canRequest && !isGenerating && !isRateLimited && rateLimitMessage && (
+            {canRequest && !isGenerating && !isRateLimited && rateLimitMessage && isSelectionMade && (
               <p className="text-center text-xs text-bocado-gray mt-2">
                 💡 {rateLimitMessage}
               </p>

@@ -18,15 +18,17 @@ interface MainAppProps {
   showTutorial?: boolean;
   onTutorialFinished: () => void;
   onLogoutComplete: () => void;
+  initialTab?: Tab;
 }
 
-const MainApp: React.FC<MainAppProps> = ({ 
-  onPlanGenerated, 
-  showTutorial = false, 
-  onTutorialFinished, 
-  onLogoutComplete 
+const MainApp: React.FC<MainAppProps> = ({
+  onPlanGenerated,
+  showTutorial = false,
+  onTutorialFinished,
+  onLogoutComplete,
+  initialTab = 'recommendation'
 }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('recommendation');
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [isTutorialOpen, setIsTutorialOpen] = useState(showTutorial);
   
   // Sincronizar estado del tutorial cuando cambia la prop

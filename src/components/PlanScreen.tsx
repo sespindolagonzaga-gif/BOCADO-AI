@@ -5,10 +5,12 @@ import { collection, query, where, getDocs, limit, doc, getDoc, DocumentSnapshot
 import { Plan, Meal } from '../types';
 import MealCard from './MealCard';
 import { useToggleSavedItem } from '../hooks/useSavedItems';
+import BottomTabBar, { Tab } from './BottomTabBar';
 
 interface PlanScreenProps {
   planId: string;
   onStartNewPlan: () => void;
+  onNavigateTab?: (tab: Tab) => void;
 }
 
 const loadingMessages = [
@@ -243,8 +245,8 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
   }
 
   return (
-    // ✅ Estructura flex para contener todo dentro del "teléfono"
-    <div className="flex-1 flex flex-col h-full min-h-0 animate-fade-in">
+    // ✅ Estructura flex para contener todo incluido BottomTabBar
+    <div className="flex flex-col h-full min-h-0">
       {/* Contenido scrolleable */}
       <div className="flex-1 overflow-y-auto px-4 py-4 no-scrollbar min-h-0">
         <div className="text-center mb-6">
@@ -253,33 +255,42 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
             <p className="text-bocado-dark-green italic text-sm leading-relaxed">"{selectedPlan.greeting}"</p>
           </div>
         </div>
-        
+
         <div className="space-y-3 max-w-2xl mx-auto">
           {selectedPlan.meals.map((meal, index) => (
-            <MealCard 
-              key={index} 
-              meal={meal} 
+            <MealCard
+              key={index}
+              meal={meal}
               onInteraction={(type) => {
                 if (type === 'save') handleToggleSave(meal);
-              }} 
+              }}
             />
           ))}
         </div>
-        
+
         {/* Espacio al final */}
         <div className="h-4"></div>
       </div>
-      
-      {/* ✅ Botón al final del flex, no fixed */}
-      <div className="px-4 py-4 border-t border-bocado-border bg-white shrink-0">
-        <div className="max-w-2xl mx-auto">
-          <button 
-            onClick={handleStartNew}
-            className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-          >
-            Volver al inicio
-          </button>
+
+      {/* ✅ Botón + BottomTabBar */}
+      <div className="shrink-0 border-t border-bocado-border bg-white">
+        <div className="px-4 py-4">
+          <div className="max-w-2xl mx-auto">
+            <button
+              onClick={handleStartNew}
+              className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
+            >
+              Volver al inicio
+            </button>
+          </div>
         </div>
+
+        {/* ✅ BottomTabBar - mostrar siempre cuando está en plan */}
+        <BottomTabBar activeTab="recommendation" onTabChange={(tab) => {
+          if (onNavigateTab) {
+            onNavigateTab(tab);
+          }
+        }} />
       </div>
     </div>
   );

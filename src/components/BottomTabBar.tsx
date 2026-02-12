@@ -18,24 +18,24 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
         {/* Contenedor flex simple: 5 elementos, mismo tamaño, centrados verticalmente */}
         <div className="flex items-center justify-between h-16 px-2 relative">
           
-          {/* 1. Recetas */}
+          {/* 1. Guardados (Recetas) */}
           <button
             data-testid="nav-saved"
             onClick={() => onTabChange('saved')}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 ${isActive('saved') ? 'text-bocado-green' : 'text-bocado-gray'}`}
           >
             <BookOpen className="w-5 h-5" strokeWidth={isActive('saved') ? 2.5 : 1.5} />
-            <span className="text-2xs font-medium whitespace-nowrap">Recetas</span>
+            <span className="text-2xs font-medium whitespace-nowrap">Guardados</span>
           </button>
 
-          {/* 2. Lugares */}
+          {/* 2. Favoritos (Lugares) */}
           <button
             data-testid="nav-restaurants"
             onClick={() => onTabChange('restaurants')}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 ${isActive('restaurants') ? 'text-bocado-green' : 'text-bocado-gray'}`}
           >
             <MapPin className="w-5 h-5" strokeWidth={isActive('restaurants') ? 2.5 : 1.5} />
-            <span className="text-2xs font-medium whitespace-nowrap">Lugares</span>
+            <span className="text-2xs font-medium whitespace-nowrap">Favoritos</span>
           </button>
 
           {/* 3. Inicio (Centro) - más grande y elevado */}
