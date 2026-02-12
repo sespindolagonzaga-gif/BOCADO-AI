@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { EATING_HABITS, MEALS, CRAVINGS } from '../constants';
 import BocadoLogo from './BocadoLogo';
-import { auth, db, serverTimestamp, trackEvent } from '../firebaseConfig';
+import { db, serverTimestamp, trackEvent } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { CurrencyService } from '../data/budgets';
 import { useUserProfile, useGeolocation, useSmartNotifications } from '../hooks';
@@ -430,7 +430,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                       onChange={(e) => {
                         setCookingTime(Number(e.target.value));
                       }}
-                      onMouseUp={() => trackEvent('recommendation_time_adjusted', { time: cookingTime })}
+                      onMouseUp={(e) => trackEvent('recommendation_time_adjusted', { time: Number((e.target as HTMLInputElement).value) })}
                       className="w-full h-3 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50 slider-with-ticks"
                     />
 
