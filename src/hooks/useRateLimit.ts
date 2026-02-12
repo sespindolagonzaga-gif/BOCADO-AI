@@ -77,12 +77,16 @@ export const useRateLimit = (userId: string | undefined) => {
   );
 
   // Memoizar el mensaje
-  const message = useMemo(() => 
-    status.canRequest 
-      ? '' 
-      : `Espera ${formatTimeLeft(status.nextAvailableIn)}`,
-    [formatTimeLeft, status.canRequest, status.nextAvailableIn]
-  );
+  const message = useMemo(() => {
+    if (!status.canRequest) {
+      return `Espera ${formatTimeLeft(status.nextAvailableIn)}`;
+    }
+    // Cuando puede hacer requests, mostrar info util
+    const remaining = status.remainingRequests ?? 5;
+    return remaining <= 2
+      ? `⚠️ ${remaining} recomendación${remaining === 1 ? '' : 'es'} disponible${remaining === 1 ? '' : 's'}`
+      : `${remaining} recomendaciones en esta sesión`;
+  }, [formatTimeLeft, status.canRequest, status.nextAvailableIn, status.remainingRequests]);
 
   return {
     ...status,

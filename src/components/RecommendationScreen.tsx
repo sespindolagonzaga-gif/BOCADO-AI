@@ -321,20 +321,20 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
       {/* Banner de notificaciones (solo si no están activadas y el usuario no lo cerró) */}
       {showNotificationBanner && notificationPermission !== 'granted' && (
-        <div className="mb-4 p-3 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-xl animate-fade-in">
+        <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-lg shadow-sm animate-fade-in">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Bell className="w-4 h-4 text-indigo-600" />
+            <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0">
+              <Bell className="w-5 h-5 text-amber-700" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-indigo-900">
-                ¡No olvides tus comidas!
+              <p className="text-sm font-bold text-amber-900">
+                🔔 No te pierdas tus comidas
               </p>
-              <p className="text-xs text-indigo-700 mt-0.5">
-                Activa recordatorios para desayuno, comida y cena.
+              <p className="text-xs text-amber-800 mt-0.5">
+                Recibe recordatorios para desayuno, comida y cena.
               </p>
             </div>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1.5 flex-shrink-0">
               <button
                 onClick={async () => {
                   const granted = await requestNotificationPermission();
@@ -343,7 +343,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                     setShowNotificationBanner(false);
                   }
                 }}
-                className="text-xs bg-indigo-600 text-white font-semibold px-3 py-1.5 rounded-full hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                className="text-xs bg-amber-600 text-white font-bold px-3 py-1.5 rounded-full hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
               >
                 Activar
               </button>
@@ -352,9 +352,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                   setShowNotificationBanner(false);
                   trackEvent('notification_banner_dismissed');
                 }}
-                className="text-xs text-indigo-500 hover:text-indigo-700 transition-colors"
+                className="text-xs text-amber-700 hover:text-amber-900 transition-colors"
               >
-                Ahora no
+                Después
               </button>
             </div>
           </div>
@@ -364,18 +364,25 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       {/* Selector principal */}
       <div className="grid grid-cols-2 gap-3 mb-6">
         {EATING_HABITS.map(habit => (
-          <button 
-            key={habit} 
-            onClick={() => handleTypeChange(habit as any)} 
+          <button
+            key={habit}
+            onClick={() => handleTypeChange(habit as any)}
             disabled={isGenerating}
-            className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 ${
-              recommendationType === habit 
-                ? 'bg-bocado-green text-white border-bocado-green shadow-bocado' 
+            className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all duration-200 active:scale-[0.98] disabled:opacity-50 ${
+              recommendationType === habit
+                ? 'bg-bocado-green text-white border-bocado-green shadow-bocado'
                 : 'bg-white text-bocado-text border-bocado-border hover:border-bocado-green/50'
             }`}
           >
-            <span className="text-3xl mb-1">{habit === 'En casa' ? '🏡' : '🍽️'}</span>
-            <span className="font-bold text-sm">{habit}</span>
+            <span className="text-3xl mb-2">{habit === 'En casa' ? '🏡' : '🍽️'}</span>
+            <span className="font-bold text-sm text-center">{habit}</span>
+            <span className={`text-2xs mt-1 text-center leading-tight ${
+              recommendationType === habit
+                ? 'text-white/80'
+                : 'text-bocado-gray'
+            }`}>
+              {habit === 'En casa' ? 'Usa tus\ningredientes' : 'Encuéntrame\nun lugar'}
+            </span>
           </button>
         ))}
       </div>
@@ -474,23 +481,23 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
               </div>
 
               {/* Indicador de ubicación */}
-              <div className="bg-bocado-background/50 p-3 rounded-xl">
+              <div className="bg-bocado-background/50 p-3 rounded-xl border border-bocado-border">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MapPin className={`w-4 h-4 ${
-                      userPosition ? 'text-bocado-green' : 
-                      locationPermission === 'denied' ? 'text-red-400' : 
+                  <div className="flex items-center gap-2 flex-1">
+                    <MapPin className={`w-4 h-4 flex-shrink-0 ${
+                      userPosition ? 'text-bocado-green' :
+                      locationPermission === 'denied' ? 'text-red-600' :
                       'text-bocado-gray'
                     }`} />
                     <span className="text-xs text-bocado-dark-gray">
                       {userPosition ? (
                         <span className="text-bocado-green font-medium">📍 Ubicación activa</span>
                       ) : locationPermission === 'denied' ? (
-                        <span className="text-red-400">Ubicación denegada</span>
+                        <span className="text-red-600">Ubicación denegada</span>
                       ) : locationLoading ? (
                         <span className="text-bocado-gray">Obteniendo ubicación...</span>
                       ) : (
-                        <span className="text-bocado-gray">Usando ciudad del perfil</span>
+                        <span className="text-bocado-gray">Usar ubicación actual</span>
                       )}
                     </span>
                   </div>
@@ -498,16 +505,16 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                     <button
                       onClick={requestLocation}
                       disabled={locationLoading || isGenerating}
-                      className="text-xs font-medium text-bocado-green hover:text-bocado-dark-green disabled:text-bocado-gray transition-colors"
+                      className="text-xs font-bold text-white bg-bocado-green px-3 py-1.5 rounded-full hover:bg-bocado-dark-green active:scale-95 disabled:bg-bocado-gray disabled:cursor-not-allowed transition-all flex-shrink-0 ml-2 whitespace-nowrap"
                     >
                       {locationLoading ? '...' : 'Activar'}
                     </button>
                   )}
                 </div>
-                <p className="text-2xs text-bocado-gray mt-1 ml-6">
-                  {userPosition 
-                    ? `Buscando restaurantes en ${SEARCH_RADIUS.label} de ${detectedLocation?.city || 'tu ubicación'}` 
-                    : `Las recomendaciones serán de ${profile?.city || 'tu ciudad'}`
+                <p className="text-2xs text-bocado-gray mt-2 ml-6">
+                  {userPosition
+                    ? `Buscando restaurantes en ${SEARCH_RADIUS.label} de ${detectedLocation?.city || 'tu ubicación'}`
+                    : `Sin ubicación: buscaré en ${profile?.city || 'tu ciudad'}`
                   }
                 </p>
               </div>
@@ -516,18 +523,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
           {/* Botón acción con rate limit */}
           <div className={`mt-6 transition-all duration-300 ${isSelectionMade ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-            {/* Indicador de rate limit */}
-            {!isGenerating && !canRequest && (
-              <div className="mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl text-center">
-                <p className="text-xs text-amber-700">
-                  ⏱️ <span className="font-medium">{rateLimitMessage}</span>
-                </p>
-              </div>
-            )}
-            
-            <button 
-              onClick={handleGenerateRecommendation} 
-              disabled={isGenerating || isRateLimited} 
+            <button
+              onClick={handleGenerateRecommendation}
+              disabled={isGenerating || isRateLimited}
               className="w-full bg-bocado-green text-white font-bold py-4 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isGenerating ? (
@@ -537,17 +535,19 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                 </>
               ) : isRateLimited ? (
                 <>
-                  <span>⏱️ Espera {formattedTimeLeft}</span>
+                  <span className="text-lg">⏱️</span>
+                  <span>Espera {formattedTimeLeft}s</span>
                 </>
               ) : (
                 "¡A comer! 🍽️"
               )}
             </button>
-            
+
+
             {/* Contador de requests restantes */}
-            {canRequest && !isGenerating && rateLimitMessage && (
+            {canRequest && !isGenerating && !isRateLimited && rateLimitMessage && (
               <p className="text-center text-xs text-bocado-gray mt-2">
-                {rateLimitMessage} en los últimos 10 min
+                💡 {rateLimitMessage}
               </p>
             )}
           </div>

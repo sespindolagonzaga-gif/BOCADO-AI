@@ -127,7 +127,7 @@ export const PantryZoneDetail: React.FC<PantryZoneDetailProps> = ({
     <div className="flex-1 flex flex-col bg-white">
       <div className="sticky top-0 bg-white z-20 border-b border-bocado-border/50 px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
-          <button 
+          <button
             onClick={onBack}
             className="w-8 h-8 flex items-center justify-center bg-bocado-background rounded-full text-bocado-dark-gray font-bold active:scale-95 transition-transform"
           >
@@ -139,14 +139,34 @@ export const PantryZoneDetail: React.FC<PantryZoneDetailProps> = ({
           {isSaving && <span className="text-xs text-bocado-gray animate-pulse">Guardando...</span>}
         </div>
 
+        {/* Leyenda de frescura */}
+        <div className="bg-bocado-background/50 rounded-lg p-3 mb-3 border border-bocado-border/30">
+          <p className="text-2xs font-bold text-bocado-gray mb-2 uppercase tracking-wider">Estados</p>
+          <div className="flex gap-3 flex-wrap">
+            <div className="flex items-center gap-2 text-2xs">
+              <div className="w-3 h-3 rounded-full bg-green-400"></div>
+              <span className="font-medium text-bocado-text">Fresco</span>
+            </div>
+            <div className="flex items-center gap-2 text-2xs">
+              <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+              <span className="font-medium text-bocado-text">Por caducar</span>
+            </div>
+            <div className="flex items-center gap-2 text-2xs">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span className="font-medium text-bocado-text">Urgente</span>
+            </div>
+          </div>
+          <p className="text-2xs text-bocado-gray mt-2">👆 Toca un ingrediente para cambiar su estado</p>
+        </div>
+
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
           {ZONE_CATEGORIES[zone].map(cat => (
             <button
               key={cat}
               onClick={() => handleCategorySelect(cat)}
               className={`whitespace-nowrap px-3 py-1.5 rounded-full text-2xs font-bold transition-all active:scale-95 ${
-                activeCategory === cat 
-                  ? 'bg-bocado-green text-white shadow-sm' 
+                activeCategory === cat
+                  ? 'bg-bocado-green text-white shadow-sm'
                   : 'bg-bocado-background text-bocado-dark-gray'
               }`}
             >
