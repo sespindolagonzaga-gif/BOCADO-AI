@@ -131,6 +131,10 @@ export async function getCachedWithFallback<T>(
   fallbackFn: () => Promise<T>,
   timeoutMs: number = 2000
 ): Promise<T> {
+  const createTimeoutPromise = (ms: number) =>
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Fallback timeout')), ms)
+    );
   let fallbackPromise: Promise<T> | null = null;
   try {
     // Intentar obtener de cache
@@ -143,9 +147,7 @@ export async function getCachedWithFallback<T>(
     fallbackPromise = fallbackFn();
     const result = await Promise.race([
       fallbackPromise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error('Fallback timeout')), timeoutMs)
-      )
+      createTimeoutPromise(timeoutMs)
     ]);
 
     // Guardar en cache
@@ -153,11 +155,18 @@ export async function getCachedWithFallback<T>(
     return result;
   } catch (error) {
     console.warn('[Cache] getCachedWithFallback error:', error);
-    // Si todo falla, intentar fallback sin timeout
+    // Si todo falla, intentar fallback con timeout secundario
+    const secondaryTimeoutMs = 500;
     if (fallbackPromise) {
-      return await fallbackPromise;
+      return await Promise.race([
+        fallbackPromise,
+        createTimeoutPromise(secondaryTimeoutMs)
+      ]);
     }
-    return await fallbackFn();
+    return await Promise.race([
+      fallbackFn(),
+      createTimeoutPromise(secondaryTimeoutMs)
+    ]);
   }
 }
 

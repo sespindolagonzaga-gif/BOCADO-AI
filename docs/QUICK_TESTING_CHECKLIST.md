@@ -27,7 +27,7 @@
 ## 🔧 BACKEND (5 min)
 
 - [ ] **Test 3.1:** Usuario sin ciudad + sin GPS → Error claro (NO crash)
-- [ ] **Verificar:** Logs en consola no muestran crasheyo ls
+- [ ] **Verificar:** Logs en consola no muestran crashes
 
 **Bugs encontrados:** ___________________________________________
 
