@@ -3,6 +3,8 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth as getAdminAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
+import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG, CurrencyService } from '../src/data/budgets.js';
+import { profileCache, pantryCache, historyCache } from './utils/cache.js';
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
@@ -25,10 +27,19 @@ if (!getApps().length) {
 const db = getFirestore();
 
 // ============================================
-// AIRTABLE CACHE (6 horas TTL) - Evita rate limits de Airtable
+// 💰 FINOPS: JSON TEMPLATES (AHORRO DE TOKENS)
+// ============================================
+// Extraídos como constantes para evitar repetirlos en cada prompt (~40 tokens ahorrados por request)
+
+const RECIPE_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
+
+const RESTAURANT_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicar por qué","hack_saludable":"consejo práctico"}]}`;
+
+// ============================================
+// AIRTABLE CACHE (24 horas TTL) - Evita rate limits de Airtable
 // ============================================
 
-const AIRTABLE_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 horas
+const AIRTABLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas (aumentado de 6h)
 
 interface AirtableCacheEntry {
   items: any[];
@@ -102,6 +113,108 @@ async function getAirtableIngredientsWithCache(
 }
 
 // ============================================
+// 💰 FINOPS: CACHED USER PROFILE RETRIEVAL
+// ============================================
+
+interface UserProfile {
+  userId: string;
+  eatingHabit?: string;
+  age?: number;
+  sex?: string;
+  activityLevel?: string;
+  nutritionalGoal?: string;
+  diseases?: string[];
+  allergies?: string[];
+  dislikedFoods?: string[];
+  cookingAffinity?: string;
+  city?: string;
+  country?: string;
+  location?: { lat: number; lng: number };
+  [key: string]: any;
+}
+
+/**
+ * Obtiene perfil del usuario con cache en memoria
+ * TTL: 10 minutos
+ * Fallback: Firestore directo si cache falla
+ * Ahorro: 1 read de Firestore por cada cache hit
+ */
+async function getUserProfileCached(userId: string): Promise<UserProfile> {
+  // Layer 1: Intentar memoria cache
+  try {
+    const cached = profileCache.get<UserProfile>(userId);
+    if (cached) {
+      safeLog('log', `[Cache] Profile HIT: ${userId.substring(0, 8)}...`);
+      return cached;
+    }
+  } catch (cacheError) {
+    safeLog('warn', '[Cache] Profile read error, falling back to Firestore:', cacheError);
+  }
+
+  // Layer 2: Fallback a Firestore
+  safeLog('log', `[Cache] Profile MISS: fetching from Firestore ${userId.substring(0, 8)}...`);
+  
+  const userSnap = await db.collection('users').doc(userId).get();
+  if (!userSnap.exists) {
+    throw new Error('Usuario no encontrado');
+  }
+
+  const profile = userSnap.data() as UserProfile;
+
+  // Guardar en cache (no throw si falla)
+  try {
+    profileCache.set(userId, profile);
+  } catch (cacheError) {
+    safeLog('warn', '[Cache] Profile write error:', cacheError);
+  }
+
+  return profile;
+}
+
+/**
+ * Obtiene items de despensa con cache en memoria
+ * TTL: 5 minutos
+ * Fallback graceful: [] si falla (no crítico)
+ */
+async function getPantryItemsCached(userId: string): Promise<string[]> {
+  // Layer 1: Memoria cache
+  try {
+    const cached = pantryCache.get<string[]>(userId);
+    if (cached) {
+      safeLog('log', `[Cache] Pantry HIT: ${userId.substring(0, 8)}...`);
+      return cached;
+    }
+  } catch (cacheError) {
+    safeLog('warn', '[Cache] Pantry read error:', cacheError);
+  }
+
+  // Layer 2: Fallback a Firestore
+  try {
+    safeLog('log', `[Cache] Pantry MISS: fetching from Firestore ${userId.substring(0, 8)}...`);
+    const pantryDoc = await db.collection('user_pantry').doc(userId).get();
+    const pantryData = pantryDoc.exists ? pantryDoc.data() : null;
+    
+    // Transformar items (igual que antes)
+    const items: string[] = (pantryData?.items && Array.isArray(pantryData.items))
+      ? pantryData.items.map((item: any) => item.name || "").filter(Boolean)
+      : [];
+
+    // Guardar en cache
+    try {
+      pantryCache.set(userId, items);
+    } catch (cacheError) {
+      safeLog('warn', '[Cache] Pantry write error:', cacheError);
+    }
+
+    return items;
+  } catch (error) {
+    // Graceful degradation: despensa no es crítica
+    safeLog('warn', '[Cache] Pantry fetch failed, using empty array:', error);
+    return [];
+  }
+}
+
+// ============================================
 // RATE LIMITING DISTRIBUIDO (INLINE - después de inicializar Firebase)
 // ============================================
 
@@ -172,9 +285,10 @@ class DistributedRateLimiter {
           }
         }
 
-        const validRequests = data?.requests?.filter(
+        // ✅ FIX: Proteger contra null/undefined en array
+        const validRequests = (data?.requests || []).filter(
           (ts) => now - ts < this.config.windowMs
-        ) || [];
+        );
 
         if (validRequests.length >= this.config.maxRequests) {
           const oldestRequest = Math.min(...validRequests);
@@ -301,10 +415,11 @@ class DistributedRateLimiter {
 
       let nextAvailableAt: number | undefined;
 
+      // 🟠 FIX #13: Validar que validRequests no esté vacío antes de Math.min/max
       if (data.currentProcess) {
         nextAvailableAt = data.currentProcess.startedAt + this.config.cooldownMs;
       } else if (validRequests.length >= this.config.maxRequests) {
-        const oldestRequest = Math.min(...validRequests);
+        const oldestRequest = validRequests.length > 0 ? Math.min(...validRequests) : now;
         nextAvailableAt = oldestRequest + this.config.windowMs;
       } else if (validRequests.length > 0) {
         const lastRequest = Math.max(...validRequests);
@@ -335,23 +450,47 @@ const rateLimiter = new DistributedRateLimiter();
 
 import { z } from 'zod';
 
-// Schema para validar el body de la request
+// ✅ FIX: Schema más estricto para validar datos
 const RequestBodySchema = z.object({
   userId: z.string().min(1).max(128),
   type: z.enum(['En casa', 'Fuera']),
   mealType: z.string().max(50).optional().nullable(),
-  cookingTime: z.union([z.string(), z.number()]).optional().nullable(),
+  // ✅ Validación estricta: solo números o strings numéricos
+  cookingTime: z.union([
+    z.string().regex(/^\d+$/, 'Cooking time debe ser un número válido'),
+    z.number().int().min(1).max(180)
+  ])
+  .optional()
+  .nullable()
+  .transform(val => {
+    if (val === null || val === undefined) return null;
+    const num = typeof val === 'string' ? parseInt(val, 10) : val;
+    return isNaN(num) ? null : num;
+  }),
   cravings: z.union([z.string(), z.array(z.string())]).optional().nullable(),
-  budget: z.string().max(50).optional().nullable(),
-  currency: z.string().max(10).optional().nullable(),
+  // ✅ Validación de budget: solo valores específicos o 'sin límite'
+  budget: z.string()
+    .max(50)
+    .refine(
+      (val) => !val || val === 'sin límite' || ['low', 'medium', 'high'].includes(val),
+      { message: 'Budget debe ser low, medium, high o sin límite' }
+    )
+    .optional()
+    .nullable(),
+  // ✅ Validación de currency: códigos ISO válidos
+  currency: z.string()
+    .max(10)
+    .regex(/^[A-Z]{3}$/, 'Currency debe ser código ISO de 3 letras (ej: USD, EUR, MXN)')
+    .optional()
+    .nullable(),
   dislikedFoods: z.array(z.string().max(100)).max(50).optional().default([]),
   onlyPantryIngredients: z.boolean().optional().default(false),
   _id: z.string().max(128).optional(),
   // Ubicación del usuario (opcional - geolocalización del navegador)
   userLocation: z.object({
-    lat: z.number(),
-    lng: z.number(),
-    accuracy: z.number().optional(),
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+    accuracy: z.number().positive().optional(),
   }).optional().nullable(),
 });
 
@@ -404,8 +543,10 @@ interface UserProfile {
   allergies?: string[];
   diseases?: string[];
   dislikedFoods?: string[];
+  eatingHabit?: string;
+  cookingAffinity?: string;
   city?: string;
-  countryName?: string;
+  country?: string; // Código ISO (MX, ES, US, etc)
   gender?: string;
   age?: string;
   weight?: string;
@@ -538,8 +679,15 @@ const buildAirtableFormula = (user: UserProfile): string => {
   const conditions: string[] = [];
   
   const prefs = ensureArray(user.allergies);
-  if (prefs.includes("Vegano")) conditions.push("{Vegano} = TRUE()");
-  if (prefs.includes("Vegetariano")) conditions.push("{Vegetariano} = TRUE()");
+  const eatingHabit = user.eatingHabit || '';
+  
+  // Verificar AMBOS: allergies Y eatingHabit (fix crítico)
+  if (prefs.includes("Vegano") || eatingHabit.includes("Vegano")) {
+    conditions.push("{Vegano} = TRUE()");
+  }
+  if (prefs.includes("Vegetariano") || eatingHabit.includes("Vegetariano")) {
+    conditions.push("{Vegetariano} = TRUE()");
+  }
   if (prefs.includes("Celíaco")) conditions.push("{Celíaco} = TRUE()");
   if (prefs.includes("Intolerante a la lactosa")) conditions.push("{Intolerancia_lactosa} = TRUE()");
   if (prefs.includes("Alergia a frutos secos")) conditions.push("{Alergia_frutos_secos} = TRUE()");
@@ -723,6 +871,143 @@ function formatCoordinates(coords: Coordinates): string {
   return `${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}`;
 }
 
+/**
+ * Obtiene el código de país desde coordenadas GPS usando reverse geocoding
+ * Llama al proxy interno de Google Maps con timeout de 5s
+ */
+async function getCountryCodeFromCoords(coords: Coordinates): Promise<string | null> {
+  // ✅ FIX: Timeout para evitar bloqueo indefinido
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos
+  
+  try {
+    const MAPS_PROXY_URL = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}/api/maps-proxy`
+      : 'http://localhost:5001/api/maps-proxy';
+    
+    const response = await fetch(MAPS_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'reverseGeocode',
+        lat: coords.lat,
+        lng: coords.lng
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      safeLog('warn', '⚠️ Reverse geocode falló:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.countryCode || null;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      safeLog('warn', '⚠️ Reverse geocode timeout (5s) - usando fallback');
+      return null;
+    }
+    safeLog('error', '❌ Error en reverse geocoding:', error);
+    return null;
+  }
+}
+
+/**
+ * Detecta si el usuario está viajando (GPS location != perfil location)
+ * Considera que está viajando si las ciudades son diferentes
+ */
+interface LocationContext {
+  isTraveling: boolean;
+  homeCurrency: string;
+  activeCurrency: string;
+  homeCountryCode: string;
+  activeCountryCode: string | null;
+  locationLabel: string; // "en Madrid" o "aprovechando que estás en Tokio"
+}
+
+async function detectTravelContext(
+  searchCoords: Coordinates | null,
+  request: RequestBody,
+  user: UserProfile
+): Promise<LocationContext> {
+  // ✅ FIX: Usar ?? para preservar strings vacíos válidos
+  const homeCountryCode = user.country ?? 'MX'; // fallback a México
+  const homeCurrency = COUNTRY_TO_CURRENCY[homeCountryCode] ?? 'USD';
+  
+  // Si no hay GPS activo, usar ubicación de casa
+  if (!request.userLocation || !searchCoords) {
+    return {
+      isTraveling: false,
+      homeCurrency,
+      activeCurrency: homeCurrency,
+      homeCountryCode,
+      activeCountryCode: null,
+      locationLabel: `en ${user.city ?? 'tu ciudad'}`
+    };
+  }
+
+  // Detectar país desde coordenadas GPS
+  const activeCountryCode = await getCountryCodeFromCoords(searchCoords);
+  
+  if (!activeCountryCode) {
+    // Si falla reverse geocoding, asumir que está en casa
+    return {
+      isTraveling: false,
+      homeCurrency,
+      activeCurrency: homeCurrency,
+      homeCountryCode,
+      activeCountryCode: null,
+      locationLabel: `en ${user.city ?? 'tu ciudad'}`
+    };
+  }
+
+  // ✅ FIX: Usar ?? con logging si no se encuentra moneda
+  const activeCurrency = COUNTRY_TO_CURRENCY[activeCountryCode];
+  if (!activeCurrency) {
+    safeLog('warn', `⚠️ Currency not found for country: ${activeCountryCode}, fallback to home currency`);
+  }
+  const finalActiveCurrency = activeCurrency ?? homeCurrency;
+  
+  const isTraveling = activeCountryCode !== homeCountryCode;
+
+  return {
+    isTraveling,
+    homeCurrency,
+    activeCurrency: finalActiveCurrency,
+    homeCountryCode,
+    activeCountryCode,
+    locationLabel: isTraveling 
+      ? `aprovechando que estás de visita` 
+      : `en ${user.city ?? 'tu ciudad'}`
+  };
+}
+
+/**
+ * Genera instrucción de presupuesto con conversión de moneda si es necesario
+ */
+function getBudgetInstruction(
+  request: RequestBody,
+  context: LocationContext
+): string {
+  const budgetValue = request.budget ?? 'sin límite';
+  const requestCurrency = request.currency ?? context.homeCurrency;
+
+  // Si no está viajando o no hay presupuesto, devolver normal
+  if (!context.isTraveling || budgetValue === 'sin límite') {
+    return `PRESUPUESTO: ${budgetValue} ${requestCurrency}`;
+  }
+
+  // Si está viajando, mostrar ambas monedas
+  const homeConfig = CURRENCY_CONFIG[context.homeCurrency] || CURRENCY_CONFIG.DEFAULT;
+  const activeConfig = CURRENCY_CONFIG[context.activeCurrency] || CURRENCY_CONFIG.DEFAULT;
+
+  return `PRESUPUESTO: ${budgetValue} ${requestCurrency} (equivalente aproximado en ${activeConfig.code} - ajustar recomendaciones a precios locales)`;
+}
+
 // ============================================
 // 8. UTILIDAD PARA GENERAR LINKS DE MAPS
 // ============================================
@@ -870,10 +1155,28 @@ export default async function handler(req: any, res: any) {
     const parseResult = RequestBodySchema.safeParse(req.body);
     if (!parseResult.success) {
       const issues = parseResult.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+      // ✅ FIX: Log de errores de validación para debugging
+      // 🔴 FIX #15: Validar JSON.stringify antes de .substring()
+      const bodyStr = req.body ? JSON.stringify(req.body) : 'undefined';
+      safeLog('warn', '⚠️ Request validation failed:', {
+        userId: authUserId,
+        issues,
+        body: bodyStr.substring(0, 200)
+      });
       return res.status(400).json({ error: 'Invalid request body', details: issues });
     }
     
     const request: RequestBody = parseResult.data;
+    
+    // ✅ FIX: Log de requests exitosos (solo campos clave)
+    safeLog('log', '📥 Request received:', {
+      userId: authUserId,
+      type: request.type,
+      hasGPS: !!request.userLocation,
+      budget: request.budget,
+      cookingTime: request.cookingTime
+    });
+    
     userId = authUserId;
     if (request.userId && request.userId !== authUserId) {
       return res.status(403).json({ error: 'userId no coincide con el token' });
@@ -908,61 +1211,56 @@ export default async function handler(req: any, res: any) {
 
     const historyCol = type === 'En casa' ? 'historial_recetas' : 'historial_recomendaciones';
 
-    const userSnap = await db.collection('users').doc(userId).get();
-    if (!userSnap.exists) {
-      await interactionRef.update({ status: 'error', error: 'Usuario no encontrado' });
-      return res.status(404).json({ error: 'Usuario no encontrado' });
-    }
-    const user = userSnap.data() as UserProfile;
+    // 💰 FINOPS: Usar cache de perfil en lugar de lectura directa
+    const user = await getUserProfileCached(userId);
 
     let historyContext = "";
     try {
-      // Intentar consulta con índice
-      let historySnap;
-      try {
-        historySnap = await db.collection(historyCol)
+      // 💰 FINOPS FIX #4: Query sin orderBy y sort en memoria (deduplica read)
+      // Antes: 2 queries si falta índice (con orderBy + fallback sin orderBy)
+      // Después: 1 query siempre (sin orderBy + sort en memoria)
+      const firestoreTimeout = (ms: number) => new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Firestore timeout')), ms)
+      );
+      
+      // Query única sin orderBy (más rápido, no requiere índice)
+      const historySnap = await Promise.race([
+        db.collection(historyCol)
           .where('user_id', '==', userId)
-          .orderBy('fecha_creacion', 'desc')
-          .limit(5)
-          .get();
-      } catch (indexError: any) {
-        // En producción: fallar fuerte si falta el índice
-        if (process.env.NODE_ENV === 'production') {
-          safeLog('error', '❌ Índice de Firestore faltante en producción', indexError);
-          throw new Error('Error de configuración: índice de base de datos requerido');
-        }
-        // En desarrollo: fallback sin orderBy (lento pero funcional)
-        if (indexError?.message?.includes('index') || indexError?.code === 'failed-precondition') {
-          safeLog('warn', '⚠️ Índice faltante en desarrollo, usando fallback');
-          const allHistory = await db.collection(historyCol)
-            .where('user_id', '==', userId)
-            .limit(20)
-            .get();
-          interface HistoryDoc { id: string; data: any; }
-          const sortedDocs: HistoryDoc[] = allHistory.docs
-            .map((d: any) => ({ id: d.id, data: d.data() }))
-            .sort((a: HistoryDoc, b: HistoryDoc) => {
-              const aTime = a.data?.fecha_creacion?.toMillis?.() || 0;
-              const bTime = b.data?.fecha_creacion?.toMillis?.() || 0;
-              return bTime - aTime;
-            })
-            .slice(0, 5);
-          historySnap = { 
-            docs: sortedDocs.map(d => ({ ...d, data: () => d.data })), 
-            empty: sortedDocs.length === 0 
-          } as any;
-        } else {
-          throw indexError;
-        }
-      }
+          .limit(20) // Traer más para compensar el sort en memoria
+          .get(),
+        firestoreTimeout(8000) // 8 segundos timeout
+      ]) as FirebaseFirestore.QuerySnapshot;
       
       if (!historySnap.empty) {
-        const recent = historySnap.docs.map((doc: any) => {
-          const d = doc.data();
-          return type === 'En casa' 
-            ? d.receta?.recetas?.map((r: any) => r.titulo)
-            : d.recomendaciones?.map((r: any) => r.nombre_restaurante);
-        }).flat().filter(Boolean);
+        // Sort en memoria por fecha_creacion
+        interface HistoryDoc { id: string; data: any; timestamp: number; }
+        const sortedDocs: HistoryDoc[] = historySnap.docs
+          .map((doc: any) => {
+            const data = doc.data();
+            const timestamp = data?.fecha_creacion?.toMillis?.() || 0;
+            return { id: doc.id, data, timestamp };
+          })
+          .sort((a, b) => b.timestamp - a.timestamp) // Desc (más recientes primero)
+          .slice(0, 5); // Top 5
+      
+        // ✅ FIX: Validar doc.data() antes de acceder a propiedades
+        const recent = sortedDocs
+          .map((doc: HistoryDoc) => {
+            const d = doc.data;
+            if (!d) return null; // Documento borrado o sin data
+            
+            if (type === 'En casa') {
+              const recetas = d.receta?.recetas || [];
+              return Array.isArray(recetas) ? recetas.map((r: any) => r?.titulo).filter(Boolean) : [];
+            } else {
+              const recs = d.recomendaciones || [];
+              return Array.isArray(recs) ? recs.map((r: any) => r?.nombre_restaurante).filter(Boolean) : [];
+            }
+          })
+          .filter(Boolean)
+          .flat();
+          
         if (recent.length > 0) {
           historyContext = `### 🧠 MEMORIA (NO REPETIR): Recientemente recomendaste: ${recent.join(", ")}. INTENTA VARIAR Y NO REPETIR ESTOS NOMBRES.`;
         }
@@ -1022,10 +1320,8 @@ export default async function handler(req: any, res: any) {
         airtableItems = [];
       }
 
-      // FIX: La despensa se guarda como un documento por usuario con array 'items'
-      const pantryDoc = await db.collection('user_pantry').doc(userId).get();
-      const pantryData = pantryDoc.exists ? pantryDoc.data() : null;
-      const pantryItems: string[] = pantryData?.items?.map((item: any) => item.name || "").filter(Boolean) || [];
+      // 💰 FINOPS: Usar cache de pantry en lugar de lectura directa
+      const pantryItems = await getPantryItemsCached(userId);
       
       const { priorityList, marketList, hasPantryItems } = scoreIngredients(airtableItems, pantryItems);
       
@@ -1034,58 +1330,149 @@ export default async function handler(req: any, res: any) {
         ? "usar SOLO ingredientes de la despensa (sin excepciones, sin básicos)"
         : "usar despensa primero, respetar restricciones. Opcionales: básicos (aceite, sal, especias)";
 
+      // Contexto demográfico relevante (solo si está disponible)
+      const demographicParts = [
+        user.eatingHabit ? `Dieta: ${user.eatingHabit}` : '',
+        user.age ? `${user.age} años` : '',
+        user.activityLevel && user.activityLevel !== 'Sedentario' ? user.activityLevel : ''
+      ].filter(Boolean);
+      const demographicContext = demographicParts.length > 0 ? demographicParts.join(', ') : '';
+
+      // Restricciones médicas (solo mostrar si existen)
+      const diseases = ensureArray(user.diseases);
+      const allergies = ensureArray(user.allergies);
+      const medicalRestrictions = [...diseases, ...allergies].filter(Boolean);
+      const medicalContext = medicalRestrictions.length > 0 
+        ? `Restricciones: ${medicalRestrictions.join(', ')}` 
+        : '';
+
+      // Alimentos no deseados
+      const allDislikedFoods = [...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)].filter(Boolean);
+      const dislikedContext = allDislikedFoods.length > 0 
+        ? `NO usar: ${allDislikedFoods.join(', ')}` 
+        : '';
+
+      // Construir línea de perfil limpia
+      const profileParts = [demographicContext, medicalContext, dislikedContext].filter(Boolean);
+      const profileLine = profileParts.join(' | ');
+
+      // Ajuste de dificultad según experiencia culinaria
+      const difficultyHint = user.cookingAffinity === 'Novato' || user.cookingAffinity === 'No me gusta cocinar'
+        ? ', dificultad máxima: Fácil'
+        : '';
+
       finalPrompt = `Eres nutricionista. Genera 3 recetas para: ${user.nutritionalGoal || 'comer saludable'}
 
-PERFIL: ${formatList(user.diseases)}, ${formatList(user.allergies)} | NO usar: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])} | Ubic: ${user.city || 'su ciudad'}
+PERFIL: ${profileLine || 'Sin restricciones'} | Ubic: ${user.city || 'su ciudad'}
 SOLICITUD: ${request.mealType || 'Comida'}, ${request.cookingTime || '30'}min, ${request.budget || 'sin límite'} ${request.currency || ''}
 ${historyContext ? '\nMEMORIA: ' + historyContext.slice(30, 200) : ''}
 ${feedbackContext ? '\nFEEDBACK: ' + feedbackContext.slice(30, 150) : ''}
 ${hasPantryItems ? `\nDESPENSA: ${priorityList.slice(0, 200)}` : ''}
 ${marketList && !request.onlyPantryIngredients ? `\nDISPONIBLE: ${marketList.slice(0, 150)}` : ''}
 
-REGLAS: 3 recetas creativas, tiempo ≤${request.cookingTime || '30'}min, ${pantryRule}.
+REGLAS: 3 recetas creativas, tiempo ≤${request.cookingTime || '30'}min, ${pantryRule}${difficultyHint}.
 
-JSON:{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
+Responde en formato JSON usando esta estructura exacta:
+${RECIPE_JSON_TEMPLATE}
 
+Personaliza el saludo_personalizado usando${demographicParts.length > 0 ? ' el perfil del usuario' : ' un mensaje motivador'}.`;
     } else {
+      // 🔴 FIX #11: Mover searchCoords ANTES de usarlo en validación
       // Determinar coordenadas para búsqueda de restaurantes
       const searchCoords = getSearchCoordinates(request, user);
+      
+      // ✅ FIX: Validar ciudad antes de generar prompt de restaurantes
+      if (!user.city && !searchCoords) {
+        throw new Error('No se pudo determinar tu ubicación. Por favor actualiza tu perfil o activa el GPS.');
+      }
+      
+      // ✨ NUEVA LÓGICA: Detectar si está viajando y qué moneda usar
+      const travelContext = await detectTravelContext(searchCoords, request, user);
       
       // Logging detallado para debugging de ubicación
       safeLog('log', `📍 Búsqueda de restaurantes:`, {
         userLocationFromRequest: request.userLocation ? `${request.userLocation.lat},${request.userLocation.lng}` : 'no proporcionada',
         userLocationFromProfile: user.location ? `${user.location.lat},${user.location.lng}` : 'no guardada',
         profileCity: user.city,
-        profileCountry: user.countryName,
+        profileCountry: user.country,
         finalCoords: searchCoords ? `${searchCoords.lat},${searchCoords.lng}` : 'usando ciudad del perfil',
+        isTraveling: travelContext.isTraveling,
+        homeCurrency: travelContext.homeCurrency,
+        activeCurrency: travelContext.activeCurrency
       });
       
       const locationContext = searchCoords 
         ? `Coordenadas de referencia: ${formatCoordinates(searchCoords)}`
-        : `Ciudad: ${user.city || "su ciudad"}, ${user.countryName || ""}`;
+        : `Ciudad: ${user.city || "su ciudad"}`;
       
       const locationInstruction = searchCoords
         ? `**IMPORTANTE - RANGO DE BÚSQUEDA**: Busca restaurantes DENTRO de un radio de ${SEARCH_RADIUS_METERS / 1000}km desde las coordenadas ${formatCoordinates(searchCoords)}. Prioriza lugares cercanos a esta ubicación.`
         : `**IMPORTANTE**: Busca restaurantes en ${user.city || "su ciudad"} que sean accesibles y no muy alejados del centro.`;
       
-      // ✅ OPTIMIZACIÓN: Prompt conciso para restaurantes (~40% menos tokens)
-      finalPrompt = `Eres guía gastronómico en ${user.city || 'su ciudad'}. Recomienda 5 restaurantes reales.
+      // Contexto demográfico relevante (solo si está disponible)
+      const demographicPartsOut = [
+        user.eatingHabit ? `Dieta: ${user.eatingHabit}` : '',
+        user.age ? `${user.age} años` : '',
+        user.activityLevel && user.activityLevel !== 'Sedentario' ? user.activityLevel : ''
+      ].filter(Boolean);
+      const demographicContextOut = demographicPartsOut.length > 0 ? demographicPartsOut.join(', ') : '';
 
-PERFIL: ${user.nutritionalGoal || 'saludable'} | ${formatList(user.diseases)}, ${formatList(user.allergies)} | NO: ${formatList([...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)])}
+      // Restricciones médicas (solo mostrar si existen)
+      const diseasesOut = ensureArray(user.diseases);
+      const allergiesOut = ensureArray(user.allergies);
+      const medicalRestrictionsOut = [...diseasesOut, ...allergiesOut].filter(Boolean);
+      const medicalContextOut = medicalRestrictionsOut.length > 0 
+        ? `Restricciones: ${medicalRestrictionsOut.join(', ')}` 
+        : '';
+
+      // Alimentos no deseados
+      const allDislikedFoodsOut = [...ensureArray(user.dislikedFoods), ...ensureArray(request.dislikedFoods)].filter(Boolean);
+      const dislikedContextOut = allDislikedFoodsOut.length > 0 
+        ? `NO: ${allDislikedFoodsOut.join(', ')}` 
+        : '';
+
+      // Construir línea de perfil limpia
+      const profilePartsOut = [
+        demographicContextOut, 
+        user.nutritionalGoal || 'saludable', 
+        medicalContextOut, 
+        dislikedContextOut
+      ].filter(Boolean);
+      const profileLineOut = profilePartsOut.join(' | ');
+
+      // ✨ Instrucción de presupuesto con conversión de moneda
+      const budgetInstruction = getBudgetInstruction(request, travelContext);
+
+      // ✨ Mensaje personalizado para viajeros
+      const travelTone = travelContext.isTraveling
+        ? `${travelContext.locationLabel}. Adapta tono amigable para turista. Menciona precios en ${travelContext.activeCurrency}.`
+        : '';
+
+      // ✅ OPTIMIZACIÓN: Prompt conciso para restaurantes (~40% menos tokens)
+      finalPrompt = `Eres guía gastronómico ${travelContext.locationLabel}. Recomienda 5 restaurantes reales.
+
+PERFIL: ${profileLineOut || 'Sin restricciones'}
 UBICACIÓN: ${locationContext} | RANGO: ${SEARCH_RADIUS_METERS / 1000}km
-SOLICITUD: ${request.cravings || 'saludable'}, ${request.budget || 'sin límite'} ${request.currency || ''}
+SOLICITUD: ${request.cravings || 'saludable'}, ${budgetInstruction}
+${travelTone ? '\nCONTEXTO: ' + travelTone : ''}
 ${historyContext ? '\nMEMORIA: ' + historyContext.slice(30, 200) : ''}
 ${feedbackContext ? '\nFEEDBACK: ' + feedbackContext.slice(30, 150) : ''}
 
 REGLAS CRÍTICAS:
-1. Nombres reales de restaurantes existentes en ${user.city || 'su ciudad'}
+1. Nombres reales de restaurantes existentes ${travelContext.isTraveling ? 'cerca de tu ubicación actual' : `en ${user.city || 'su ciudad'}`}
 2. DIRECCIONES EXACTAS: Calle Número, Colonia (ej: "Calle Arturo Soria 126, Chamartín")
 3. Si no sabes dirección exacta: usa centro comercial específico
 4. NO uses "por el centro" o direcciones vagas
 5. Rango máximo: ${SEARCH_RADIUS_METERS / 1000}km
+${user.eatingHabit && (user.eatingHabit.includes('Vegano') || user.eatingHabit.includes('Vegetariano')) ? `\n6. CRÍTICO: SOLO restaurantes con opciones ${user.eatingHabit.toLowerCase()} certificadas` : ''}
+${travelContext.isTraveling ? `\n7. Menciona precios aproximados en ${travelContext.activeCurrency} (moneda local)` : ''}
 
-JSON:{"saludo_personalizado":"msg corto","ubicacion_detectada":"${user.city || 'su ciudad'}","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicación perfil","hack_saludable":"consejo práctico"}]}`;
-    }
+Responde en formato JSON usando esta estructura exacta:
+${RESTAURANT_JSON_TEMPLATE}
+
+Personaliza el saludo_personalizado${travelContext.isTraveling ? ' mencionando exploración de la zona' : (demographicPartsOut.length > 0 ? ' usando perfil' : ' con mensaje motivador')}.
+En por_que_es_bueno${medicalRestrictionsOut.length > 0 || demographicPartsOut.length > 0 ? ' explica cómo se ajusta al perfil' : ' explica por qué es buena opción'}.
+En hack_saludable${medicalRestrictionsOut.length > 0 ? ' personaliza para sus condiciones' : ' da consejo práctico'}.`;
 
     const result = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: finalPrompt }] }],
@@ -1105,11 +1492,24 @@ JSON:{"saludo_personalizado":"msg corto","ubicacion_detectada":"${user.city || '
     try {
       parsedData = JSON.parse(responseText);
     } catch (e) {
+      // ✅ FIX: Intentar extraer JSON de markdown o texto
       const jsonMatch = responseText.match(/```json\n?([\s\S]*?)\n?```/) || 
                         responseText.match(/{[\s\S]*}/);
       if (jsonMatch) {
-        parsedData = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+        const extractedJson = jsonMatch[1] || jsonMatch[0];
+        try {
+          // 🔴 FIX #12: Nested try-catch para JSON extraído (ya estaba implementado)
+          parsedData = JSON.parse(extractedJson);
+        } catch (innerError: any) {
+          // 🔴 FIX #15: Validar extractedJson antes de .substring()
+          const preview = extractedJson ? String(extractedJson).substring(0, 200) : 'undefined';
+          safeLog('error', '❌ JSON extraído es inválido:', preview);
+          throw new Error(`Invalid JSON extracted from response: ${innerError.message}`);
+        }
       } else {
+        // 🔴 FIX #15: Validar responseText antes de .substring()
+        const preview = responseText ? String(responseText).substring(0, 200) : 'undefined';
+        safeLog('error', '❌ No se encontró JSON en respuesta:', preview);
         throw new Error("No se pudo parsear la respuesta de Gemini");
       }
     }

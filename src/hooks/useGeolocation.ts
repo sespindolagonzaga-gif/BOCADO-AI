@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { logger } from '../utils/logger';
 import { trackEvent } from '../firebaseConfig';
 import { reverseGeocode, detectLocationByIP } from '../services/mapsService';
@@ -37,6 +37,14 @@ export function useGeolocation() {
     error: null,
     permission: 'unknown',
   });
+  
+  // 🔴 FIX #22: Usar ref para evitar recreación de getCountryCodeForCurrency
+  const detectedLocationRef = useRef<DetectedLocation | null>(null);
+  
+  // Actualizar ref cuando cambia detectedLocation
+  useEffect(() => {
+    detectedLocationRef.current = state.detectedLocation;
+  }, [state.detectedLocation]);
 
   // Verificar el estado del permiso
   const checkPermission = useCallback(async () => {
@@ -66,10 +74,26 @@ export function useGeolocation() {
     }
 
     setState(prev => ({ ...prev, loading: true, error: null }));
-    trackEvent('geolocation_request');
+    // 🟡 FIX #25: Wrap trackEvent en try-catch
+    try {
+      trackEvent('geolocation_request');
+    } catch (error) {
+      logger.warn('[useGeolocation] Analytics failed:', error);
+    }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        // 🟠 FIX #24: Validar que position.coords existe antes de acceder
+        if (!position?.coords) {
+          logger.error('[useGeolocation] Invalid position object, missing coords');
+          setState(prev => ({
+            ...prev,
+            loading: false,
+            error: 'Ubicación inválida recibida del navegador'
+          }));
+          return;
+        }
+        
         const newPosition = {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
@@ -103,12 +127,17 @@ export function useGeolocation() {
           permission: 'granted',
         });
         
-        trackEvent('geolocation_success', { 
-          accuracy: position.coords.accuracy,
-          lat: Math.round(position.coords.latitude * 100) / 100,
-          lng: Math.round(position.coords.longitude * 100) / 100,
-          country: detectedLocation?.countryCode,
-        });
+        // 🟡 FIX #25: Wrap trackEvent en try-catch
+        try {
+          trackEvent('geolocation_success', { 
+            accuracy: position.coords.accuracy,
+            lat: Math.round(position.coords.latitude * 100) / 100,
+            lng: Math.round(position.coords.longitude * 100) / 100,
+            country: detectedLocation?.countryCode,
+          });
+        } catch (error) {
+          logger.warn('[useGeolocation] Analytics failed:', error);
+        }
       },
       (error) => {
         let errorMessage = 'No se pudo obtener tu ubicación';
@@ -118,17 +147,30 @@ export function useGeolocation() {
           case error.PERMISSION_DENIED:
             errorMessage = 'Permiso de ubicación denegado';
             permission = 'denied';
-            trackEvent('geolocation_denied');
+            // 🟡 FIX #25: Wrap trackEvent en try-catch
+            try {
+              trackEvent('geolocation_denied');
+            } catch (err) {
+              logger.warn('[useGeolocation] Analytics failed:', err);
+            }
             break;
           case error.POSITION_UNAVAILABLE:
             errorMessage = 'Ubicación no disponible';
             permission = 'prompt';
-            trackEvent('geolocation_error', { reason: 'unavailable' });
+            try {
+              trackEvent('geolocation_error', { reason: 'unavailable' });
+            } catch (err) {
+              logger.warn('[useGeolocation] Analytics failed:', err);
+            }
             break;
           case error.TIMEOUT:
             errorMessage = 'Tiempo de espera agotado';
             permission = 'prompt';
-            trackEvent('geolocation_error', { reason: 'timeout' });
+            try {
+              trackEvent('geolocation_error', { reason: 'timeout' });
+            } catch (err) {
+              logger.warn('[useGeolocation] Analytics failed:', err);
+            }
             break;
         }
 
@@ -148,12 +190,13 @@ export function useGeolocation() {
     );
   }, []);
 
+  // 🔴 FIX #21: Remover checkPermission de dependencies para evitar loop infinito
   // Verificar permiso al montar
   useEffect(() => {
     checkPermission().then(permission => {
       setState(prev => ({ ...prev, permission }));
     });
-  }, [checkPermission]);
+  }, []); // ✅ Solo ejecutar en mount
 
   // Intentar detectar ubicación por IP al montar (fallback silencioso)
   useEffect(() => {
@@ -163,7 +206,12 @@ export function useGeolocation() {
       
       try {
         const ipLocation = await detectLocationByIP();
-        if (ipLocation) {
+        
+        // ✅ FIX: Validar estructura completa antes de usar
+        if (ipLocation && 
+            ipLocation.city && 
+            ipLocation.country && 
+            ipLocation.countryCode) {
           logger.info(`📍 Ubicación detectada por IP: ${ipLocation.city}, ${ipLocation.country} (${ipLocation.countryCode})`);
           setState(prev => ({
             ...prev,
@@ -178,6 +226,8 @@ export function useGeolocation() {
             country: ipLocation.countryCode,
             city: ipLocation.city,
           });
+        } else {
+          logger.warn('IP location data incomplete, skipping:', ipLocation);
         }
       } catch (error) {
         // Silenciar errores de IP detection, es solo un fallback
@@ -197,19 +247,25 @@ export function useGeolocation() {
       error: null,
       permission: 'unknown',
     });
-    trackEvent('geolocation_cleared');
+    // 🟡 FIX #25: Wrap trackEvent en try-catch
+    try {
+      trackEvent('geolocation_cleared');
+    } catch (error) {
+      logger.warn('[useGeolocation] Analytics failed:', error);
+    }
   }, []);
 
   /**
+   * 🔴 FIX #22: Usar ref para evitar loop infinito
    * Obtiene el código de país para usar en la moneda/budget.
    * Prioriza: 1) Ubicación detectada por geolocalización, 2) Fallback del parámetro
    */
   const getCountryCodeForCurrency = useCallback((fallbackCountryCode?: string): string => {
-    if (state.detectedLocation?.countryCode) {
-      return state.detectedLocation.countryCode;
+    if (detectedLocationRef.current?.countryCode) {
+      return detectedLocationRef.current.countryCode;
     }
     return fallbackCountryCode || 'MX';
-  }, [state.detectedLocation]);
+  }, []); // ✅ Sin dependencies, usa ref
 
   return {
     ...state,

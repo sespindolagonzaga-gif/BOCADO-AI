@@ -45,13 +45,17 @@ const processFirestoreDoc = (doc: DocumentSnapshot): Plan | null => {
     const meals: Meal[] = recipesArray.map((rec: any, index: number) => ({
       mealType: `Opción ${index + 1}`,
       recipe: {
-        title: rec.titulo || rec.nombre || 'Receta',
-        time: rec.tiempo_estimado || rec.tiempo_preparacion || 'N/A',
-        difficulty: rec.dificultad || 'N/A',
-        calories: rec.macros_por_porcion?.kcal || rec.kcal || 'N/A',
-        savingsMatch: rec.coincidencia_despensa || 'Ninguno',
+        title: rec.titulo ?? rec.nombre ?? 'Receta',
+        time: rec.tiempo_estimado ?? rec.tiempo_preparacion ?? 'N/A',
+        difficulty: rec.dificultad ?? 'N/A',
+        calories: rec.macros_por_porcion?.kcal ?? rec.kcal ?? 'N/A',
+        savingsMatch: rec.coincidencia_despensa ?? 'Ninguno',
         ingredients: Array.isArray(rec.ingredientes) ? rec.ingredientes : [],
-        instructions: Array.isArray(rec.pasos_preparacion) ? rec.pasos_preparacion : (Array.isArray(rec.instrucciones) ? rec.instrucciones : [])
+        instructions: Array.isArray(rec.pasos_preparacion) ? rec.pasos_preparacion : (Array.isArray(rec.instrucciones) ? rec.instrucciones : []),
+        // Macros completos
+        protein_g: rec.macros_por_porcion?.proteinas_g,
+        carbs_g: rec.macros_por_porcion?.carbohidratos_g,
+        fat_g: rec.macros_por_porcion?.grasas_g,
       },
     }));
 
@@ -64,29 +68,30 @@ const processRecommendationDoc = (doc: DocumentSnapshot): Plan | null => {
   try {
     const data = doc.data();
     if (!data) return null;
-    const interactionId = data.interaction_id || data.user_interactions;
-    const rawDate = data.fecha_creacion || data.createdAt;
+    // ✅ FIX: Usar ?? para preservar valores falsy válidos
+    const interactionId = data.interaction_id ?? data.user_interactions;
+    const rawDate = data.fecha_creacion ?? data.createdAt;
     
-    let items = data.recomendaciones?.recomendaciones || data.recomendaciones || [];
-    let greeting = data.saludo_personalizado || "Opciones fuera de casa";
+    let items = data.recomendaciones?.recomendaciones ?? data.recomendaciones ?? [];
+    let greeting = data.saludo_personalizado ?? "Opciones fuera de casa";
     if (!Array.isArray(items) || items.length === 0) return null;
 
     const meals: Meal[] = items.map((rec: any, index: number) => ({
       mealType: `Sugerencia ${index + 1}`,
       recipe: {
-        title: rec.nombre_restaurante || rec.nombre || 'Restaurante',
-        cuisine: rec.tipo_comida || rec.cuisine || rec.tipo || 'Gastronomía', 
+        title: rec.nombre_restaurante ?? rec.nombre ?? 'Restaurante',
+        cuisine: rec.tipo_comida ?? rec.cuisine ?? rec.tipo ?? 'Gastronomía', 
         time: 'N/A', 
         difficulty: 'Restaurante', 
         calories: 'N/A', 
         savingsMatch: 'Ninguno',
         
         // Campos separados para restaurantes
-        link_maps: rec.link_maps || null,
-        direccion_aproximada: rec.direccion_aproximada || null,
-        plato_sugerido: rec.plato_sugerido || null,
-        por_que_es_bueno: rec.por_que_es_bueno || null,
-        hack_saludable: rec.hack_saludable || null,
+        link_maps: rec.link_maps ?? null,
+        direccion_aproximada: rec.direccion_aproximada ?? null,
+        plato_sugerido: rec.plato_sugerido ?? null,
+        por_que_es_bueno: rec.por_que_es_bueno ?? null,
+        hack_saludable: rec.hack_saludable ?? null,
         
         // Arrays vacíos para restaurantes
         ingredients: [],
@@ -123,13 +128,14 @@ const usePlanQuery = (planId: string | undefined, userId: string | undefined) =>
         ))
       ]);
 
-      if (!recipesSnap.empty) {
+      // ✅ FIX: Validar que existan docs antes de acceder al array
+      if (!recipesSnap.empty && recipesSnap.docs.length > 0) {
         const docSnap = recipesSnap.docs[0];
         const plan = processFirestoreDoc(docSnap);
         if (plan) return plan;
       }
 
-      if (!recsSnap.empty) {
+      if (!recsSnap.empty && recsSnap.docs.length > 0) {
         const docSnap = recsSnap.docs[0];
         const plan = processRecommendationDoc(docSnap);
         if (plan) return plan;
@@ -187,8 +193,10 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
     if (!isLoading) return;
     const intervalId = setInterval(() => {
       setCurrentLoadingMessage(prev => {
+        // 🟠 FIX #4: Validar indexOf antes de usar en array access
         const idx = loadingMessages.indexOf(prev);
-        return loadingMessages[(idx + 1) % loadingMessages.length];
+        const nextIdx = idx >= 0 ? (idx + 1) % loadingMessages.length : 0;
+        return loadingMessages[nextIdx] || loadingMessages[0] || 'Cargando...';
       });
     }, 4000);
     return () => clearInterval(intervalId);
@@ -268,30 +276,28 @@ const PlanScreen: React.FC<PlanScreenProps> = ({ planId, onStartNewPlan }) => {
           ))}
         </div>
 
-        {/* Espacio al final */}
-        <div className="h-4"></div>
+        {/* Espacio al final para evitar que BottomTabBar tape contenido */}
+        <div className="h-32"></div>
       </div>
 
-      {/* ✅ Botón + BottomTabBar */}
-      <div className="shrink-0 border-t border-bocado-border bg-white">
-        <div className="px-4 py-4">
-          <div className="max-w-2xl mx-auto">
-            <button
-              onClick={handleStartNew}
-              className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-            >
-              Volver al inicio
-            </button>
-          </div>
+      {/* ✅ Botón fijo encima del BottomTabBar */}
+      <div className="fixed bottom-20 left-0 right-0 px-4 pb-4 pointer-events-none z-40">
+        <div className="max-w-2xl mx-auto pointer-events-auto">
+          <button
+            onClick={handleStartNew}
+            className="w-full bg-bocado-green text-white font-bold py-3 px-6 rounded-full text-sm shadow-lg hover:bg-bocado-dark-green active:scale-95 transition-all"
+          >
+            Volver al inicio
+          </button>
         </div>
-
-        {/* ✅ BottomTabBar - mostrar siempre cuando está en plan */}
-        <BottomTabBar activeTab="recommendation" onTabChange={(tab) => {
-          if (onNavigateTab) {
-            onNavigateTab(tab);
-          }
-        }} />
       </div>
+
+      {/* ✅ BottomTabBar - fixed en la parte inferior */}
+      <BottomTabBar activeTab="recommendation" onTabChange={(tab) => {
+        if (onNavigateTab) {
+          onNavigateTab(tab);
+        }
+      }} />
     </div>
   );
 };

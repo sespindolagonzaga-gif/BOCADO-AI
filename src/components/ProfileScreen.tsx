@@ -235,6 +235,18 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
       await updateProfileMutation.mutateAsync({ userId: userUid, data: userProfile });
       queryClient.setQueryData(['userProfile', userUid], userProfile);
       
+      // 💰 FINOPS: Invalidar cache del perfil después de actualizarlo
+      try {
+        await fetch('/api/invalidate-cache', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: userUid, type: 'profile' })
+        });
+      } catch (cacheError) {
+        // No crítico - continuar sin cache invalidation
+        safeLog('warn', 'Failed to invalidate profile cache:', cacheError);
+      }
+      
       // ✅ ANALÍTICA: Perfil actualizado correctamente
       trackEvent('profile_update_success', {
         goals: userProfile.nutritionalGoal.join(','),
@@ -1110,7 +1122,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         </div>
         
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 pb-24 no-scrollbar">
+        <div className="flex-1 overflow-y-auto px-4 pb-4 no-scrollbar">
             {renderContent()}
         </div>
         

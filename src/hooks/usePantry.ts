@@ -58,6 +58,16 @@ export const usePantry = (userUid: string) => {
     mutationFn: (items: KitchenItem[]) => savePantry(userUid, items),
     onSuccess: (items) => {
       queryClient.setQueryData([PANTRY_KEY, userUid], items);
+      
+      // 💰 FINOPS: Invalidar cache de pantry después de actualizarla
+      fetch('/api/invalidate-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userUid, type: 'pantry' })
+      }).catch(err => {
+        // No crítico - solo log
+        console.warn('Failed to invalidate pantry cache:', err);
+      });
     },
   });
 

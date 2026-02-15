@@ -180,16 +180,33 @@ const MealCard: React.FC<MealCardProps> = memo(({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [showMacros, setShowMacros] = useState(false);
   
   // Estado para escalar porciones (solo recetas, no restaurantes)
   const [servings, setServings] = useState(2);
   const baseServings = useMemo(() => detectBaseServings(recipe), [recipe]);
-  const scaledIngredients = useMemo(() => 
-    recipe.ingredients ? scaleIngredientsSimple(recipe.ingredients, { 
+  
+  // 🔴 FIX #1: Mover isRestaurant ANTES de usarlo en hasMacros
+  const isRestaurant = useMemo(() => recipe.difficulty === 'Restaurante', [recipe.difficulty]);
+  
+  // 🔴 FIX #2: Validar que recipe.ingredients sea array antes de .map()
+  const scaledIngredients = useMemo(() => {
+    if (!recipe?.ingredients || !Array.isArray(recipe.ingredients)) {
+      return [];
+    }
+    return scaleIngredientsSimple(recipe.ingredients, { 
       baseServings, 
       targetServings: servings 
-    }) : [],
-    [recipe.ingredients, baseServings, servings]
+    });
+  }, [recipe, baseServings, servings]);
+  
+  // ✅ FIX: Validar recipe antes de acceder a propiedades
+  const hasMacros = useMemo(() => 
+    recipe && !isRestaurant && 
+    recipe.protein_g !== undefined && 
+    recipe.carbs_g !== undefined && 
+    recipe.fat_g !== undefined,
+    [recipe, isRestaurant]
   );
   
   // Calculamos el "multiplicador aparente" para mostrar info al usuario
@@ -199,9 +216,6 @@ const MealCard: React.FC<MealCardProps> = memo(({
   const { user } = useAuthStore();
   const toggleMutation = useToggleSavedItem();
   const saved = useIsItemSaved(user?.uid, recipe.difficulty === 'Restaurante' ? 'restaurant' : 'recipe', recipe.title);
-
-  // Memoización de valores computados
-  const isRestaurant = useMemo(() => recipe.difficulty === 'Restaurante', [recipe.difficulty]);
   const type = useMemo(() => isRestaurant ? 'restaurant' : 'recipe', [isRestaurant]);
   const emoji = useMemo(() => getSmartEmoji(recipe.title), [recipe.title]);
   const showSavings = useMemo(() => 
@@ -276,7 +290,11 @@ const MealCard: React.FC<MealCardProps> = memo(({
         restaurant: recipe.title,
         url: recipe.link_maps
       });
-      window.open(recipe.link_maps, '_blank', 'noopener,noreferrer');
+      // 🟡 FIX #6: Validar que window.open no retorne null (popup blocker)
+      const newWindow = window.open(recipe.link_maps, '_blank', 'noopener,noreferrer');
+      if (!newWindow) {
+        alert('Por favor permite ventanas emergentes para abrir Google Maps');
+      }
     }
   }, [recipe.link_maps, recipe.title]);
 
@@ -309,6 +327,7 @@ const MealCard: React.FC<MealCardProps> = memo(({
       : recipe.title;
     
     try {
+      // ✅ FIX: Intento 1 - Clipboard API moderna
       await navigator.clipboard.writeText(textToCopy);
       setCopiedAddress(true);
       trackEvent('restaurant_address_copied', { 
@@ -317,17 +336,39 @@ const MealCard: React.FC<MealCardProps> = memo(({
       });
       
       setTimeout(() => setCopiedAddress(false), 2000);
-    } catch (err) {
-      logger.error('Error copying:', err);
-      // Fallback para navegadores antiguos
-      const textArea = document.createElement("textarea");
-      textArea.value = textToCopy;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+    } catch (clipboardError) {
+      logger.warn('Clipboard API failed, trying fallback:', clipboardError);
+      
+      // ✅ FIX: Fallback mejorado con validación
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        textArea.setSelectionRange(0, 99999); // Para móviles
+        
+        const success = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        
+        if (success) {
+          setCopiedAddress(true);
+          trackEvent('restaurant_address_copied_fallback', { 
+            restaurant: recipe.title 
+          });
+          setTimeout(() => setCopiedAddress(false), 2000);
+        } else {
+          // 🟡 FIX #7: Agregar logging cuando execCommand falla
+          logger.warn('[MealCard] execCommand copy returned false');
+          throw new Error('Copy command returned false');
+        }
+      } catch (fallbackError) {
+        logger.error('All copy methods failed:', fallbackError);
+        // Mostrar mensaje al usuario
+        alert('No se pudo copiar automáticamente. Por favor copia manualmente:\n' + textToCopy);
+      }
     }
   }, [recipe.title, recipe.direccion_aproximada]);
 
@@ -384,6 +425,44 @@ const MealCard: React.FC<MealCardProps> = memo(({
                 <span className="inline-block mt-2 text-xs font-medium text-bocado-green bg-bocado-green/10 px-2 py-1 rounded-lg">
                   ✨ Usa ingredientes que ya tienes
                 </span>
+              )}
+
+              {/* Macros expandibles (solo si existen) */}
+              {hasMacros && recipe.calories !== 'N/A' && (
+                <div className="mt-3 pt-3 border-t border-bocado-background">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMacros(!showMacros);
+                      if (!showMacros) {
+                        trackEvent('macros_expanded', {
+                          item_title: recipe.title,
+                        });
+                      }
+                    }}
+                    className="flex items-center justify-between w-full text-left text-xs font-semibold text-bocado-dark-gray hover:text-bocado-green transition-colors"
+                  >
+                    <span>📊 Información nutricional</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showMacros ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {showMacros && (
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      <div className="bg-blue-50 p-2 rounded-lg text-center">
+                        <div className="font-bold text-blue-600">{recipe.protein_g}g</div>
+                        <div className="text-blue-500 text-[10px] mt-0.5">Proteínas</div>
+                      </div>
+                      <div className="bg-amber-50 p-2 rounded-lg text-center">
+                        <div className="font-bold text-amber-600">{recipe.carbs_g}g</div>
+                        <div className="text-amber-500 text-[10px] mt-0.5">Carbohidratos</div>
+                      </div>
+                      <div className="bg-rose-50 p-2 rounded-lg text-center">
+                        <div className="font-bold text-rose-600">{recipe.fat_g}g</div>
+                        <div className="text-rose-500 text-[10px] mt-0.5">Grasas</div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>

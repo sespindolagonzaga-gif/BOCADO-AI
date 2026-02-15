@@ -71,6 +71,11 @@ export interface Recipe {
   instructions: string[];
   cuisine?: string; // Tipo de Comida (Restaurantes)
   
+  // ✅ MACROS COMPLETOS (disponibles para recetas En Casa)
+  protein_g?: number;      // macros_por_porcion.proteinas_g
+  carbs_g?: number;        // macros_por_porcion.carbohidratos_g
+  fat_g?: number;          // macros_por_porcion.grasas_g
+  
   // ✅ CAMPOS ESPECÍFICOS PARA RESTAURANTES (opcionales)
   link_maps?: string;                    // URL de Google Maps
   direccion_aproximada?: string;         // Dirección del lugar

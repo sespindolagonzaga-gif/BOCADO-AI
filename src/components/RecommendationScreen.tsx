@@ -86,9 +86,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     refreshStatus 
   } = useRateLimit(user?.uid);
 
-  // Usar país detectado por geolocalización si está disponible, sino el del perfil
+  // 🟠 FIX #3: Validar que getCountryCodeForCurrency no retorne null antes de .toUpperCase()
   const detectedCountryCode = getCountryCodeForCurrency(profile?.country);
-  const countryCode = detectedCountryCode.toUpperCase().trim();
+  const countryCode = (detectedCountryCode || 'MX').toUpperCase().trim();
   const currencyConfig = CurrencyService.fromCountryCode(countryCode);
   const budgetOptions = CurrencyService.getBudgetOptions(countryCode);
 
@@ -201,6 +201,14 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
         });
       }
       
+      // ✅ FIX: Agregar timeout de 30s para evitar esperas indefinidas
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        setError('La solicitud tardó demasiado. Por favor intenta de nuevo.');
+        resetProcessingState();
+      }, 30000); // 30 segundos
+      
       const response = await fetch(env.api.recommendationUrl, {
         method: 'POST',
         headers: { 
@@ -208,19 +216,28 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(requestBody),
-        signal: abortControllerRef.current.signal
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       // ✅ CORREGIDO: Manejar 429 sin quedar bloqueado
       if (response.status === 429) {
-        const errorData = await response.json().catch(() => ({}));
+        // 🟠 FIX #5: Try-catch para response.json() con defaults robustos
+        let errorData: any = {};
+        try {
+          errorData = await response.json();
+        } catch (jsonError) {
+          logger.warn('[RecommendationScreen] Failed to parse 429 error JSON:', jsonError);
+          errorData = { error: 'Demasiadas solicitudes. Por favor espera.', retryAfter: 60 };
+        }
         
         trackEvent('recommendation_rate_limited', { 
           retryAfter: errorData.retryAfter || 30,
           type: recommendationType 
         });
         
-        // Mostrar mensaje y refrescar status del rate limit
+        // Mostrar mensaje y refreschar status del rate limit
         const fallbackSeconds = typeof errorData.retryAfter === 'number' ? errorData.retryAfter : 30;
         const fallbackMessage = `Espera ${fallbackSeconds}s antes de generar otra recomendación.`;
         setError(errorData.error || fallbackMessage);
@@ -230,8 +247,10 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
       }
 
       if (!response.ok) {
+        // 🟠 FIX #9: Limitar tamaño de response.text() para evitar OOM en móviles
         const errorText = await response.text();
-        throw new Error(`Error ${response.status}: ${errorText}`);
+        const truncatedError = errorText.substring(0, 10000); // Max 10KB
+        throw new Error(`Error ${response.status}: ${truncatedError}`);
       }
 
       // Éxito
@@ -436,9 +455,12 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
                         value={cookingTime}
                         disabled={isGenerating}
                         onChange={(e) => {
+                          // ✅ FIX: Validar NaN en conversión numérica
                           const newValue = Number(e.target.value);
-                          setCookingTime(newValue);
-                          trackEvent('recommendation_time_adjusted', { time: newValue });
+                          if (!isNaN(newValue) && newValue >= 10 && newValue <= 180) {
+                            setCookingTime(newValue);
+                            trackEvent('recommendation_time_adjusted', { time: newValue });
+                          }
                         }}
                         className="w-full h-3 bg-bocado-border rounded-lg appearance-none cursor-pointer accent-bocado-green disabled:opacity-50 slider-with-ticks"
                       />
