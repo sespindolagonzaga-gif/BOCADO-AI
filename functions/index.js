@@ -325,6 +325,10 @@ exports.sendNotificationReminders = functions.pubsub
           let remindersState = reminders.slice();
 
           for (const reminder of remindersToSend) {
+            if (tokens.length === 0) {
+              break;
+            }
+
             const response = await messaging.sendEachForMulticast({
               tokens,
               notification: {
