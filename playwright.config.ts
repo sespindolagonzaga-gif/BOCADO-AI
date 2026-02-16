@@ -51,6 +51,12 @@ export default defineConfig({
 
     // Viewport por defecto
     viewport: { width: 1280, height: 720 },
+
+    // Configurar idioma español para los tests
+    locale: 'es-ES',
+    
+    // Timezone
+    timezane: 'Europe/Madrid',
   },
 
   // Proyectos de test

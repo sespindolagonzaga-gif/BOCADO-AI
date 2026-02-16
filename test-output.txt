@@ -1,0 +1,1355 @@
+
+> bocado-ai@0.1.0 test:e2e
+> node scripts/with-esbuild.cjs -- playwright test
+
+🚀 Iniciando setup global de tests E2E...
+📍 Base URL: http://localhost:3000
+✅ Setup global completado
+
+Running 50 tests using 1 worker
+
+  ✘   1 [chromium] › e2e/auth.spec.ts:13:5 › Autenticación › Registro › usuario puede registrarse completando el formulario de 3 pasos (18.8s)
+  ✘   2 [chromium] › e2e/auth.spec.ts:78:5 › Autenticación › Registro › muestra error cuando las contraseñas no coinciden (17.7s)
+  ✘   3 [chromium] › e2e/auth.spec.ts:97:5 › Autenticación › Registro › muestra error con email inválido (17.9s)
+  ✘   4 [chromium] › e2e/auth.spec.ts:119:5 › Autenticación › Login › usuario puede iniciar sesión con credenciales válidas (17.4s)
+  ✘   5 [chromium] › e2e/auth.spec.ts:136:5 › Autenticación › Login › muestra error con credenciales inválidas (17.4s)
+  ✘   6 [chromium] › e2e/auth.spec.ts:157:5 › Autenticación › Login › navegación entre login y registro funciona (17.3s)
+  ✘   7 [chromium] › e2e/auth.spec.ts:170:5 › Autenticación › Navegación desde Home › botón Empezar redirige al flujo de registro (17.4s)
+  ✘   8 [chromium] › e2e/auth.spec.ts:179:5 › Autenticación › Navegación desde Home › botón Iniciar sesión redirige a login (12.6s)
+  ✘   9 [chromium] › e2e/example-using-fixtures.spec.ts:17:3 › Ejemplo usando Fixtures › usuario autenticado puede generar recomendación (18.0s)
+  ✘  10 [chromium] › e2e/example-using-fixtures.spec.ts:39:3 › Ejemplo usando Fixtures › puede actualizar perfil y limpiar automáticamente (18.2s)
+  ✓  11 [chromium] › e2e/example-using-fixtures.spec.ts:63:3 › Ejemplo usando Fixtures › flujo completo de registro a primera recomendación (2.3s)
+  ✘  12 [chromium] › e2e/navigation.spec.ts:18:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Home desde cualquier pantalla (17.7s)
+  ✘  13 [chromium] › e2e/navigation.spec.ts:28:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Recomendaciones (18.1s)
+  ✘  14 [chromium] › e2e/navigation.spec.ts:33:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Despensa (18.1s)
+  ✘  15 [chromium] › e2e/navigation.spec.ts:38:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Plan (17.9s)
+  ✘  16 [chromium] › e2e/navigation.spec.ts:43:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Perfil (18.0s)
+  ✘  17 [chromium] › e2e/navigation.spec.ts:48:5 › Navegación › Navegación principal (Bottom Tab Bar) › mantiene el estado al navegar entre pestañas (17.9s)
+  ✘  18 [chromium] › e2e/navigation.spec.ts:69:5 › Navegación › Navegación móvil › navegación inferior es visible en móvil (18.2s)
+  ✘  19 [chromium] › e2e/navigation.spec.ts:78:5 › Navegación › Navegación móvil › todos los tabs son accesibles en móvil (18.0s)
+  ✘  20 [chromium] › e2e/navigation.spec.ts:97:5 › Navegación › URLs y rutas › accede directamente a /recommendation estando autenticado (18.5s)
+  ✘  21 [chromium] › e2e/navigation.spec.ts:102:5 › Navegación › URLs y rutas › accede directamente a /profile estando autenticado (17.9s)
+  ✘  22 [chromium] › e2e/navigation.spec.ts:107:5 › Navegación › URLs y rutas › accede directamente a /pantry estando autenticado (18.0s)
+  ✘  23 [chromium] › e2e/navigation.spec.ts:112:5 › Navegación › URLs y rutas › accede directamente a /plan estando autenticado (18.1s)
+  ✘  24 [chromium] › e2e/navigation.spec.ts:119:5 › Navegación › Página 404 › muestra página 404 para rutas inexistentes (18.0s)
+  ✘  25 [chromium] › e2e/pantry.spec.ts:22:5 › Despensa (Pantry) › Visualización de la despensa › muestra la lista de la despensa (18.0s)
+  ✘  26 [chromium] › e2e/pantry.spec.ts:35:5 › Despensa (Pantry) › Visualización de la despensa › muestra botón para añadir items (18.0s)
+  ✘  27 [chromium] › e2e/pantry.spec.ts:42:5 › Despensa (Pantry) › Gestión de items › puede añadir un nuevo item a la despensa (17.9s)
+  ✘  28 [chromium] › e2e/pantry.spec.ts:70:5 › Despensa (Pantry) › Gestión de items › puede añadir múltiples items (18.1s)
+  ✘  29 [chromium] › e2e/pantry.spec.ts:99:5 › Despensa (Pantry) › Gestión de items › puede eliminar un item de la despensa (18.1s)
+  ✘  30 [chromium] › e2e/pantry.spec.ts:127:5 › Despensa (Pantry) › Filtrado y búsqueda › puede filtrar items por categoría (18.1s)
+  ✘  31 [chromium] › e2e/pantry.spec.ts:145:5 › Despensa (Pantry) › Integración con recomendaciones › navega a recomendaciones desde la despensa (18.1s)
+  ✘  32 [chromium] › e2e/profile.spec.ts:22:5 › Perfil de Usuario › Visualización del perfil › muestra el nombre del usuario (17.9s)
+  ✘  33 [chromium] › e2e/profile.spec.ts:30:5 › Perfil de Usuario › Visualización del perfil › muestra el email del usuario (18.0s)
+  ✘  34 [chromium] › e2e/profile.spec.ts:39:5 › Perfil de Usuario › Visualización del perfil › muestra estadísticas del perfil (17.8s)
+  ✘  35 [chromium] › e2e/profile.spec.ts:58:5 › Perfil de Usuario › Edición del perfil › puede abrir el modo de edición (17.9s)
+  ✘  36 [chromium] › e2e/profile.spec.ts:65:5 › Perfil de Usuario › Edición del perfil › puede actualizar el peso del usuario (17.9s)
+  ✘  37 [chromium] › e2e/profile.spec.ts:80:5 › Perfil de Usuario › Edición del perfil › puede actualizar el objetivo nutricional (18.5s)
+  ✘  38 [chromium] › e2e/profile.spec.ts:95:5 › Perfil de Usuario › Gestión de cuenta › puede cerrar sesión (18.2s)
+  ✘  39 [chromium] › e2e/profile.spec.ts:112:5 › Perfil de Usuario › Gestión de cuenta › puede navegar a otras secciones desde el perfil (18.0s)
+  ✘  40 [chromium] › e2e/profile.spec.ts:128:5 › Perfil de Usuario › Recetas guardadas › accede a recetas guardadas desde el perfil (18.1s)
+  ✘  41 [chromium] › e2e/recommendation.spec.ts:18:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para desayuno (17.9s)
+  ✘  42 [chromium] › e2e/recommendation.spec.ts:38:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para almuerzo (18.1s)
+  ✘  43 [chromium] › e2e/recommendation.spec.ts:51:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para cena (18.0s)
+  ✘  44 [chromium] › e2e/recommendation.spec.ts:64:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "Fuera" para comida (18.1s)
+  ✘  45 [chromium] › e2e/recommendation.spec.ts:77:5 › Recomendaciones › Generación de recomendaciones › muestra información nutricional en la recomendación (18.1s)
+  ✘  46 [chromium] › e2e/recommendation.spec.ts:110:5 › Recomendaciones › Interacción con recetas › puede guardar una receta (33.0s)
+  ✘  47 [chromium] › e2e/recommendation.spec.ts:126:5 › Recomendaciones › Interacción con recetas › puede regenerar una recomendación (33.1s)
+  ✘  48 [chromium] › e2e/recommendation.spec.ts:144:5 › Recomendaciones › Navegación desde recomendación › puede navegar al perfil desde la pantalla de recomendación (18.0s)
+  ✘  49 [chromium] › e2e/recommendation.spec.ts:151:5 › Recomendaciones › Navegación desde recomendación › puede navegar a la despensa desde la pantalla de recomendación (18.3s)
+  ✘  50 [chromium] › e2e/recommendation.spec.ts:157:5 › Recomendaciones › Navegación desde recomendación › puede navegar al plan desde la pantalla de recomendación (17.8s)
+🧹 Iniciando teardown global de tests E2E...
+✅ Teardown global completado
+
+
+  1) [chromium] › e2e/auth.spec.ts:13:5 › Autenticación › Registro › usuario puede registrarse completando el formulario de 3 pasos 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+      21 |       
+      22 |       // Paso 2: Completar datos personales (Step 1)
+    > 23 |       await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |                  ^
+      24 |       
+      25 |       await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      26 |       await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:23:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Registr-e521f-do-el-formulario-de-3-pasos-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Registr-e521f-do-el-formulario-de-3-pasos-chromium/error-context.md
+
+  2) [chromium] › e2e/auth.spec.ts:78:5 › Autenticación › Registro › muestra error cuando las contraseñas no coinciden 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+      80 |       await page.click(SELECTORS.home.startButton);
+      81 |       
+    > 82 |       await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |                  ^
+      83 |       
+      84 |       await page.fill(SELECTORS.register.firstNameInput, 'Test');
+      85 |       await page.fill(SELECTORS.register.lastNameInput, 'User');
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:82:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Registr-97619-as-contraseñas-no-coinciden-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Registr-97619-as-contraseñas-no-coinciden-chromium/error-context.md
+
+  3) [chromium] › e2e/auth.spec.ts:97:5 › Autenticación › Registro › muestra error con email inválido 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       99 |       await page.click(SELECTORS.home.startButton);
+      100 |       
+    > 101 |       await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+          |                  ^
+      102 |       
+      103 |       await page.fill(SELECTORS.register.firstNameInput, 'Test');
+      104 |       await page.fill(SELECTORS.register.lastNameInput, 'User');
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:101:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Registro-muestra-error-con-email-inválido-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Registro-muestra-error-con-email-inválido-chromium/error-context.md
+
+  4) [chromium] › e2e/auth.spec.ts:119:5 › Autenticación › Login › usuario puede iniciar sesión con credenciales válidas 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="email"], input[type="email"]') to be visible[22m
+
+
+      123 |       await page.goto('/login');
+      124 |       
+    > 125 |       await page.waitForSelector(SELECTORS.login.emailInput, { state: 'visible' });
+          |                  ^
+      126 |       
+      127 |       await page.fill(SELECTORS.login.emailInput, FIXED_TEST_USER.email);
+      128 |       await page.fill(SELECTORS.login.passwordInput, FIXED_TEST_USER.password);
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:125:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Login-u-39618-ón-con-credenciales-válidas-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Login-u-39618-ón-con-credenciales-válidas-chromium/error-context.md
+
+  5) [chromium] › e2e/auth.spec.ts:136:5 › Autenticación › Login › muestra error con credenciales inválidas 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="email"], input[type="email"]') to be visible[22m
+
+
+      137 |       await page.goto('/login');
+      138 |       
+    > 139 |       await page.waitForSelector(SELECTORS.login.emailInput, { state: 'visible' });
+          |                  ^
+      140 |       
+      141 |       await page.fill(SELECTORS.login.emailInput, INVALID_CREDENTIALS.email);
+      142 |       await page.fill(SELECTORS.login.passwordInput, INVALID_CREDENTIALS.password);
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:139:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Login-m-80107--con-credenciales-inválidas-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Login-m-80107--con-credenciales-inválidas-chromium/error-context.md
+
+  6) [chromium] › e2e/auth.spec.ts:157:5 › Autenticación › Login › navegación entre login y registro funciona 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('a:has-text("Regístrate"), a:has-text("Crear cuenta")') to be visible[22m
+
+
+      158 |       await page.goto('/login');
+      159 |       
+    > 160 |       await page.waitForSelector(SELECTORS.login.registerLink, { state: 'visible' });
+          |                  ^
+      161 |       await page.click(SELECTORS.login.registerLink);
+      162 |       
+      163 |       // Verificar que estamos en la página de registro
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:160:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Login-n-14e3c-e-login-y-registro-funciona-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Login-n-14e3c-e-login-y-registro-funciona-chromium/error-context.md
+
+  7) [chromium] › e2e/auth.spec.ts:170:5 › Autenticación › Navegación desde Home › botón Empezar redirige al flujo de registro 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+      174 |       
+      175 |       // Verificar que estamos en el flujo de registro
+    > 176 |       await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+          |                  ^
+      177 |     });
+      178 |
+      179 |     test('botón Iniciar sesión redirige a login', async ({ page }) => {
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:176:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Navegac-5d05e-dirige-al-flujo-de-registro-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Navegac-5d05e-dirige-al-flujo-de-registro-chromium/error-context.md
+
+  8) [chromium] › e2e/auth.spec.ts:179:5 › Autenticación › Navegación desde Home › botón Iniciar sesión redirige a login 
+
+    Error: [2mexpect([22m[31mpage[39m[2m).[22mtoHaveURL[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Expected pattern: [32m/.*login.*/[39m
+    Received string:  [31m"http://localhost:3000/"[39m
+    Timeout: 10000ms
+
+    Call log:
+    [2m  - Expect "toHaveURL" with timeout 10000ms[22m
+    [2m    14 × unexpected value "http://localhost:3000/"[22m
+
+
+      183 |       if (await loginButton.isVisible().catch(() => false)) {
+      184 |         await loginButton.click();
+    > 185 |         await expect(page).toHaveURL(/.*login.*/);
+          |                            ^
+      186 |       }
+      187 |     });
+      188 |   });
+        at /workspaces/BOCADO-AI/e2e/auth.spec.ts:185:28
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/auth-Autenticación-Navegac-bbf92-iar-sesión-redirige-a-login-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/auth-Autenticación-Navegac-bbf92-iar-sesión-redirige-a-login-chromium/error-context.md
+
+  9) [chromium] › e2e/example-using-fixtures.spec.ts:17:3 › Ejemplo usando Fixtures › usuario autenticado puede generar recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at Object.authenticatedUser (/workspaces/BOCADO-AI/e2e/fixtures.ts:47:5)
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/example-using-fixtures-Eje-20e56-puede-generar-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/example-using-fixtures-Eje-20e56-puede-generar-recomendación-chromium/error-context.md
+
+  10) [chromium] › e2e/example-using-fixtures.spec.ts:39:3 › Ejemplo usando Fixtures › puede actualizar perfil y limpiar automáticamente 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at Object.authenticatedPage (/workspaces/BOCADO-AI/e2e/fixtures.ts:57:5)
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/example-using-fixtures-Eje-1f5a6-l-y-limpiar-automáticamente-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/example-using-fixtures-Eje-1f5a6-l-y-limpiar-automáticamente-chromium/error-context.md
+
+  11) [chromium] › e2e/navigation.spec.ts:18:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Home desde cualquier pantalla 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-f034b-me-desde-cualquier-pantalla-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-f034b-me-desde-cualquier-pantalla-chromium/error-context.md
+
+  12) [chromium] › e2e/navigation.spec.ts:28:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Recomendaciones 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-dbbc4-ar-navega-a-Recomendaciones-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-dbbc4-ar-navega-a-Recomendaciones-chromium/error-context.md
+
+  13) [chromium] › e2e/navigation.spec.ts:33:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Despensa 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-b85c9-m-Tab-Bar-navega-a-Despensa-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-b85c9-m-Tab-Bar-navega-a-Despensa-chromium/error-context.md
+
+  14) [chromium] › e2e/navigation.spec.ts:38:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Plan 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-2ea9c-ottom-Tab-Bar-navega-a-Plan-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-2ea9c-ottom-Tab-Bar-navega-a-Plan-chromium/error-context.md
+
+  15) [chromium] › e2e/navigation.spec.ts:43:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Perfil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-bdf82-tom-Tab-Bar-navega-a-Perfil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-bdf82-tom-Tab-Bar-navega-a-Perfil-chromium/error-context.md
+
+  16) [chromium] › e2e/navigation.spec.ts:48:5 › Navegación › Navegación principal (Bottom Tab Bar) › mantiene el estado al navegar entre pestañas 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-3d969-o-al-navegar-entre-pestañas-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-3d969-o-al-navegar-entre-pestañas-chromium/error-context.md
+
+  17) [chromium] › e2e/navigation.spec.ts:69:5 › Navegación › Navegación móvil › navegación inferior es visible en móvil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-6af94-nferior-es-visible-en-móvil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-6af94-nferior-es-visible-en-móvil-chromium/error-context.md
+
+  18) [chromium] › e2e/navigation.spec.ts:78:5 › Navegación › Navegación móvil › todos los tabs son accesibles en móvil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Nave-e5c1e-abs-son-accesibles-en-móvil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Nave-e5c1e-abs-son-accesibles-en-móvil-chromium/error-context.md
+
+  19) [chromium] › e2e/navigation.spec.ts:97:5 › Navegación › URLs y rutas › accede directamente a /recommendation estando autenticado 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-URLs-46b15-ndation-estando-autenticado-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-URLs-46b15-ndation-estando-autenticado-chromium/error-context.md
+
+  20) [chromium] › e2e/navigation.spec.ts:102:5 › Navegación › URLs y rutas › accede directamente a /profile estando autenticado 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-URLs-675da-profile-estando-autenticado-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-URLs-675da-profile-estando-autenticado-chromium/error-context.md
+
+  21) [chromium] › e2e/navigation.spec.ts:107:5 › Navegación › URLs y rutas › accede directamente a /pantry estando autenticado 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-URLs-54721--pantry-estando-autenticado-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-URLs-54721--pantry-estando-autenticado-chromium/error-context.md
+
+  22) [chromium] › e2e/navigation.spec.ts:112:5 › Navegación › URLs y rutas › accede directamente a /plan estando autenticado 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-URLs-7ab13--a-plan-estando-autenticado-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-URLs-7ab13--a-plan-estando-autenticado-chromium/error-context.md
+
+  23) [chromium] › e2e/navigation.spec.ts:119:5 › Navegación › Página 404 › muestra página 404 para rutas inexistentes 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/navigation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/navigation-Navegación-Pági-03faf-404-para-rutas-inexistentes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/navigation-Navegación-Pági-03faf-404-para-rutas-inexistentes-chromium/error-context.md
+
+  24) [chromium] › e2e/pantry.spec.ts:22:5 › Despensa (Pantry) › Visualización de la despensa › muestra la lista de la despensa 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Vis-38c26-tra-la-lista-de-la-despensa-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Vis-38c26-tra-la-lista-de-la-despensa-chromium/error-context.md
+
+  25) [chromium] › e2e/pantry.spec.ts:35:5 › Despensa (Pantry) › Visualización de la despensa › muestra botón para añadir items 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Vis-033cc-tra-botón-para-añadir-items-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Vis-033cc-tra-botón-para-añadir-items-chromium/error-context.md
+
+  26) [chromium] › e2e/pantry.spec.ts:42:5 › Despensa (Pantry) › Gestión de items › puede añadir un nuevo item a la despensa 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Ges-43e07-un-nuevo-item-a-la-despensa-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Ges-43e07-un-nuevo-item-a-la-despensa-chromium/error-context.md
+
+  27) [chromium] › e2e/pantry.spec.ts:70:5 › Despensa (Pantry) › Gestión de items › puede añadir múltiples items 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Ges-3d407-uede-añadir-múltiples-items-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Ges-3d407-uede-añadir-múltiples-items-chromium/error-context.md
+
+  28) [chromium] › e2e/pantry.spec.ts:99:5 › Despensa (Pantry) › Gestión de items › puede eliminar un item de la despensa 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Ges-87d0d-inar-un-item-de-la-despensa-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Ges-87d0d-inar-un-item-de-la-despensa-chromium/error-context.md
+
+  29) [chromium] › e2e/pantry.spec.ts:127:5 › Despensa (Pantry) › Filtrado y búsqueda › puede filtrar items por categoría 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Fil-7e576-filtrar-items-por-categoría-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Fil-7e576-filtrar-items-por-categoría-chromium/error-context.md
+
+  30) [chromium] › e2e/pantry.spec.ts:145:5 › Despensa (Pantry) › Integración con recomendaciones › navega a recomendaciones desde la despensa 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/pantry.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/pantry-Despensa-Pantry-Int-83e18-ndaciones-desde-la-despensa-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/pantry-Despensa-Pantry-Int-83e18-ndaciones-desde-la-despensa-chromium/error-context.md
+
+  31) [chromium] › e2e/profile.spec.ts:22:5 › Perfil de Usuario › Visualización del perfil › muestra el nombre del usuario 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--df88d-estra-el-nombre-del-usuario-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--df88d-estra-el-nombre-del-usuario-chromium/error-context.md
+
+  32) [chromium] › e2e/profile.spec.ts:30:5 › Perfil de Usuario › Visualización del perfil › muestra el email del usuario 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--b891c-uestra-el-email-del-usuario-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--b891c-uestra-el-email-del-usuario-chromium/error-context.md
+
+  33) [chromium] › e2e/profile.spec.ts:39:5 › Perfil de Usuario › Visualización del perfil › muestra estadísticas del perfil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--4649f-tra-estadísticas-del-perfil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--4649f-tra-estadísticas-del-perfil-chromium/error-context.md
+
+  34) [chromium] › e2e/profile.spec.ts:58:5 › Perfil de Usuario › Edición del perfil › puede abrir el modo de edición 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--3a9c3-de-abrir-el-modo-de-edición-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--3a9c3-de-abrir-el-modo-de-edición-chromium/error-context.md
+
+  35) [chromium] › e2e/profile.spec.ts:65:5 › Perfil de Usuario › Edición del perfil › puede actualizar el peso del usuario 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--a88d2-ualizar-el-peso-del-usuario-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--a88d2-ualizar-el-peso-del-usuario-chromium/error-context.md
+
+  36) [chromium] › e2e/profile.spec.ts:80:5 › Perfil de Usuario › Edición del perfil › puede actualizar el objetivo nutricional 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--917af-zar-el-objetivo-nutricional-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--917af-zar-el-objetivo-nutricional-chromium/error-context.md
+
+  37) [chromium] › e2e/profile.spec.ts:95:5 › Perfil de Usuario › Gestión de cuenta › puede cerrar sesión 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--937d8--cuenta-puede-cerrar-sesión-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--937d8--cuenta-puede-cerrar-sesión-chromium/error-context.md
+
+  38) [chromium] › e2e/profile.spec.ts:112:5 › Perfil de Usuario › Gestión de cuenta › puede navegar a otras secciones desde el perfil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--4e31d-s-secciones-desde-el-perfil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--4e31d-s-secciones-desde-el-perfil-chromium/error-context.md
+
+  39) [chromium] › e2e/profile.spec.ts:128:5 › Perfil de Usuario › Recetas guardadas › accede a recetas guardadas desde el perfil 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/profile.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/profile-Perfil-de-Usuario--76cc6-s-guardadas-desde-el-perfil-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/profile-Perfil-de-Usuario--76cc6-s-guardadas-desde-el-perfil-chromium/error-context.md
+
+  40) [chromium] › e2e/recommendation.spec.ts:18:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para desayuno 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-33b1d-ación-En-casa-para-desayuno-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-33b1d-ación-En-casa-para-desayuno-chromium/error-context.md
+
+  41) [chromium] › e2e/recommendation.spec.ts:38:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para almuerzo 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-e9a09-ación-En-casa-para-almuerzo-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-e9a09-ación-En-casa-para-almuerzo-chromium/error-context.md
+
+  42) [chromium] › e2e/recommendation.spec.ts:51:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para cena 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-67141-mendación-En-casa-para-cena-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-67141-mendación-En-casa-para-cena-chromium/error-context.md
+
+  43) [chromium] › e2e/recommendation.spec.ts:64:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "Fuera" para comida 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-2ebbe-mendación-Fuera-para-comida-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-2ebbe-mendación-Fuera-para-comida-chromium/error-context.md
+
+  44) [chromium] › e2e/recommendation.spec.ts:77:5 › Recomendaciones › Generación de recomendaciones › muestra información nutricional en la recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-0ef24-icional-en-la-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-0ef24-icional-en-la-recomendación-chromium/error-context.md
+
+  45) [chromium] › e2e/recommendation.spec.ts:110:5 › Recomendaciones › Interacción con recetas › puede guardar una receta 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    TimeoutError: page.click: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('button:has-text("En casa"), [data-testid="location-home"], div:has-text("En casa")')[22m
+
+
+       98 |     test.beforeEach(async ({ page }) => {
+       99 |       // Generar una recomendación primero
+    > 100 |       await page.click(SELECTORS.recommendation.homeOption);
+          |                  ^
+      101 |       await page.click(SELECTORS.recommendation.mealTypeLunch);
+      102 |       await page.click(SELECTORS.recommendation.generateButton);
+      103 |       
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:100:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-68683-as-puede-guardar-una-receta-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-68683-as-puede-guardar-una-receta-chromium/error-context.md
+
+  46) [chromium] › e2e/recommendation.spec.ts:126:5 › Recomendaciones › Interacción con recetas › puede regenerar una recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    TimeoutError: page.click: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('button:has-text("En casa"), [data-testid="location-home"], div:has-text("En casa")')[22m
+
+
+       98 |     test.beforeEach(async ({ page }) => {
+       99 |       // Generar una recomendación primero
+    > 100 |       await page.click(SELECTORS.recommendation.homeOption);
+          |                  ^
+      101 |       await page.click(SELECTORS.recommendation.mealTypeLunch);
+      102 |       await page.click(SELECTORS.recommendation.generateButton);
+      103 |       
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:100:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-887dd-regenerar-una-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-887dd-regenerar-una-recomendación-chromium/error-context.md
+
+  47) [chromium] › e2e/recommendation.spec.ts:144:5 › Recomendaciones › Navegación desde recomendación › puede navegar al perfil desde la pantalla de recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-e8dec-a-pantalla-de-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-e8dec-a-pantalla-de-recomendación-chromium/error-context.md
+
+  48) [chromium] › e2e/recommendation.spec.ts:151:5 › Recomendaciones › Navegación desde recomendación › puede navegar a la despensa desde la pantalla de recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-afdb9-a-pantalla-de-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-afdb9-a-pantalla-de-recomendación-chromium/error-context.md
+
+  49) [chromium] › e2e/recommendation.spec.ts:157:5 › Recomendaciones › Navegación desde recomendación › puede navegar al plan desde la pantalla de recomendación 
+
+    TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('input[name="firstName"], input[placeholder*="nombre" i]') to be visible[22m
+
+
+       at utils/auth.ts:70
+
+      68 |
+      69 |   // === Step 1: Datos personales ===
+    > 70 |   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
+         |              ^
+      71 |   
+      72 |   await page.fill(SELECTORS.register.firstNameInput, user.firstName);
+      73 |   await page.fill(SELECTORS.register.lastNameInput, user.lastName);
+        at register (/workspaces/BOCADO-AI/e2e/utils/auth.ts:70:14)
+        at /workspaces/BOCADO-AI/e2e/recommendation.spec.ts:14:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/recommendation-Recomendaci-f29e3-a-pantalla-de-recomendación-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/recommendation-Recomendaci-f29e3-a-pantalla-de-recomendación-chromium/error-context.md
+
+  49 failed
+    [chromium] › e2e/auth.spec.ts:13:5 › Autenticación › Registro › usuario puede registrarse completando el formulario de 3 pasos 
+    [chromium] › e2e/auth.spec.ts:78:5 › Autenticación › Registro › muestra error cuando las contraseñas no coinciden 
+    [chromium] › e2e/auth.spec.ts:97:5 › Autenticación › Registro › muestra error con email inválido 
+    [chromium] › e2e/auth.spec.ts:119:5 › Autenticación › Login › usuario puede iniciar sesión con credenciales válidas 
+    [chromium] › e2e/auth.spec.ts:136:5 › Autenticación › Login › muestra error con credenciales inválidas 
+    [chromium] › e2e/auth.spec.ts:157:5 › Autenticación › Login › navegación entre login y registro funciona 
+    [chromium] › e2e/auth.spec.ts:170:5 › Autenticación › Navegación desde Home › botón Empezar redirige al flujo de registro 
+    [chromium] › e2e/auth.spec.ts:179:5 › Autenticación › Navegación desde Home › botón Iniciar sesión redirige a login 
+    [chromium] › e2e/example-using-fixtures.spec.ts:17:3 › Ejemplo usando Fixtures › usuario autenticado puede generar recomendación 
+    [chromium] › e2e/example-using-fixtures.spec.ts:39:3 › Ejemplo usando Fixtures › puede actualizar perfil y limpiar automáticamente 
+    [chromium] › e2e/navigation.spec.ts:18:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Home desde cualquier pantalla 
+    [chromium] › e2e/navigation.spec.ts:28:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Recomendaciones 
+    [chromium] › e2e/navigation.spec.ts:33:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Despensa 
+    [chromium] › e2e/navigation.spec.ts:38:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Plan 
+    [chromium] › e2e/navigation.spec.ts:43:5 › Navegación › Navegación principal (Bottom Tab Bar) › navega a Perfil 
+    [chromium] › e2e/navigation.spec.ts:48:5 › Navegación › Navegación principal (Bottom Tab Bar) › mantiene el estado al navegar entre pestañas 
+    [chromium] › e2e/navigation.spec.ts:69:5 › Navegación › Navegación móvil › navegación inferior es visible en móvil 
+    [chromium] › e2e/navigation.spec.ts:78:5 › Navegación › Navegación móvil › todos los tabs son accesibles en móvil 
+    [chromium] › e2e/navigation.spec.ts:97:5 › Navegación › URLs y rutas › accede directamente a /recommendation estando autenticado 
+    [chromium] › e2e/navigation.spec.ts:102:5 › Navegación › URLs y rutas › accede directamente a /profile estando autenticado 
+    [chromium] › e2e/navigation.spec.ts:107:5 › Navegación › URLs y rutas › accede directamente a /pantry estando autenticado 
+    [chromium] › e2e/navigation.spec.ts:112:5 › Navegación › URLs y rutas › accede directamente a /plan estando autenticado 
+    [chromium] › e2e/navigation.spec.ts:119:5 › Navegación › Página 404 › muestra página 404 para rutas inexistentes 
+    [chromium] › e2e/pantry.spec.ts:22:5 › Despensa (Pantry) › Visualización de la despensa › muestra la lista de la despensa 
+    [chromium] › e2e/pantry.spec.ts:35:5 › Despensa (Pantry) › Visualización de la despensa › muestra botón para añadir items 
+    [chromium] › e2e/pantry.spec.ts:42:5 › Despensa (Pantry) › Gestión de items › puede añadir un nuevo item a la despensa 
+    [chromium] › e2e/pantry.spec.ts:70:5 › Despensa (Pantry) › Gestión de items › puede añadir múltiples items 
+    [chromium] › e2e/pantry.spec.ts:99:5 › Despensa (Pantry) › Gestión de items › puede eliminar un item de la despensa 
+    [chromium] › e2e/pantry.spec.ts:127:5 › Despensa (Pantry) › Filtrado y búsqueda › puede filtrar items por categoría 
+    [chromium] › e2e/pantry.spec.ts:145:5 › Despensa (Pantry) › Integración con recomendaciones › navega a recomendaciones desde la despensa 
+    [chromium] › e2e/profile.spec.ts:22:5 › Perfil de Usuario › Visualización del perfil › muestra el nombre del usuario 
+    [chromium] › e2e/profile.spec.ts:30:5 › Perfil de Usuario › Visualización del perfil › muestra el email del usuario 
+    [chromium] › e2e/profile.spec.ts:39:5 › Perfil de Usuario › Visualización del perfil › muestra estadísticas del perfil 
+    [chromium] › e2e/profile.spec.ts:58:5 › Perfil de Usuario › Edición del perfil › puede abrir el modo de edición 
+    [chromium] › e2e/profile.spec.ts:65:5 › Perfil de Usuario › Edición del perfil › puede actualizar el peso del usuario 
+    [chromium] › e2e/profile.spec.ts:80:5 › Perfil de Usuario › Edición del perfil › puede actualizar el objetivo nutricional 
+    [chromium] › e2e/profile.spec.ts:95:5 › Perfil de Usuario › Gestión de cuenta › puede cerrar sesión 
+    [chromium] › e2e/profile.spec.ts:112:5 › Perfil de Usuario › Gestión de cuenta › puede navegar a otras secciones desde el perfil 
+    [chromium] › e2e/profile.spec.ts:128:5 › Perfil de Usuario › Recetas guardadas › accede a recetas guardadas desde el perfil 
+    [chromium] › e2e/recommendation.spec.ts:18:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para desayuno 
+    [chromium] › e2e/recommendation.spec.ts:38:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para almuerzo 
+    [chromium] › e2e/recommendation.spec.ts:51:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "En casa" para cena 
+    [chromium] › e2e/recommendation.spec.ts:64:5 › Recomendaciones › Generación de recomendaciones › puede generar recomendación "Fuera" para comida 
+    [chromium] › e2e/recommendation.spec.ts:77:5 › Recomendaciones › Generación de recomendaciones › muestra información nutricional en la recomendación 
+    [chromium] › e2e/recommendation.spec.ts:110:5 › Recomendaciones › Interacción con recetas › puede guardar una receta 
+    [chromium] › e2e/recommendation.spec.ts:126:5 › Recomendaciones › Interacción con recetas › puede regenerar una recomendación 
+    [chromium] › e2e/recommendation.spec.ts:144:5 › Recomendaciones › Navegación desde recomendación › puede navegar al perfil desde la pantalla de recomendación 
+    [chromium] › e2e/recommendation.spec.ts:151:5 › Recomendaciones › Navegación desde recomendación › puede navegar a la despensa desde la pantalla de recomendación 
+    [chromium] › e2e/recommendation.spec.ts:157:5 › Recomendaciones › Navegación desde recomendación › puede navegar al plan desde la pantalla de recomendación 
+  1 passed (16.2m)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m

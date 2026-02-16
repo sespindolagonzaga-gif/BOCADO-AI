@@ -66,6 +66,42 @@ export async function register(page: Page, user: TestUser): Promise<void> {
 
   await page.click('[data-testid="start-button"]');
 
+  // === Manejar pantalla de permisos/privacidad ===
+  // Después de hacer clic en "Empezar", aparece una pantalla de consentimiento de privacidad
+  try {
+    // Esperar a que aparezca el título de la pantalla de permisos
+    const permissionsTitle = page.locator('h1:has-text("Protegemos"), h1:has-text("protect")');
+    
+    // Si existe la pantalla de permisos, manejarla
+    const isVisible = await permissionsTitle.isVisible({ timeout: 3000 }).catch(() => false);
+    
+    if (isVisible) {
+      console.log('Permissions screen detected, handling it...');
+      
+      // Hacer clic en el área del checkbox (el div container con cursor-pointer)
+      // Buscar el texto "Entiendo y acepto" o "agree" y hacer clic en su contenedor
+      const consentArea = page.locator('text=Entiendo y acepto, text=agree').first();
+      await consentArea.click({ timeout: 5000 });
+      
+      console.log('Clicked on consent checkbox');
+      
+      // Esperar un momento para que se habilite el botón
+      await page.waitForTimeout(500);
+      
+      // Hacer clic en el botón "Continuar" / "Continue" (ahora debería estar habilitado)
+      const continueButton = page.locator('button:has-text("Continuar"), button:has-text("Continue")').first();
+      await continueButton.click({ timeout: 5000 });
+      
+      console.log('Clicked on continue button');
+      
+      // Esperar a que desaparezca la pantalla de permisos
+      await page.waitForTimeout(1000);
+    }
+  } catch (error) {
+    // Si no aparece la pantalla de permisos o ya fue aceptada, continuar normalmente
+    console.log('Permissions screen not found or already accepted:', error);
+  }
+
   // === Step 1: Datos personales ===
   await page.waitForSelector(SELECTORS.register.firstNameInput, { state: 'visible' });
   
@@ -229,6 +265,9 @@ export async function clearAuthState(page: Page): Promise<void> {
         indexedDB.deleteDatabase(db.name);
       }
     });
+    
+    // Configurar idioma español por defecto para los tests
+    localStorage.setItem('bocado-locale', 'es');
   });
   
   // Recargar para asegurar que todo el estado se limpia
