@@ -53,7 +53,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
   };
 
   return (
-    <div className="min-h-full flex flex-col items-center justify-center px-6 py-12 pt-safe">
+    <div className="h-full flex flex-col items-center px-6 pt-safe">
       {/* Selector de idioma en la esquina superior derecha */}
       <div className="fixed top-4 right-4 z-10">
         <button
@@ -68,62 +68,71 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
         </button>
       </div>
 
-      {/* Logo */}
-      <div className="w-64 sm:w-72 md:w-80 mb-8">
-        <BocadoLogo className="w-full h-auto" />
+      {/* Spacer superior — empuja el contenido hacia el centro-bajo */}
+      <div className="flex-[2]" />
+
+      {/* Card con contenido principal */}
+      <div className="w-full max-w-sm rounded-3xl bg-white/5 dark:bg-white/[0.04] border border-white/10 dark:border-white/[0.08] backdrop-blur-sm p-8 flex flex-col items-center">
+        {/* Logo */}
+        <div className="w-56 sm:w-64 md:w-72 mb-6">
+          <BocadoLogo className="w-full h-auto" />
+        </div>
+
+        {/* Texto */}
+        <div className="text-center mb-8">
+          <h1 className="text-xl font-bold text-bocado-dark-gray dark:text-gray-200 mb-2">
+            {t('home.title')}{' '}
+            <span className="underline decoration-bocado-green decoration-4 underline-offset-4">
+              {t('home.titleHighlight')}
+            </span>
+          </h1>
+          <p className="text-sm text-bocado-gray dark:text-gray-400">
+            {t('home.subtitle')}
+          </p>
+        </div>
+
+        {/* Botones */}
+        <div className="flex flex-col w-full gap-3">
+          {hasSession ? (
+            <>
+              <button
+                data-testid="enter-app-button"
+                onClick={handleEnterApp}
+                className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
+              >
+                {t('home.enterButton')}
+              </button>
+              <button
+                data-testid="logout-button"
+                onClick={handleLogout}
+                className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
+              >
+                {t('home.logoutButton')}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                data-testid="start-button"
+                onClick={handleStartRegistration}
+                className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
+              >
+                {t('home.startButton')}
+              </button>
+              <button
+                data-testid="login-button"
+                onClick={handleGoToLogin}
+                className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
+              >
+                {t('home.loginButton')}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Texto */}
-      <div className="text-center max-w-sm mb-10">
-        <h1 className="text-xl font-bold text-bocado-dark-gray dark:text-gray-200 mb-3">
-          {t('home.title')}{' '}
-          <span className="underline decoration-bocado-green decoration-4 underline-offset-4">
-            {t('home.titleHighlight')}
-          </span>
-        </h1>
-        <p className="text-base text-bocado-gray dark:text-gray-400">
-          {t('home.subtitle')}
-        </p>
-      </div>
-
-      {/* Botones */}
-      <div className="flex flex-col w-full max-w-xs gap-4">
-        {hasSession ? (
-          <>
-            <button
-              data-testid="enter-app-button"
-              onClick={handleEnterApp}
-              className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-            >
-              {t('home.enterButton')}
-            </button>
-            <button
-              data-testid="logout-button"
-              onClick={handleLogout}
-              className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
-            >
-              {t('home.logoutButton')}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              data-testid="start-button"
-              onClick={handleStartRegistration}
-              className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
-            >
-              {t('home.startButton')}
-            </button>
-            <button
-              data-testid="login-button"
-              onClick={handleGoToLogin}
-              className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
-            >
-              {t('home.loginButton')}
-            </button>
-          </>
-        )}
-      </div>
+      {/* Spacer inferior — más pequeño para que el card quede ligeramente arriba del centro */}
+      <div className="flex-[3]" />
     </div>
   );
 };

@@ -209,8 +209,8 @@ function AppContent() {
 
   return (
     <SentryErrorBoundary>
-      <div className="min-h-screen bg-bocado-cream dark:bg-gray-900 flex justify-center items-start md:items-center md:p-8 lg:p-10 2xl:p-12">
-        <div className="w-full h-screen md:h-[min(900px,calc(100vh-4rem))] md:min-h-[640px] bg-bocado-background dark:bg-gray-800 
+      <div className="min-h-[100dvh] bg-bocado-cream dark:bg-gray-900 flex justify-center items-start md:items-center md:p-8 lg:p-10 2xl:p-12">
+        <div className="w-full h-[100dvh] md:h-[min(900px,calc(100dvh-4rem))] md:min-h-[640px] bg-bocado-background dark:bg-gray-800 
                         md:max-w-app lg:max-w-app-lg xl:max-w-app-xl
                         md:rounded-4xl md:shadow-bocado-lg 
                         md:border-8 md:border-white dark:md:border-gray-700
