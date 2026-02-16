@@ -141,6 +141,11 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     const isAwaySelectionComplete = recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget;
     
     if (!profile || (!isHomeSelectionComplete && !isAwaySelectionComplete)) return;
+    if (recommendationType === 'Fuera' && !userPosition && locationLoading) {
+      setError('Espera a que se detecte tu ubicación antes de continuar.');
+      resetProcessingState();
+      return;
+    }
     if (!user) {
       logger.error("No hay usuario autenticado");
       return;
@@ -295,8 +300,9 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     setSelectedMeal(meal);
   };
 
+  const isLocationReady = recommendationType !== 'Fuera' || locationPermission === 'denied' || !!userPosition;
   const isSelectionMade = (recommendationType === 'En casa' && selectedMeal) || 
-                          (recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget);
+                          (recommendationType === 'Fuera' && selectedCravings.length > 0 && selectedBudget && isLocationReady);
 
   // Mostrar error si el perfil no se encuentra
   if (profileNotFound || isProfileError) {
