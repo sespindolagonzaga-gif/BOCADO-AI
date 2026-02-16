@@ -1155,13 +1155,6 @@ export default async function handler(req: any, res: any) {
     const request: RequestBody = parseResult.data;
     
     // ✅ FIX: Log de requests exitosos (solo campos clave)
-    safeLog('log', `📥 Request received: ${JSON.stringify({
-      userId: authUserId,
-      type: request.type,
-      hasGPS: !!request.userLocation,
-      budget: request.budget,
-      cookingTime: request.cookingTime
-    })}`);
     
     userId = authUserId;
     if (request.userId && request.userId !== authUserId) {
@@ -1376,16 +1369,6 @@ Personaliza el saludo_personalizado usando${demographicParts.length > 0 ? ' el p
       const travelContext = await detectTravelContext(searchCoords, request, user);
       
       // Logging detallado para debugging de ubicación
-      safeLog('log', `📍 Búsqueda de restaurantes: ${JSON.stringify({
-        userLocationFromRequest: request.userLocation ? `${request.userLocation.lat},${request.userLocation.lng}` : 'no proporcionada',
-        userLocationFromProfile: user.location ? `${user.location.lat},${user.location.lng}` : 'no guardada',
-        profileCity: user.city,
-        profileCountry: user.country,
-        finalCoords: searchCoords ? `${searchCoords.lat},${searchCoords.lng}` : 'usando ciudad del perfil',
-        isTraveling: travelContext.isTraveling,
-        homeCurrency: travelContext.homeCurrency,
-        activeCurrency: travelContext.activeCurrency
-      })}`);
       
       const locationContext = searchCoords 
         ? `Coordenadas de referencia: ${formatCoordinates(searchCoords)}`
