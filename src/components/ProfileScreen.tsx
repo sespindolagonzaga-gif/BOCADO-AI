@@ -25,6 +25,8 @@ import { env } from '../environment/env';
 import { ADMIN_UIDS } from '../config/featureFlags';
 import { searchCities, getPlaceDetails, PlacePrediction } from '../services/mapsService';
 import { ProfileSkeleton } from './skeleton';
+import { useTranslation } from '../contexts/I18nContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface ProfileScreenProps {
   onLogout?: () => void;
@@ -91,6 +93,8 @@ const Badge: React.FC<{ text: string; color: 'green' | 'blue' | 'red' | 'gray' |
 };
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate, userUid }) => {
+  const { t, locale, setLocale } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const isAdmin = ADMIN_UIDS.includes(userUid);
   const [viewMode, setViewMode] = useState<'view' | 'edit' | 'changePassword' | 'changeEmail' | 'exportData' | 'deleteAccount' | 'adminNotifications'>('view');
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
@@ -1037,6 +1041,89 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                         <h3 className="font-bold text-bocado-dark-green text-2xs uppercase tracking-wider">Preferencias</h3>
                     </div>
                     <div className="space-y-2">
+                        {/* Selector de Idioma */}
+                        <div className="px-4 py-3 bg-bocado-background rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-bocado-text">Idioma</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    trackEvent('language_change', { from: locale, to: 'es' });
+                                    setLocale('es');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                    locale === 'es'
+                                      ? 'bg-bocado-green text-white'
+                                      : 'bg-white text-bocado-gray hover:bg-bocado-border'
+                                  }`}
+                                >
+                                  🇪🇸 Español
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    trackEvent('language_change', { from: locale, to: 'en' });
+                                    setLocale('en');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                    locale === 'en'
+                                      ? 'bg-bocado-green text-white'
+                                      : 'bg-white text-bocado-gray hover:bg-bocado-border'
+                                  }`}
+                                >
+                                  🇺🇸 English
+                                </button>
+                            </div>
+                        </div>
+                        
+                        {/* Selector de Tema */}
+                        <div className="px-4 py-3 bg-bocado-background rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-bocado-text">Tema</span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    trackEvent('theme_change', { from: theme, to: 'light' });
+                                    setTheme('light');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                    theme === 'light'
+                                      ? 'bg-bocado-green text-white'
+                                      : 'bg-white text-bocado-gray hover:bg-bocado-border'
+                                  }`}
+                                >
+                                  ☀️ Claro
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    trackEvent('theme_change', { from: theme, to: 'dark' });
+                                    setTheme('dark');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                    theme === 'dark'
+                                      ? 'bg-bocado-green text-white'
+                                      : 'bg-white text-bocado-gray hover:bg-bocado-border'
+                                  }`}
+                                >
+                                  🌙 Oscuro
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    trackEvent('theme_change', { from: theme, to: 'system' });
+                                    setTheme('system');
+                                  }}
+                                  className={`flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-all ${
+                                    theme === 'system'
+                                      ? 'bg-bocado-green text-white'
+                                      : 'bg-white text-bocado-gray hover:bg-bocado-border'
+                                  }`}
+                                >
+                                  💻 Sistema
+                                </button>
+                            </div>
+                        </div>
+                        
                         <button 
                           onClick={() => {
                             trackEvent('profile_notifications_open');

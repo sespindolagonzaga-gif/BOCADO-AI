@@ -1,0 +1,113 @@
+{
+  "common": {
+    "loading": "Loading Bocado...",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "home": {
+    "title": "What to eat today?",
+    "titleHighlight": "No longer a problem",
+    "subtitle": "Join Bocado, where you decide and AI guides you.",
+    "enterButton": "Enter",
+    "startButton": "Get Started",
+    "loginButton": "Sign In",
+    "logoutButton": "Sign Out"
+  },
+  "profile": {
+    "title": "Profile",
+    "settings": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "notifications": "Notifications",
+    "feedback": "Send Feedback",
+    "logout": "Sign Out",
+    "version": "Version"
+  },
+  "tabs": {
+    "home": "Home",
+    "pantry": "Pantry",
+    "recipes": "Recipes",
+    "restaurants": "Restaurants",
+    "profile": "Profile"
+  },
+  "permissions": {
+    "title": "App Permissions",
+    "description": "To provide you the best experience, we need your permission for:",
+    "notifications": "Notifications",
+    "notificationsDesc": "To remind you of your planned meals",
+    "location": "Location",
+    "locationDesc": "To recommend nearby restaurants",
+    "accept": "Accept Permissions",
+    "skip": "Skip for Now"
+  },
+  "registration": {
+    "title": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "name": "Name",
+    "createAccount": "Create Account",
+    "alreadyHaveAccount": "Already have an account?",
+    "goToLogin": "Sign In"
+  },
+  "login": {
+    "title": "Sign In",
+    "email": "Email",
+    "password": "Password",
+    "loginButton": "Sign In",
+    "forgotPassword": "Forgot your password?",
+    "noAccount": "Don't have an account?",
+    "register": "Sign Up"
+  },
+  "recommendation": {
+    "title": "Recommendations",
+    "generatePlan": "Generate Plan",
+    "loading": "Generating recommendations...",
+    "error": "Error generating recommendations",
+    "tryAgain": "Try Again"
+  },
+  "plan": {
+    "title": "Your Weekly Plan",
+    "breakfast": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner",
+    "startNewPlan": "Create New Plan"
+  },
+  "pantry": {
+    "title": "My Pantry",
+    "addItem": "Add Item",
+    "empty": "Your pantry is empty",
+    "zones": {
+      "fridge": "Fridge",
+      "freezer": "Freezer",
+      "pantry": "Pantry"
+    }
+  },
+  "recipes": {
+    "title": "Saved Recipes",
+    "empty": "No saved recipes",
+    "viewRecipe": "View Recipe"
+  },
+  "restaurants": {
+    "title": "Saved Restaurants",
+    "empty": "No saved restaurants",
+    "viewRestaurant": "View Restaurant"
+  },
+  "errors": {
+    "configError": "Configuration Error",
+    "configErrorDesc": "Could not load Firebase credentials. Please verify that environment variables are configured in Vercel.",
+    "renderError": "Render Error",
+    "reload": "Reload"
+  }
+}

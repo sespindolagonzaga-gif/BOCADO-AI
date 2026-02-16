@@ -5,6 +5,7 @@ import { auth, trackEvent } from '../firebaseConfig'; // ✅ Importado trackEven
 import { useAuthStore } from '../stores/authStore';
 import { useUserProfile } from '../hooks/useUser';
 import { logger } from '../utils/logger';
+import { useTranslation } from '../contexts/I18nContext';
 
 interface HomeScreenProps {
   onStartRegistration: () => void;
@@ -15,6 +16,7 @@ interface HomeScreenProps {
 const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp, onGoToLogin }) => {
   const { isAuthenticated, user } = useAuthStore();
   const { data: profile } = useUserProfile(user?.uid);
+  const { t } = useTranslation();
 
   const hasSession = isAuthenticated || !!profile;
 
@@ -53,14 +55,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
 
       {/* Texto */}
       <div className="text-center max-w-sm mb-10">
-        <h1 className="text-xl font-bold text-bocado-dark-gray mb-3">
-          ¿Qué comer hoy?{' '}
+        <h1 className="text-xl font-bold text-bocado-dark-gray dark:text-gray-200 mb-3">
+          {t('home.title')}{' '}
           <span className="underline decoration-bocado-green decoration-4 underline-offset-4">
-            Ya no es problema
+            {t('home.titleHighlight')}
           </span>
         </h1>
-        <p className="text-base text-bocado-gray">
-          Sé parte de Bocado, donde tú decides y la IA te acompaña.
+        <p className="text-base text-bocado-gray dark:text-gray-400">
+          {t('home.subtitle')}
         </p>
       </div>
 
@@ -73,14 +75,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
               onClick={handleEnterApp}
               className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
             >
-              Entrar
+              {t('home.enterButton')}
             </button>
             <button
               data-testid="logout-button"
               onClick={handleLogout}
-              className="w-full bg-white text-bocado-green border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background active:scale-95 transition-all"
+              className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
             >
-              Cerrar sesión
+              {t('home.logoutButton')}
             </button>
           </>
         ) : (
@@ -90,14 +92,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onStartRegistration, onGoToApp,
               onClick={handleStartRegistration}
               className="w-full bg-bocado-green text-white font-bold py-3.5 px-8 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all"
             >
-              Empezar
+              {t('home.startButton')}
             </button>
             <button
               data-testid="login-button"
               onClick={handleGoToLogin}
-              className="w-full bg-white text-bocado-green border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background active:scale-95 transition-all"
+              className="w-full bg-white dark:bg-gray-800 text-bocado-green dark:text-bocado-green-light border-2 border-bocado-green font-bold py-3.5 px-8 rounded-full text-base hover:bg-bocado-background dark:hover:bg-gray-700 active:scale-95 transition-all"
             >
-              Iniciar sesión
+              {t('home.loginButton')}
             </button>
           </>
         )}

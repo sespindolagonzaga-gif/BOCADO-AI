@@ -1,0 +1,113 @@
+{
+  "common": {
+    "loading": "Cargando Bocado...",
+    "error": "Error",
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "back": "Volver",
+    "next": "Siguiente",
+    "finish": "Finalizar",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "home": {
+    "title": "¿Qué comer hoy?",
+    "titleHighlight": "Ya no es problema",
+    "subtitle": "Sé parte de Bocado, donde tú decides y la IA te acompaña.",
+    "enterButton": "Entrar",
+    "startButton": "Empezar",
+    "loginButton": "Iniciar sesión",
+    "logoutButton": "Cerrar sesión"
+  },
+  "profile": {
+    "title": "Perfil",
+    "settings": "Configuración",
+    "language": "Idioma",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeSystem": "Sistema",
+    "notifications": "Notificaciones",
+    "feedback": "Enviar feedback",
+    "logout": "Cerrar sesión",
+    "version": "Versión"
+  },
+  "tabs": {
+    "home": "Inicio",
+    "pantry": "Despensa",
+    "recipes": "Recetas",
+    "restaurants": "Restaurantes",
+    "profile": "Perfil"
+  },
+  "permissions": {
+    "title": "Permisos de la aplicación",
+    "description": "Para ofrecerte la mejor experiencia, necesitamos tu permiso para:",
+    "notifications": "Notificaciones",
+    "notificationsDesc": "Para recordarte tus comidas planificadas",
+    "location": "Ubicación",
+    "locationDesc": "Para recomendarte restaurantes cercanos",
+    "accept": "Aceptar permisos",
+    "skip": "Omitir por ahora"
+  },
+  "registration": {
+    "title": "Registro",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar contraseña",
+    "name": "Nombre",
+    "createAccount": "Crear cuenta",
+    "alreadyHaveAccount": "¿Ya tienes cuenta?",
+    "goToLogin": "Inicia sesión"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "loginButton": "Entrar",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "noAccount": "¿No tienes cuenta?",
+    "register": "Regístrate"
+  },
+  "recommendation": {
+    "title": "Recomendaciones",
+    "generatePlan": "Generar plan",
+    "loading": "Generando recomendaciones...",
+    "error": "Error al generar recomendaciones",
+    "tryAgain": "Intentar de nuevo"
+  },
+  "plan": {
+    "title": "Tu plan semanal",
+    "breakfast": "Desayuno",
+    "lunch": "Almuerzo",
+    "dinner": "Cena",
+    "startNewPlan": "Crear nuevo plan"
+  },
+  "pantry": {
+    "title": "Mi despensa",
+    "addItem": "Agregar producto",
+    "empty": "Tu despensa está vacía",
+    "zones": {
+      "fridge": "Refrigerador",
+      "freezer": "Congelador",
+      "pantry": "Alacena"
+    }
+  },
+  "recipes": {
+    "title": "Recetas guardadas",
+    "empty": "No tienes recetas guardadas",
+    "viewRecipe": "Ver receta"
+  },
+  "restaurants": {
+    "title": "Restaurantes guardados",
+    "empty": "No tienes restaurantes guardados",
+    "viewRestaurant": "Ver restaurante"
+  },
+  "errors": {
+    "configError": "Error de configuración",
+    "configErrorDesc": "No se pudieron cargar las credenciales de Firebase. Verifica que las variables de entorno estén configuradas en Vercel.",
+    "renderError": "Error al renderizar",
+    "reload": "Recargar"
+  }
+}
