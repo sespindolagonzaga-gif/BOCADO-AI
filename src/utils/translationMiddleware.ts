@@ -8,7 +8,6 @@
  * REGLA: Firebase SIEMPRE almacena en español, pero la UI puede mostrar en inglés
  */
 
-import { useTranslation } from '../contexts/I18nContext';
 import { translateOption, diseaseKeys, allergyKeys, goalKeys, activityKeys, frequencyKeys, cravingKeys, mealKeys } from './translationHelpers';
 
 /**

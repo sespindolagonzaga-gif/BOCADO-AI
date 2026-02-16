@@ -1353,7 +1353,7 @@ ${marketList && !request.onlyPantryIngredients ? `\nDISPONIBLE: ${marketList.sli
 
 REGLAS: 3 recetas creativas, tiempo ≤${request.cookingTime || '30'}min, ${pantryRule}${difficultyHint}.
 
-Resp onde EXCLUSIVAMENTE en ${request.language === 'en' ? 'INGLÉS.' : 'ESPAÑOL.'}
+Responde EXCLUSIVAMENTE en ${request.language === 'en' ? 'INGLÉS.' : 'ESPAÑOL.'}
 Responde en formato JSON usando esta estructura exacta:
 ${RECIPE_JSON_TEMPLATE}
 

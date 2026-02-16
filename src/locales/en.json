@@ -686,7 +686,8 @@
     "loadMore": "Load more recipes",
     "noMore": "No more saved recipes",
     "deleteTitle": "Delete recipe?",
-    "deleteMessage": "Will delete <span class='font-bold'>\"{title}\"</span>",
+    "deleteMessage": "Will delete the recipe \"{title}\"",
+    "deleteMessageTitle": "the recipe",
     "cancel": "Cancel",
     "delete": "Delete"
   },

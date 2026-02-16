@@ -125,7 +125,9 @@ const SavedRecipesScreen: React.FC = () => {
               <span className="text-xl">🗑️</span>
             </div>
             <h3 className="text-lg font-bold text-bocado-text mb-2">{t('savedRecipes.deleteTitle')}</h3>
-            <p className="text-sm text-bocado-gray mb-6" dangerouslySetInnerHTML={{ __html: t('savedRecipes.deleteMessage', { title: mealToConfirmDelete.recipe.title }) }} />
+            <p className="text-sm text-bocado-gray mb-6">
+              {t('savedRecipes.deleteMessage', { title: mealToConfirmDelete.recipe.title })}
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setMealToConfirmDelete(null)}

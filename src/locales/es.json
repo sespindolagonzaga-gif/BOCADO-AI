@@ -810,7 +810,8 @@
     "confirmUnsave": "¿Quitar {recipe} de guardados?",
     "searchPlaceholder": "Buscar en tus recetas...",
     "deleteTitle": "¿Eliminar receta?",
-    "deleteMessage": "Se eliminará <span class='font-bold'>\"{title}\"</span>",
+    "deleteMessage": "Se eliminará la receta \"{title}\"",
+    "deleteMessageTitle": "la receta",
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "filters": {
