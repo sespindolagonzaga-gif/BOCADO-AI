@@ -528,6 +528,13 @@ async function handleReverseGeocode(res: any, params: z.infer<typeof ReverseGeoc
   const data = await response.json();
 
   if (data.status !== 'OK' || !data.results?.[0]) {
+    console.error('Reverse geocode no results:', {
+      status: data.status,
+      error_message: data.error_message || 'No error_message',
+      lat: params.lat,
+      lng: params.lng,
+      hasResults: Array.isArray(data.results) ? data.results.length : 0,
+    });
     return res.status(404).json({ error: 'Location not found' });
   }
 
