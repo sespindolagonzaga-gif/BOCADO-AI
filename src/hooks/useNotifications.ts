@@ -98,7 +98,7 @@ export const useNotifications = (): UseNotificationsReturn => {
         logger.error('Error verificando datos de notificaciones:', e);
       }
     }
-  }, []); // Solo al montar
+  }, [t]); // Al montar y cuando cambian las traducciones
 
   // Verificar soporte al inicio
   useEffect(() => {

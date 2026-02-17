@@ -151,7 +151,7 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
         logger.error('Error verificando datos de notificaciones:', e);
       }
     }
-  }, []); // Solo al montar
+  }, [t]); // Al montar y cuando cambian las traducciones
 
   // Verificar soporte
   useEffect(() => {

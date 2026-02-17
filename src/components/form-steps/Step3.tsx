@@ -175,8 +175,6 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
               {translateActivityFrequency(freq, t)}
             </button>
           ))}
-            </button>
-          ))}
         </div>
       </div>
 
