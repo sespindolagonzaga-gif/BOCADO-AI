@@ -643,7 +643,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   const translateFood = (foodKey: string): string => {
     // Si el alimento está en las traducciones, usarlas
     // De lo contrario, retornar el key original (alimento personalizado)
-    return t(`foods.${foodKey}`, { defaultValue: foodKey });
+    const translation = t(`foods.${foodKey}`);
+    // Si la traducción retorna la clave completa, significa que no existe, retornar solo el foodKey
+    return translation.startsWith('foods.') ? foodKey : translation;
   };
 
   const renderPhysicalData = () => {
