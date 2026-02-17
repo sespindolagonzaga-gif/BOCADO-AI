@@ -439,10 +439,30 @@ async function processUserReminders(docSnap, now, getLocalTimeParts, daysSince) 
     });
   }
 
-  await db.collection('notification_settings').doc(docSnap.id).set({
-    reminders: remindersState,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  // Collect which reminder IDs were sent (need lastShown update)
+  const sentIds = new Set(remindersToSend.map(r => r.id));
+  const nowISO = new Date().toISOString();
+
+  // Use transaction to merge lastShown without overwriting concurrent updates
+  const settingsRef = db.collection('notification_settings').doc(docSnap.id);
+  await db.runTransaction(async (transaction) => {
+    const freshDoc = await transaction.get(settingsRef);
+    const freshData = freshDoc.exists ? freshDoc.data() : {};
+    const freshReminders = Array.isArray(freshData.reminders) ? freshData.reminders : [];
+
+    // Merge: update lastShown only for reminders we actually sent
+    const mergedReminders = freshReminders.map((item) => {
+      if (item?.id && sentIds.has(item.id)) {
+        return { ...item, lastShown: nowISO };
+      }
+      return item;
+    });
+
+    transaction.set(settingsRef, {
+      reminders: mergedReminders,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
 }
 
 /**
