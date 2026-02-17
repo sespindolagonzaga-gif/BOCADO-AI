@@ -387,7 +387,7 @@ async function processUserReminders(docSnap, now, getLocalTimeParts, daysSince) 
 
   if (remindersToSend.length === 0) return;
 
-  let remindersState = reminders.slice();
+  const sentIds = new Set();
 
   for (const reminder of remindersToSend) {
     if (tokens.length === 0) break;
@@ -433,14 +433,11 @@ async function processUserReminders(docSnap, now, getLocalTimeParts, daysSince) 
       }
     }
 
-    remindersState = remindersState.map((item) => {
-      if (!item?.enabled || item.id !== reminder.id) return item;
-      return { ...item, lastShown: new Date().toISOString() };
-    });
+    // Track only reminders that were actually sent
+    sentIds.add(reminder.id);
   }
 
-  // Collect which reminder IDs were sent (need lastShown update)
-  const sentIds = new Set(remindersToSend.map(r => r.id));
+  if (sentIds.size === 0) return;
   const nowISO = new Date().toISOString();
 
   // Use transaction to merge lastShown without overwriting concurrent updates
