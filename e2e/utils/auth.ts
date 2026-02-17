@@ -38,28 +38,32 @@ export async function login(page: Page, email: string, password: string): Promis
  * Incluye todos los 3 pasos del formulario
  */
 export async function register(page: Page, user: TestUser): Promise<void> {
+
   // Navegar a la página de inicio
   await page.goto('/');
-
-  // Esperar a que la página esté completamente cargada
   await page.waitForLoadState('networkidle');
 
+  // Si ya está autenticado, cerrar sesión
+  const enterAppButton = await page.$('[data-testid="enter-app-button"]');
+  if (enterAppButton) {
+    // Ir a logout
+    const logoutButton = await page.$('[data-testid="logout-button"]');
+    if (logoutButton) {
+      await logoutButton.click();
+      // Esperar a que desaparezca el botón de logout y aparezca el de start
+      await page.waitForSelector('[data-testid="start-button"]', { state: 'visible', timeout: 10000 });
+    }
+  }
+
   // Click en "Empezar" - esperar a que el botón sea visible
-  // Usar timeout más largo (15s) para CI/headless environments
-  // Usar selector específico data-testid en lugar de múltiples alternativas
   try {
-    // Esperar a que el DOM esté listo y el botón exista
     await page.waitForFunction(
       () => !!document.querySelector('[data-testid="start-button"]'),
       { timeout: 15000 }
     );
-    
-    // Luego esperar a que sea visible
     await page.waitForSelector('[data-testid="start-button"]', { state: 'visible', timeout: 15000 });
   } catch (error) {
-    // Si falla, tomar screenshot para debugging
     await page.screenshot({ path: 'test-failure-start-button.png', fullPage: true });
-    // Guardar HTML en consola para debugging si es necesario
     const html = await page.content();
     console.error('Start button not found. HTML content:', html);
     throw new Error(`Start button not found. Screenshot saved. Error: ${error}`);
