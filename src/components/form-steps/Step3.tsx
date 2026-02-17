@@ -31,14 +31,14 @@ const translateActivityFrequency = (freq: string, t: (key: string) => string): s
 };
 
 const categoryIcons: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
-  'Carnes y Aves': MeatIcon,
-  'Pescados y Mariscos': FishIcon,
-  'Lácteos y Huevos': DairyIcon,
-  'Vegetales y Hortalizas': VegetableIcon,
-  'Frutas': FruitIcon,
-  'Legumbres, Granos y Tubérculos': GrainsIcon,
-  'Frutos Secos y Semillas': NutsIcon,
-  'Hierbas, Especias y Condimentos': SpicesIcon,
+  'meatPoultry': MeatIcon,
+  'seafood': FishIcon,
+  'dairyEggs': DairyIcon,
+  'vegetables': VegetableIcon,
+  'fruits': FruitIcon,
+  'legumesGrains': GrainsIcon,
+  'nutsSeeeds': NutsIcon,
+  'herbsSpices': SpicesIcon,
 };
 
 const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
@@ -50,6 +50,11 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
 
   const dislikedFoods: string[] = (Array.isArray(data.dislikedFoods) ? data.dislikedFoods : [])
     .filter((item): item is string => typeof item === 'string');
+  
+  // Helper para obtener el nombre traducido de un alimento
+  const getFoodName = (food: { key: string, default: string }) => {
+    return t(`foods.${food.key}`);
+  };
 
   const handleSelect = (field: keyof FormData, value: string) => {
     // ✅ ANALÍTICA: Tracking de actividad física
@@ -66,18 +71,18 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
     }
   };
 
-  const handleToggleDislike = (food: string) => {
-    const isAdding = !dislikedFoods.includes(food);
+  const handleToggleDislike = (foodKey: string) => {
+    const isAdding = !dislikedFoods.includes(foodKey);
     
     // ✅ ANALÍTICA: Tracking de alimentos rechazados
     trackEvent('registration_disliked_food_toggle', { 
-      food, 
+      food: foodKey, 
       action: isAdding ? 'add' : 'remove' 
     });
 
     const newDislikes = isAdding
-      ? [...dislikedFoods, food]
-      : dislikedFoods.filter(item => item !== food);
+      ? [...dislikedFoods, foodKey]
+      : dislikedFoods.filter(item => item !== foodKey);
     updateData('dislikedFoods', newDislikes);
   };
   
@@ -97,20 +102,25 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
     if (!searchTerm.trim()) return FOOD_CATEGORIES;
     
     const lowercasedFilter = searchTerm.toLowerCase();
-    const filtered: Record<string, string[]> = {};
+    const filtered: typeof FOOD_CATEGORIES = {};
 
     for (const category in FOOD_CATEGORIES) {
-      const matchingFoods = FOOD_CATEGORIES[category].filter(food =>
-        food.toLowerCase().includes(lowercasedFilter)
-      );
+      const matchingFoods = FOOD_CATEGORIES[category].filter(food => {
+        const foodName = getFoodName(food);
+        return foodName.toLowerCase().includes(lowercasedFilter);
+      });
       if (matchingFoods.length > 0) filtered[category] = matchingFoods;
     }
     return filtered;
-  }, [searchTerm]);
+  }, [searchTerm, t]);
   
-  const customDislikes = dislikedFoods.filter(food => 
-    !Object.values(FOOD_CATEGORIES).reduce((acc, val) => acc.concat(val), []).includes(food)
-  );
+  const customDislikes = dislikedFoods.filter(food => {
+    // Verificar si el food está en alguna de las categorías
+    const allFoodKeys = Object.values(FOOD_CATEGORIES)
+      .flat()
+      .map(f => f.key);
+    return !allFoodKeys.includes(food);
+  });
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -201,7 +211,9 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
         <div className="grid grid-cols-2 gap-2">
           {Object.keys(filteredCategories).map(category => {
             const Icon = categoryIcons[category];
-            const dislikedCount = dislikedFoods.filter(food => FOOD_CATEGORIES[category]?.includes(food)).length;
+            const dislikedCount = dislikedFoods.filter(food => 
+              FOOD_CATEGORIES[category]?.some(f => f.key === food)
+            ).length;
             
             return (
               <button
@@ -214,7 +226,7 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
                 className="relative flex flex-col items-center justify-center p-3 text-center bg-white border-2 border-bocado-border rounded-xl hover:border-bocado-green active:scale-95 transition-all duration-200 aspect-[4/3]"
               >
                 {Icon && <Icon className="w-8 h-8 text-bocado-green mb-1"/>}
-                <span className="font-bold text-[10px] text-bocado-text leading-tight">{category}</span>
+                <span className="font-bold text-[10px] text-bocado-text leading-tight">{t(`foodCategories.${category}`)}</span>
                 {dislikedCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
                     {dislikedCount}
@@ -281,22 +293,22 @@ const Step3: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
       {modalCategory && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 px-4 animate-fade-in">
           <div className="bg-white p-4 rounded-2xl shadow-bocado w-full max-w-sm max-h-[80vh] flex flex-col">
-            <h3 className="text-base font-bold text-bocado-dark-green mb-3">{modalCategory}</h3>
+            <h3 className="text-base font-bold text-bocado-dark-green mb-3">{t(`foodCategories.${modalCategory}`)}</h3>
             
             <div className="flex-1 overflow-y-auto no-scrollbar">
               <div className="flex flex-wrap gap-2">
                 {FOOD_CATEGORIES[modalCategory].map(food => (
                   <button 
-                    key={food} 
+                    key={food.key} 
                     type="button" 
-                    onClick={() => handleToggleDislike(food)} 
+                    onClick={() => handleToggleDislike(food.key)} 
                     className={`px-3 py-2 rounded-full border text-xs font-bold transition-all duration-200 active:scale-95 ${
-                      dislikedFoods.includes(food) 
+                      dislikedFoods.includes(food.key) 
                         ? 'bg-red-500 text-white border-red-500' 
                         : 'bg-white text-bocado-text border-bocado-border hover:border-red-400 hover:text-red-500'
                     }`}
                   >
-                    {food}
+                    {getFoodName(food)}
                   </button>
                 ))}
               </div>

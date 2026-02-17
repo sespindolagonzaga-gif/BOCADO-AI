@@ -113,10 +113,40 @@ export const usePWA = () => {
   // Detectar actualizaciones del SW
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        setState(prev => ({ ...prev, updateAvailable: true }));
-        logger.info('PWA: New service worker activated');
-      });
+      // Escuchar cuando hay un nuevo service worker esperando
+      const checkForUpdates = () => {
+        navigator.serviceWorker.ready.then((registration) => {
+          if (registration.waiting) {
+            setState(prev => ({ ...prev, updateAvailable: true }));
+            logger.info('PWA: New service worker waiting to activate');
+          }
+
+          // Escuchar cuando se instala un nuevo SW
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  // Hay un nuevo service worker instalado mientras uno viejo sigue activo
+                  setState(prev => ({ ...prev, updateAvailable: true }));
+                  logger.info('PWA: New service worker installed');
+                }
+              });
+            }
+          });
+        });
+      };
+
+      checkForUpdates();
+
+      // También revisar periódicamente por actualizaciones
+      const interval = setInterval(() => {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.update();
+        });
+      }, 60000); // Cada minuto
+
+      return () => clearInterval(interval);
     }
   }, []);
 
@@ -155,9 +185,25 @@ export const usePWA = () => {
   const updateApp = useCallback(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
-        registration.update().then(() => {
-          window.location.reload();
-        });
+        // Si hay un service worker esperando, activarlo
+        if (registration.waiting) {
+          // Enviar mensaje al SW para que haga skipWaiting
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          
+          // Recargar cuando el nuevo SW tome control
+          let refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+        } else {
+          // Si no hay uno esperando, intentar buscar actualización
+          registration.update().then(() => {
+            window.location.reload();
+          });
+        }
       });
     }
   }, []);

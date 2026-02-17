@@ -640,6 +640,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     return key ? t(`allergies.${key}`) : allergy;
   };
 
+  const translateFood = (foodKey: string): string => {
+    // Si el alimento está en las traducciones, usarlas
+    // De lo contrario, retornar el key original (alimento personalizado)
+    return t(`foods.${foodKey}`, { defaultValue: foodKey });
+  };
+
   const renderPhysicalData = () => {
     const parts: string[] = [];
     if (formData.weight) parts.push(`${formData.weight} kg`);
@@ -1080,7 +1086,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
 
                  <InfoSection title={t('profile.dislikes')}>
                     {formData.dislikedFoods.length > 0 && formData.dislikedFoods[0] !== 'Ninguno' 
-                      ? formData.dislikedFoods.map(f => <Badge key={f} text={f} color="red" />) 
+                      ? formData.dislikedFoods.map(f => <Badge key={f} text={translateFood(f)} color="red" />) 
                       : <span className="text-xs text-bocado-gray">{t('profile.noneM')}</span>
                     }
                  </InfoSection>

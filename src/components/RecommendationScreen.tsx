@@ -377,7 +377,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   }
 
   return (
-    <div className="h-full flex flex-col px-4 py-4 overflow-y-auto no-scrollbar">
+    <div className="flex-1 flex flex-col px-4 py-4 overflow-y-auto no-scrollbar min-h-0">
       {/* Header */}
       <div className="text-center mb-4 shrink-0">
         <div className="w-32 h-20 mx-auto mb-2">

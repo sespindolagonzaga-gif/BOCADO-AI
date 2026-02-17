@@ -9,11 +9,12 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       !isStorybook && VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         injectRegister: 'auto',
+        // Control manual de actualizaciones
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          importScripts: ['firebase-messaging-sw.js'],
+          importScripts: ['firebase-messaging-sw.js', 'sw-extension.js'],
           
           // Página offline para navegación fallida
           navigateFallback: '/offline.html',
@@ -147,11 +148,7 @@ export default defineConfig(({ mode }) => {
           ],
           
           // Limpieza de caches antiguas
-          cleanupOutdatedCaches: true,
-          
-          // Skip waiting para activar inmediatamente
-          skipWaiting: true,
-          clientsClaim: true
+          cleanupOutdatedCaches: true
         },
         manifest: {
           name: 'Bocado - Guía Nutricional Inteligente',

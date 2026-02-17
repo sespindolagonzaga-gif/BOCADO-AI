@@ -115,8 +115,8 @@ const MainApp: React.FC<MainAppProps> = ({
       )}
 
       {/* Contenido - ocupa todo el espacio restante */}
-      <main className="flex-1 overflow-hidden min-h-0 pb-20">
-        <div className="max-w-md md:max-w-lg mx-auto">
+      <main className="flex-1 overflow-hidden min-h-0 pb-20 flex flex-col">
+        <div className="h-full max-w-md md:max-w-lg mx-auto flex flex-col">
           <ErrorBoundary>
             {activeTab === 'recommendation' && (
               <RecommendationScreen 
@@ -127,22 +127,22 @@ const MainApp: React.FC<MainAppProps> = ({
               />
             )}
             {activeTab === 'pantry' && (
-              <div className="p-4 animate-fade-in h-full">
+              <div className="p-4 animate-fade-in flex-1 flex flex-col min-h-0">
                 <PantryScreen userUid={userUid} />
               </div>
             )}
             {activeTab === 'saved' && (
-              <div className="p-4 animate-fade-in h-full">
+              <div className="p-4 animate-fade-in flex-1 flex flex-col min-h-0">
                 <SavedRecipesScreen />
               </div>
             )}
             {activeTab === 'restaurants' && (
-              <div className="p-4 animate-fade-in h-full">
+              <div className="p-4 animate-fade-in flex-1 flex flex-col min-h-0">
                 <SavedRestaurantsScreen />
               </div>
             )}
             {activeTab === 'profile' && (
-              <div className="p-4 animate-fade-in h-full">
+              <div className="p-4 animate-fade-in flex-1 flex flex-col min-h-0">
                 <ProfileScreen 
                   userUid={userUid}
                   onLogout={handleLogout}

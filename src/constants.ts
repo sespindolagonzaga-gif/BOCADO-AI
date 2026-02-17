@@ -21,13 +21,75 @@ export const ACTIVITY_LEVELS = ['🪑 Sedentario', '🚶‍♂️ Activo ligero'
 export const ACTIVITY_FREQUENCIES = ['Diario', '3-5 veces por semana', '1-2 veces', 'Rara vez'];
 export const GOALS = ['Bajar de peso', 'Subir de peso', 'Generar músculo', 'Salud y bienestar'];
 export const EMAIL_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'];
-export const FOOD_CATEGORIES: Record<string, string[]> = {
-  'Carnes y Aves': ['Res', 'Cerdo', 'Pollo', 'Pavo', 'Cordero', 'Hígado/Vísceras'],
-  'Pescados y Mariscos': ['Pescado Blanco (Merluza/Bacalao)', 'Pescado Graso (Salmón/Atún)', 'Camarones', 'Almejas/Mejillones', 'Calamar/Pulpo', 'Anchoas'],
-  'Lácteos y Huevos': ['Huevo', 'Leche', 'Yogur', 'Queso (Genérico)', 'Quesos Fuertes (Azul, Cabra, Feta)'],
-  'Vegetales y Hortalizas': ['Champiñones', 'Cebolla', 'Ajo', 'Pimiento', 'Tomate', 'Brócoli', 'Coliflor', 'Espinaca', 'Berenjena', 'Calabacín', 'Apio', 'Aceitunas'],
-  'Frutas': ['Aguacate', 'Plátano', 'Frutos Rojos (Fresas)', 'Piña', 'Mango', 'Uvas Pasas'],
-  'Legumbres, Granos y Tubérculos': ['Frijoles', 'Lentejas', 'Garbanzos', 'Maíz', 'Soya/Tofu', 'Papa'],
-  'Frutos Secos y Semillas': ['Cacahuete/Maní', 'Almendras', 'Nueces', 'Sésamo'],
-  'Hierbas, Especias y Condimentos': ['Cilantro', 'Perejil', 'Albahaca', 'Menta', 'Jengibre', 'Comino', 'Picante (Chile/Ají)', 'Mayonesa', 'Mostaza'],
+export const FOOD_CATEGORIES: Record<string, Array<{key: string, default: string}>> = {
+  'meatPoultry': [
+    { key: 'beef', default: 'Res' },
+    { key: 'pork', default: 'Cerdo' },
+    { key: 'chicken', default: 'Pollo' },
+    { key: 'turkey', default: 'Pavo' },
+    { key: 'lamb', default: 'Cordero' },
+    { key: 'liverOrgans', default: 'Hígado/Vísceras' }
+  ],
+  'seafood': [
+    { key: 'whiteFish', default: 'Pescado Blanco (Merluza/Bacalao)' },
+    { key: 'fattyFish', default: 'Pescado Graso (Salmón/Atún)' },
+    { key: 'shrimp', default: 'Camarones' },
+    { key: 'shellfish', default: 'Almejas/Mejillones' },
+    { key: 'squidOctopus', default: 'Calamar/Pulpo' },
+    { key: 'anchovies', default: 'Anchoas' }
+  ],
+  'dairyEggs': [
+    { key: 'egg', default: 'Huevo' },
+    { key: 'milk', default: 'Leche' },
+    { key: 'yogurt', default: 'Yogur' },
+    { key: 'cheeseGeneric', default: 'Queso (Genérico)' },
+    { key: 'strongCheeses', default: 'Quesos Fuertes (Azul, Cabra, Feta)' }
+  ],
+  'vegetables': [
+    { key: 'mushrooms', default: 'Champiñones' },
+    { key: 'onion', default: 'Cebolla' },
+    { key: 'garlic', default: 'Ajo' },
+    { key: 'pepper', default: 'Pimiento' },
+    { key: 'tomato', default: 'Tomate' },
+    { key: 'broccoli', default: 'Brócoli' },
+    { key: 'cauliflower', default: 'Coliflor' },
+    { key: 'spinach', default: 'Espinaca' },
+    { key: 'eggplant', default: 'Berenjena' },
+    { key: 'zucchini', default: 'Calabacín' },
+    { key: 'celery', default: 'Apio' },
+    { key: 'olives', default: 'Aceitunas' }
+  ],
+  'fruits': [
+    { key: 'avocado', default: 'Aguacate' },
+    { key: 'banana', default: 'Plátano' },
+    { key: 'berries', default: 'Frutos Rojos (Fresas)' },
+    { key: 'pineapple', default: 'Piña' },
+    { key: 'mango', default: 'Mango' },
+    { key: 'raisins', default: 'Uvas Pasas' }
+  ],
+  'legumesGrains': [
+    { key: 'beans', default: 'Frijoles' },
+    { key: 'lentils', default: 'Lentejas' },
+    { key: 'chickpeas', default: 'Garbanzos' },
+    { key: 'corn', default: 'Maíz' },
+    { key: 'soyTofu', default: 'Soya/Tofu' },
+    { key: 'potato', default: 'Papa' }
+  ],
+  'nutsSeeeds': [
+    { key: 'peanut', default: 'Cacahuete/Maní' },
+    { key: 'almonds', default: 'Almendras' },
+    { key: 'walnuts', default: 'Nueces' },
+    { key: 'sesame', default: 'Sésamo' }
+  ],
+  'herbsSpices': [
+    { key: 'cilantro', default: 'Cilantro' },
+    { key: 'parsley', default: 'Perejil' },
+    { key: 'basil', default: 'Albahaca' },
+    { key: 'mint', default: 'Menta' },
+    { key: 'ginger', default: 'Jengibre' },
+    { key: 'cumin', default: 'Comino' },
+    { key: 'spicy', default: 'Picante (Chile/Ají)' },
+    { key: 'mayonnaise', default: 'Mayonesa' },
+    { key: 'mustard', default: 'Mostaza' }
+  ],
 };
