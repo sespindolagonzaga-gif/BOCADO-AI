@@ -14,13 +14,14 @@ import { ThemeProvider } from './contexts/ThemeContext';
 
 // ✅ IMPORTACIÓN ESTÁTICA (sin lazy loading)
 import HomeScreen from './components/HomeScreen';
+import RegistrationMethodScreen from './components/RegistrationMethodScreen';
 import RegistrationFlow from './components/RegistrationFlow';
 import LoginScreen from './components/LoginScreen';
 import PermissionsScreen from './components/PermissionsScreen';
 import PlanScreen from './components/PlanScreen';
 import MainApp from './components/MainApp';
 
-export type AppScreen = 'home' | 'register' | 'login' | 'recommendation' | 'permissions' | 'plan';
+export type AppScreen = 'home' | 'registerMethod' | 'register' | 'login' | 'recommendation' | 'permissions' | 'plan';
 
 // Configuración de TanStack Query
 const queryClient = new QueryClient({
@@ -188,7 +189,19 @@ function AppContent() {
     try {
       switch (currentScreen) {
         case 'permissions':
-          return <PermissionsScreen onAccept={() => setCurrentScreen('register')} onGoHome={() => setCurrentScreen('home')} />;
+          return <PermissionsScreen onAccept={() => setCurrentScreen('registerMethod')} onGoHome={() => setCurrentScreen('home')} />;
+        case 'registerMethod':
+          return (
+            <RegistrationMethodScreen 
+              onGoogleSuccess={(uid, email) => {
+                // Usuario se registró con Google, ir al flujo de completar perfil
+                setIsNewUser(true);
+                setCurrentScreen('register');
+              }}
+              onChooseEmail={() => setCurrentScreen('register')}
+              onGoHome={() => setCurrentScreen('home')}
+            />
+          );
         case 'register':
           return <RegistrationFlow onRegistrationComplete={() => { setIsNewUser(true); setCurrentScreen('recommendation'); }} onGoHome={() => setCurrentScreen('home')} />;
         case 'login':

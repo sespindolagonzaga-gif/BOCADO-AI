@@ -217,6 +217,7 @@
     "resetSubtitle": "We'll send you a link",
     "sendLink": "Send link",
     "sending": "Sending...",
+    "continueWithGoogle": "Continue with Google",
     "emailNotVerified": "Email not verified",
     "verificationRequired": "To continue using Bocado, you must verify your email address.",
     "resendEmail": "Resend email",
@@ -242,6 +243,12 @@
       "resetEmailSent": "An email has been sent to {email} with instructions.",
       "profileIncomplete": "Incomplete profile. Please contact support."
     }
+  },
+  "registration": {
+    "title": "Create account",
+    "subtitle": "Choose how you want to sign up",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithEmail": "Continue with Email"
   },
   "savedRestaurants": {
     "title": "Saved Restaurants",

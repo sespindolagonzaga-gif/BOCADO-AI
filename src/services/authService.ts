@@ -1,6 +1,11 @@
 import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  signInWithPopup, 
+  GoogleAuthProvider 
+} from 'firebase/auth';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { FormData, UserProfile } from '../types';
 import { separateUserData } from '../utils/profileSanitizer';
 
@@ -54,4 +59,44 @@ export const registerUser = async (formData: FormData): Promise<{ uid: string }>
   await setDoc(doc(db, 'users', uid), cleanForFirestore(userProfile));
 
   return { uid };
+};
+
+/**
+ * Inicia sesión con Google
+ * Si es un usuario nuevo, retorna isNewUser: true para que complete el perfil
+ */
+export const signInWithGoogle = async (): Promise<{ 
+  uid: string; 
+  isNewUser: boolean; 
+  email: string | null;
+}> => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  
+  const userCredential = await signInWithPopup(auth, provider);
+  const user = userCredential.user;
+  
+  // Verificar si el usuario ya tiene perfil en Firestore
+  const userDoc = await getDoc(doc(db, 'users', user.uid));
+  const isNewUser = !userDoc.exists();
+  
+  // Si es usuario nuevo, crear un perfil básico (se completará después)
+  if (isNewUser) {
+    const basicProfile: Partial<UserProfile> = {
+      uid: user.uid,
+      emailVerified: user.emailVerified,
+      createdAt: serverTimestamp() as UserProfile['createdAt'],
+      updatedAt: serverTimestamp() as UserProfile['updatedAt'],
+    };
+    
+    await setDoc(doc(db, 'users', user.uid), cleanForFirestore(basicProfile));
+  }
+  
+  return { 
+    uid: user.uid, 
+    isNewUser,
+    email: user.email 
+  };
 };

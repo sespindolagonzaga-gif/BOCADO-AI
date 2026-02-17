@@ -217,6 +217,7 @@
     "resetSubtitle": "Te enviaremos un enlace",
     "sendLink": "Enviar enlace",
     "sending": "Enviando...",
+    "continueWithGoogle": "Continuar con Google",
     "emailNotVerified": "Correo no verificado",
     "verificationRequired": "Para continuar usando Bocado, debes verificar tu correo electrónico.",
     "resendEmail": "Reenviar correo",
@@ -242,6 +243,12 @@
       "resetEmailSent": "Se ha enviado un correo a {email} con instrucciones.",
       "profileIncomplete": "Perfil incompleto. Por favor contacta soporte."
     }
+  },
+  "registration": {
+    "title": "Crear cuenta",
+    "subtitle": "Elige cómo quieres registrarte",
+    "continueWithGoogle": "Continuar con Google",
+    "continueWithEmail": "Continuar con Email"
   },
   "savedRestaurants": {
     "title": "Restaurantes guardados",
