@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSmartNotifications, SmartReminder } from '../hooks/useSmartNotifications';
 import { Bell, BellOff, Clock, CheckCircle } from './icons';
 import { trackEvent } from '../firebaseConfig';
@@ -37,7 +38,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
 
   // Si el navegador no soporta notificaciones
   if (!isSupported) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-fade-in">
           <div className="text-center">
@@ -56,7 +57,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
             </button>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -154,7 +156,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
     }
   };
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden"
       style={{ touchAction: 'none', overscrollBehavior: 'none' }}
@@ -414,7 +416,8 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

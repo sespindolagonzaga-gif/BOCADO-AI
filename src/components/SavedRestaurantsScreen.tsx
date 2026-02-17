@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useSavedItems, useToggleSavedItem } from '../hooks/useSavedItems';
 import { useAuthStore } from '../stores/authStore';
 import { trackEvent } from '../firebaseConfig';
@@ -143,8 +144,8 @@ const SavedRestaurantsScreen: React.FC = () => {
       </div>
 
       {/* Modal de confirmación */}
-      {mealToConfirmDelete && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
+      {mealToConfirmDelete && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
           <div className="bg-white rounded-3xl shadow-bocado w-full max-w-sm p-6 text-center">
             <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-xl">🗑️</span>
@@ -175,7 +176,8 @@ const SavedRestaurantsScreen: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
