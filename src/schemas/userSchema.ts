@@ -18,7 +18,8 @@ export const step1Schema = z.object({
 
 // ✅ Esquema para el Paso 2 (Salud y Nutrición)
 export const step2Schema = z.object({
-  allergies: z.array(z.string()),
+  diseases: z.array(z.string()).default([]),
+  allergies: z.array(z.string()).default([]),
   otherAllergies: z.string().optional(),
   nutritionalGoal: z.array(z.string()).min(1, "Selecciona al menos un objetivo"),
 }).refine((data) => {
