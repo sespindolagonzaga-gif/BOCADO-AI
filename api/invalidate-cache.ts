@@ -26,6 +26,8 @@ if (!getApps().length) {
     if (serviceAccountKey) {
       const serviceAccount = JSON.parse(serviceAccountKey.trim());
       initializeApp({ credential: cert(serviceAccount) });
+    } else {
+      console.warn('[invalidate-cache] FIREBASE_SERVICE_ACCOUNT_KEY not set - auth will fail');
     }
   } catch (error) {
     console.error('[invalidate-cache] Firebase init error:', error);
@@ -36,13 +38,21 @@ if (!getApps().length) {
 // CORS
 // ============================================
 const ALLOWED_ORIGINS = [
+  // Producción
   'https://bocado-ai.vercel.app',
-  'https://www.bocado-ai.vercel.app',
+  'https://bocado.app',
+  'https://www.bocado.app',
+  'https://app.bocado.app',
+  // Desarrollo
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
 ];
 
 const isOriginAllowed = (origin: string | undefined): boolean => {
   if (!origin) return true; // same-origin requests
-  if (origin.startsWith('http://localhost:')) return true;
+  if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) return true;
   return ALLOWED_ORIGINS.includes(origin);
 };
 

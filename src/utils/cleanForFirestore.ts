@@ -12,10 +12,18 @@ export const cleanForFirestore = (obj: Record<string, any>): Record<string, any>
   const cleanValue = (value: any): any => {
     if (value === undefined) return null;
     if (value === null) return null;
-    if (typeof value === 'object' && !Array.isArray(value)) {
+    // Preserve Firestore-native types and Date instances
+    if (value instanceof Date) return value;
+    if (Array.isArray(value)) {
+      return value.map(v => cleanValue(v)).filter(v => v !== undefined);
+    }
+    if (typeof value === 'object') {
       const cleanedObj: Record<string, any> = {};
       Object.keys(value).forEach(k => {
-        cleanedObj[k] = cleanValue(value[k]);
+        const cleaned = cleanValue(value[k]);
+        if (cleaned !== undefined) {
+          cleanedObj[k] = cleaned;
+        }
       });
       return cleanedObj;
     }

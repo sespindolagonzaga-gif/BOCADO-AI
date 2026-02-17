@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
         // Control manual de actualizaciones
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-          importScripts: ['firebase-messaging-sw.js', 'sw-extension.js'],
+          importScripts: ['firebase-messaging-sw.js'],
           
           // Página offline para navegación fallida
           navigateFallback: '/offline.html',
@@ -193,6 +193,12 @@ export default defineConfig(({ mode }) => {
               type: 'image/png'
             },
             {
+              src: '/icons/icon-192x192.png',
+              sizes: '192x192',
+              type: 'image/png',
+              purpose: 'maskable'
+            },
+            {
               src: '/icons/icon-384x384.png',
               sizes: '384x384',
               type: 'image/png'
@@ -201,10 +207,31 @@ export default defineConfig(({ mode }) => {
               src: '/icons/icon-512x512.png',
               sizes: '512x512',
               type: 'image/png'
+            },
+            {
+              src: '/icons/icon-512x512.png',
+              sizes: '512x512',
+              type: 'image/png',
+              purpose: 'maskable'
             }
           ],
-          categories: ['health', 'food', 'lifestyle'],
-          screenshots: []
+          shortcuts: [
+            {
+              name: 'Nueva Recomendación',
+              short_name: 'Recomendar',
+              description: 'Obtener una nueva recomendación de comida',
+              url: '/?action=recommend',
+              icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }]
+            },
+            {
+              name: 'Mi Perfil',
+              short_name: 'Perfil',
+              description: 'Ver y editar tu perfil',
+              url: '/?action=profile',
+              icons: [{ src: '/icons/icon-96x96.png', sizes: '96x96' }]
+            }
+          ],
+          categories: ['health', 'food', 'lifestyle']
         },
         devOptions: {
           enabled: true,

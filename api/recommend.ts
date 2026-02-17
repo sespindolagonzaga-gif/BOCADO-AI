@@ -34,7 +34,7 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 const RECIPE_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
 
-const RESTAURANT_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","recomendaciones":[{"id":1,"nombre_restaurante":"DEBE coincidir exactamente con nombre de la lista","tipo_comida":"ej: Italiana","direccion_aproximada":"COPIAR dirección exacta de la lista","plato_sugerido":"tipo de plato típico del restaurante según su cocina","por_que_es_bueno":"explicar por qué encaja con el perfil","hack_saludable":"consejo práctico para pedir saludable"}]}`;
+const RESTAURANT_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicar por qué","hack_saludable":"consejo práctico"}]}`;
 
 // ============================================
 // AIRTABLE CACHE (24 horas TTL) - Evita rate limits de Airtable
@@ -1592,6 +1592,16 @@ Personaliza el saludo_personalizado usando${demographicParts.length > 0 ? ' el p
       // ✨ NUEVA LÓGICA: Detectar si está viajando y qué moneda usar
       const travelContext = await detectTravelContext(searchCoords, request, user);
       
+      // Logging detallado para debugging de ubicación
+      
+      const locationContext = searchCoords 
+        ? `Coordenadas de referencia: ${formatCoordinates(searchCoords)}`
+        : `Ciudad: ${user.city || "su ciudad"}`;
+      
+      const locationInstruction = searchCoords
+        ? `**IMPORTANTE - RANGO DE BÚSQUEDA**: Busca restaurantes DENTRO de un radio de ${SEARCH_RADIUS_METERS / 1000}km desde las coordenadas ${formatCoordinates(searchCoords)}. Prioriza lugares cercanos a esta ubicación.`
+        : `**IMPORTANTE**: Busca restaurantes en ${user.city || "su ciudad"} que sean accesibles y no muy alejados del centro.`;
+      
       // Contexto demográfico relevante (solo si está disponible)
       const demographicPartsOut = [
         user.eatingHabit ? `Dieta: ${user.eatingHabit}` : '',
@@ -1631,57 +1641,32 @@ Personaliza el saludo_personalizado usando${demographicParts.length > 0 ? ' el p
         ? `${travelContext.locationLabel}. Adapta tono amigable para turista. Menciona precios en ${travelContext.activeCurrency}.`
         : '';
 
-      // ✅ GOOGLE PLACES: Buscar restaurantes REALES primero
-      const cravingsText = Array.isArray(request.cravings) ? request.cravings.join(' ') : (request.cravings || '');
-      const searchQuery = cravingsText || user.eatingHabit || 'saludable';
-      const placesResult = await searchNearbyRestaurants(
-        searchCoords || { lat: 0, lng: 0 }, // Si no hay coords, Places no devolverá nada
-        searchQuery,
-        request.budget,
-        SEARCH_RADIUS_METERS,
-        request.language || 'es'
-      );
-      
-      const hasRealPlaces = placesResult.restaurants.length > 0;
-      const placesContext = hasRealPlaces
-        ? `\n### RESTAURANTES REALES VERIFICADOS (Google Places):\n${formatPlacesForPrompt(placesResult.restaurants)}`
-        : '';
-
-      // ✅ Prompt con datos reales de Google Places
-      finalPrompt = `Eres guía gastronómico experto ${travelContext.locationLabel}. Selecciona los 5 MEJORES restaurantes para este usuario.
+      // ✅ OPTIMIZACIÓN: Prompt conciso para restaurantes (~40% menos tokens)
+      finalPrompt = `Eres guía gastronómico ${travelContext.locationLabel}. Recomienda 5 restaurantes reales.
 
 PERFIL: ${profileLineOut || 'Sin restricciones'}
-SOLICITUD: ${searchQuery}, ${budgetInstruction}
+UBICACIÓN: ${locationContext} | RANGO: ${SEARCH_RADIUS_METERS / 1000}km
+SOLICITUD: ${request.cravings || 'saludable'}, ${budgetInstruction}
 ${travelTone ? '\nCONTEXTO: ' + travelTone : ''}
 ${historyContext ? '\nMEMORIA: ' + historyContext.slice(30, 200) : ''}
 ${feedbackContext ? '\nFEEDBACK: ' + feedbackContext.slice(30, 150) : ''}
-${placesContext}
 
-REGLAS CRÍTICAS (OBLIGATORIAS):
-${hasRealPlaces ? `1. SELECCIONA ÚNICAMENTE restaurantes de la lista "RESTAURANTES REALES VERIFICADOS" de arriba.
-2. COPIA el nombre EXACTO del restaurante tal como aparece en la lista (sin modificar ni una letra).
-3. COPIA la dirección EXACTA tal como aparece en la lista.
-4. NO INVENTES restaurantes que no estén en la lista.
-5. Selecciona los 5 que mejor se ajusten al PERFIL y la SOLICITUD del usuario.
-6. Si la lista tiene menos de 5, usa TODOS los de la lista.` : `1. Recomienda restaurantes REALES que conozcas con certeza en ${user.city || 'la ciudad'}.
-2. Si NO estás 100% seguro de que un restaurante existe, NO lo incluyas.
-3. Prefiere cadenas conocidas o restaurantes populares antes que inventar nombres.
-4. Direcciones deben ser lo más específicas posible.`}
-${user.eatingHabit && (user.eatingHabit.includes('Vegano') || user.eatingHabit.includes('Vegetariano')) ? `\n7. CRÍTICO: Solo restaurantes con opciones ${user.eatingHabit.toLowerCase()} reales` : ''}
-${travelContext.isTraveling ? `\n8. Menciona precios aproximados en ${travelContext.activeCurrency} (moneda local)` : ''}
-
-PARA "plato_sugerido": Sugiere un TIPO de plato coherente con el tipo de cocina del restaurante (ej: si es japonés → "Sushi variado" o "Ramen"). NO inventes nombres de platos específicos del menú a menos que sean platos universales de ese tipo de cocina.
-PARA "por_que_es_bueno": Explica por qué este restaurante específico encaja con el perfil del usuario.
-PARA "hack_saludable": Da un consejo práctico y real para pedir de forma saludable en ese tipo de restaurante.
+REGLAS CRÍTICAS:
+1. Nombres reales de restaurantes existentes ${travelContext.isTraveling ? 'cerca de tu ubicación actual' : `en ${user.city || 'su ciudad'}`}
+2. DIRECCIONES EXACTAS: Calle Número, Colonia (ej: "Calle Arturo Soria 126, Chamartín")
+3. Si no sabes dirección exacta: usa centro comercial específico
+4. NO uses "por el centro" o direcciones vagas
+5. Rango máximo: ${SEARCH_RADIUS_METERS / 1000}km
+${user.eatingHabit && (user.eatingHabit.includes('Vegano') || user.eatingHabit.includes('Vegetariano')) ? `\n6. CRÍTICO: SOLO restaurantes con opciones ${user.eatingHabit.toLowerCase()} certificadas` : ''}
+${travelContext.isTraveling ? `\n7. Menciona precios aproximados en ${travelContext.activeCurrency} (moneda local)` : ''}
 
 Responde EXCLUSIVAMENTE en ${request.language === 'en' ? 'INGLÉS.' : 'ESPAÑOL.'}
 Responde en formato JSON usando esta estructura exacta:
 ${RESTAURANT_JSON_TEMPLATE}
 
-Personaliza el saludo_personalizado${travelContext.isTraveling ? ' mencionando exploración de la zona' : (demographicPartsOut.length > 0 ? ' usando perfil' : ' con mensaje motivador')}.`;
-
-      // Guardar referencia a Places para post-procesamiento
-      (request as any)._placesData = placesResult.restaurants;
+Personaliza el saludo_personalizado${travelContext.isTraveling ? ' mencionando exploración de la zona' : (demographicPartsOut.length > 0 ? ' usando perfil' : ' con mensaje motivador')}.
+En por_que_es_bueno${medicalRestrictionsOut.length > 0 || demographicPartsOut.length > 0 ? ' explica cómo se ajusta al perfil' : ' explica por qué es buena opción'}.
+En hack_saludable${medicalRestrictionsOut.length > 0 ? ' personaliza para sus condiciones' : ' da consejo práctico'}.`;
 
   }
 
@@ -1741,96 +1726,13 @@ Personaliza el saludo_personalizado${travelContext.isTraveling ? ' mencionando e
     }
 
     // ============================================
-    // POST-VALIDACIÓN: INGREDIENTES DE RECETAS
-    // ============================================
-    if (type === 'En casa' && parsedData.receta?.recetas) {
-      // Lista de ingredientes básicos universales que no necesitan estar en Airtable
-      const BASIC_INGREDIENTS = new Set([
-        'sal', 'pimienta', 'aceite', 'aceite de oliva', 'aceite vegetal',
-        'agua', 'vinagre', 'azucar', 'azúcar', 'mantequilla', 'ajo',
-        'cebolla', 'limon', 'limón', 'oregano', 'orégano', 'comino',
-        'paprika', 'pimentón', 'canela', 'perejil', 'cilantro',
-        'salsa de soya', 'salsa de soja', 'mostaza', 'miel',
-        'harina', 'pan', 'arroz', 'pasta', 'huevo', 'huevos',
-        'leche', 'queso', 'crema', 'yogur', 'yogurt',
-        'tomate', 'jitomate', 'zanahoria', 'papa', 'patata',
-        'pollo', 'res', 'cerdo', 'atún', 'atun', 'salmon', 'salmón',
-      ]);
-
-      // Obtener nombres de ingredientes de Airtable (ya disponibles en scope)
-      const pantryItemsLower = (await getPantryItemsCached(userId)).map(i => normalizeText(i));
-      
-      // Log de ingredientes que NO están en la lista conocida
-      parsedData.receta.recetas.forEach((receta: any) => {
-        if (!receta.ingredientes || !Array.isArray(receta.ingredientes)) return;
-        
-        const unknownIngredients = receta.ingredientes.filter((ing: string) => {
-          const normalized = normalizeText(ing);
-          // Extraer solo el nombre del ingrediente (sin cantidad)
-          // "200g de pollo" → "pollo", "2 cucharadas de aceite" → "aceite"
-          const parts = normalized.split(/\s+de\s+|\s+/);
-          const ingredientWords = parts.filter(p => p.length > 2 && !/^\d/.test(p));
-          
-          return !ingredientWords.some(word => 
-            BASIC_INGREDIENTS.has(word) || 
-            pantryItemsLower.some(pantry => pantry.includes(word) || word.includes(pantry))
-          );
-        });
-
-        if (unknownIngredients.length > 0) {
-          safeLog('warn', `⚠️ Ingredientes no verificados en "${receta.titulo}": ${unknownIngredients.join(', ')}`);
-        }
-      });
-    }
-
-    // ============================================
     // POST-PROCESAMIENTO PARA LINKS CLICKEABLES
     // ============================================
     if (type === 'Fuera' && parsedData.recomendaciones) {
-      // Obtener datos de Places para matching con place_id
-      const placesData: PlaceResult[] = (request as any)._placesData || [];
-      
-      parsedData.recomendaciones = parsedData.recomendaciones.map((rec: any) => {
-        // Intentar match con Places para obtener place_id
-        const matchedPlace = placesData.find((p: PlaceResult) => {
-          const recName = normalizeText(rec.nombre_restaurante || '');
-          const placeName = normalizeText(p.name || '');
-          // Match exacto o parcial (>70% coincidencia)
-          return recName === placeName || 
-                 placeName.includes(recName) || 
-                 recName.includes(placeName);
-        });
-        
-        if (matchedPlace) {
-          // ✅ Usar datos verificados de Google Places
-          rec.link_maps = generateMapsLinkFromPlaceId(
-            matchedPlace.place_id, 
-            matchedPlace.name, 
-            matchedPlace.formatted_address
-          );
-          // Sobreescribir dirección con la real de Google
-          rec.direccion_aproximada = matchedPlace.formatted_address || rec.direccion_aproximada;
-          // Agregar rating si existe
-          if (matchedPlace.rating) {
-            rec.google_rating = matchedPlace.rating;
-            rec.google_reviews = matchedPlace.user_ratings_total;
-          }
-          if (matchedPlace.price_level !== undefined) {
-            rec.price_level = matchedPlace.price_level;
-          }
-        } else {
-          // Fallback: usar link genérico (sin place_id)
-          rec = sanitizeRecommendation(rec, user.city || "");
-        }
-        
-        // Asegurar campos mínimos
-        rec.direccion_aproximada = rec.direccion_aproximada || `En ${user.city || 'la ciudad'}`;
-        rec.por_que_es_bueno = rec.por_que_es_bueno || 'Opción saludable disponible';
-        rec.plato_sugerido = rec.plato_sugerido || 'Consulta el menú saludable';
-        rec.hack_saludable = rec.hack_saludable || 'Pide porciones pequeñas';
-        
-        return rec;
-      });
+      // Generar links válidos en el backend usando nombre + dirección + ciudad
+      parsedData.recomendaciones = parsedData.recomendaciones.map((rec: any) => 
+        sanitizeRecommendation(rec, user.city || "")
+      );
     }
 
     const batch = db.batch();

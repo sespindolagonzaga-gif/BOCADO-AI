@@ -28,15 +28,23 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
   } = usePWA();
 
   const [dismissedInstall, setDismissedInstall] = React.useState(() => {
-    // Persistir el dismissed en sessionStorage para la sesión actual
-    return sessionStorage.getItem('pwa-install-dismissed') === 'true';
+    // Persistir dismiss con expiración de 3 días para no ser demasiado agresivo
+    const dismissedAt = localStorage.getItem('pwa-install-dismissed-at');
+    if (!dismissedAt) return false;
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const elapsed = Date.now() - parseInt(dismissedAt, 10);
+    if (elapsed > THREE_DAYS_MS) {
+      localStorage.removeItem('pwa-install-dismissed-at');
+      return false;
+    }
+    return true;
   });
   
   const [dismissedUpdate, setDismissedUpdate] = React.useState(false);
 
   const handleDismissInstall = () => {
     setDismissedInstall(true);
-    sessionStorage.setItem('pwa-install-dismissed', 'true');
+    localStorage.setItem('pwa-install-dismissed-at', String(Date.now()));
   };
 
   const handleDismissUpdate = () => {

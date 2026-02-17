@@ -97,7 +97,7 @@ const SavedRestaurantsScreen: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex-1 px-4 pb-4 min-h-0">
+      <div className="flex-1 px-4 pb-8 min-h-0">
         {savedRestaurants.length === 0 ? (
           <div className="text-center py-12 px-6 bg-bocado-background rounded-2xl border-2 border-dashed border-bocado-border">
             <p className="text-bocado-gray text-base mb-2">{t('saved.emptyState')}</p>

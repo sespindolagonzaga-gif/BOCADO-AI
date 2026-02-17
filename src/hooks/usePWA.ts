@@ -1,11 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { logger } from '../utils/logger';
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 interface PWAState {
   isInstallable: boolean;
   isOffline: boolean;
   isInstalled: boolean;
-  installPrompt: Event | null;
+  installPrompt: BeforeInstallPromptEvent | null;
   updateAvailable: boolean;
   isIOS: boolean;
   isAndroid: boolean;
@@ -68,15 +73,27 @@ export const usePWA = () => {
       setState(prev => ({
         ...prev,
         isInstallable: true,
-        installPrompt: e,
+        installPrompt: e as BeforeInstallPromptEvent,
       }));
       logger.info('PWA: App is installable');
     };
 
+    const handleAppInstalled = () => {
+      logger.info('PWA: App was installed');
+      setState(prev => ({
+        ...prev,
+        isInstalled: true,
+        isInstallable: false,
+        installPrompt: null,
+      }));
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
     
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
@@ -158,7 +175,9 @@ export const usePWA = () => {
     }
 
     try {
-      const promptEvent = state.installPrompt as any;
+      const promptEvent = state.installPrompt;
+      if (!promptEvent) return false;
+      
       promptEvent.prompt();
       const result = await promptEvent.userChoice;
       

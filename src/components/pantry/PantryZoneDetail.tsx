@@ -194,7 +194,7 @@ export const PantryZoneDetail: React.FC<PantryZoneDetailProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white">
+    <div className="flex-1 flex flex-col bg-white relative">
       <div className="sticky top-0 bg-white z-20 border-b border-bocado-border/50 px-4 py-3">
         <div className="flex items-center gap-2 mb-3">
           <button
@@ -314,7 +314,7 @@ export const PantryZoneDetail: React.FC<PantryZoneDetailProps> = ({
       </div>
 
       {urgentItems.length > 0 && (
-        <div className="absolute bottom-20 left-4 right-4 bg-white border-t-2 border-red-400 rounded-xl p-3 shadow-bocado-lg z-30 flex items-center justify-between">
+        <div className="fixed bottom-24 left-4 right-4 max-w-md mx-auto bg-white border-t-2 border-red-400 rounded-xl p-3 shadow-bocado-lg z-30 flex items-center justify-between">
           <div className="flex flex-col">
             <span className="text-2xs font-bold text-red-500 uppercase tracking-wider">{t('pantry.expiry')}</span>
             <span className="text-xs font-bold text-bocado-text">{t('pantry.urgentCount', { count: urgentItems.length })}</span>

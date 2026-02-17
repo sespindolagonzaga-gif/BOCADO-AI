@@ -49,6 +49,7 @@ export function useGeolocation() {
 
   // ✅ FIX #9: Detect Safari iOS for proper permission handling
   const isSafariIOS = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
     const ua = navigator.userAgent;
     const iOS = /iPad|iPhone|iPod/.test(ua);
     const webkit = /WebKit/.test(ua);

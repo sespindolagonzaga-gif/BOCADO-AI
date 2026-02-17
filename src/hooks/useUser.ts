@@ -79,8 +79,8 @@ export const useUserProfile = (
     // Reintentar si no se encuentra el perfil (eventual consistency)
     retry: (failureCount, error) => {
       // No reintentar errores permanentes (permisos, no encontrado)
-      const msg = error?.message || '';
-      if (msg.includes('permission-denied') || msg.includes('not-found')) return false;
+      const code = (error as any)?.code || '';
+      if (code === 'permission-denied' || code === 'not-found') return false;
       return failureCount < 5;
     },
     retryDelay: (attemptIndex) => Math.min(1000 * Math.pow(2, attemptIndex), 5000),
