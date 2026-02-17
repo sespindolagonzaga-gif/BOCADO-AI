@@ -4,11 +4,47 @@ import { DISEASES, ALLERGIES, GOALS } from '../../constants';
 import { trackEvent } from '../../firebaseConfig'; // ✅ Importado trackEvent
 import { useTranslation } from '../../contexts/I18nContext';
 
+// Funciones de traducción para las opciones
+const translateDisease = (disease: string, t: (key: string) => string): string => {
+  const map: Record<string, string> = {
+    'Hipertensión': t('diseases.hypertension'),
+    'Diabetes': t('diseases.diabetes'),
+    'Hipotiroidismo': t('diseases.hypothyroidism'),
+    'Hipertiroidismo': t('diseases.hyperthyroidism'),
+    'Colesterol': t('diseases.cholesterol'),
+    'Intestino irritable': t('diseases.ibs')
+  };
+  return map[disease] || disease;
+};
+
+const translateAllergy = (allergy: string, t: (key: string) => string): string => {
+  const map: Record<string, string> = {
+    'Intolerante a la lactosa': t('allergies.lactoseIntolerant'),
+    'Alergia a frutos secos': t('allergies.nutAllergy'),
+    'Celíaco': t('allergies.celiac'),
+    'Vegano': t('allergies.vegan'),
+    'Vegetariano': t('allergies.vegetarian'),
+    'Otro': t('allergies.other')
+  };
+  return map[allergy] || allergy;
+};
+
+const translateGoal = (goal: string, t: (key: string) => string): string => {
+  const map: Record<string, string> = {
+    'Bajar de peso': t('goals.loseWeight'),
+    'Subir de peso': t('goals.gainWeight'),
+    'Generar músculo': t('goals.buildMuscle'),
+    'Salud y bienestar': t('goals.healthWellness')
+  };
+  return map[goal] || goal;
+};
+
 const MultiSelectButton: React.FC<{
   option: string;
+  label: string;
   selected: boolean;
   onToggle: () => void;
-}> = ({ option, selected, onToggle }) => (
+}> = ({ option, label, selected, onToggle }) => (
   <button
     type="button"
     onClick={onToggle}
@@ -18,7 +54,7 @@ const MultiSelectButton: React.FC<{
         : 'bg-white text-bocado-dark-gray border-bocado-border hover:border-bocado-green/50'
     }`}
   >
-    {option}
+    {label}
   </button>
 );
 
@@ -83,8 +119,9 @@ const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
         <div className="flex flex-wrap gap-2">
           {DISEASES.map(disease => (
             <MultiSelectButton 
-              key={disease} 
-              option={disease} 
+              key={disease}
+              option={disease}
+              label={translateDisease(disease, t)}
               selected={diseases.includes(disease)} 
               onToggle={() => toggleSelection('diseases', disease)} 
             />
@@ -100,8 +137,9 @@ const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
         <div className="flex flex-wrap gap-2">
           {ALLERGIES.map(allergy => (
             <MultiSelectButton 
-              key={allergy} 
-              option={allergy} 
+              key={allergy}
+              option={allergy}
+              label={translateAllergy(allergy, t)}
               selected={allergies.includes(allergy)} 
               onToggle={() => toggleSelection('allergies', allergy)} 
             />
@@ -136,8 +174,9 @@ const Step2: React.FC<FormStepProps> = ({ data, updateData, errors }) => {
         <div className="flex flex-wrap gap-2">
           {GOALS.map(goal => (
             <MultiSelectButton 
-              key={goal} 
-              option={goal} 
+              key={goal}
+              option={goal}
+              label={translateGoal(goal, t)}
               selected={nutritionalGoal.includes(goal)} 
               onToggle={() => toggleNutritionalGoal(goal)} 
             />

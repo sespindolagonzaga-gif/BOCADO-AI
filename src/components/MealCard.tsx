@@ -51,6 +51,15 @@ const getDifficultyStyle = (difficulty: string): string => {
   return DIFFICULTY_STYLES[difficulty] || 'bg-bocado-background text-bocado-dark-gray';
 };
 
+const translateDifficulty = (difficulty: string, t: (key: string) => string): string => {
+  const map: Record<string, string> = {
+    'Fácil': t('difficulty.easy'),
+    'Media': t('difficulty.medium'),
+    'Difícil': t('difficulty.hard'),
+  };
+  return map[difficulty] || difficulty;
+};
+
 // ============================================
 // COMPONENTES HIJO MEMOIZADOS
 // ============================================
@@ -417,7 +426,7 @@ const MealCard: React.FC<MealCardProps> = memo(({
 
                 {!isRestaurant && recipe.difficulty && recipe.difficulty !== 'N/A' && (
                   <span className={`px-2 py-1 rounded-lg font-medium ${getDifficultyStyle(recipe.difficulty)}`}>
-                    {recipe.difficulty}
+                    {translateDifficulty(recipe.difficulty, t)}
                   </span>
                 )}
               </div>

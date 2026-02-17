@@ -127,6 +127,32 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoadedSettingsRef = useRef(false);
 
+  // Limpiar datos corruptos con claves de traducción al inicio
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const hasCorruptedData = parsed.some((item: any) => 
+          item.title?.includes('notifications.') || 
+          item.title?.includes('notificacions.') ||
+          item.body?.includes('notifications.') || 
+          item.body?.includes('notificacions.')
+        );
+        
+        if (hasCorruptedData) {
+          logger.info('Limpiando datos de notificaciones corruptos');
+          localStorage.removeItem(STORAGE_KEY);
+          // Regenerar con traducciones correctas
+          const defaultReminders = createDefaultReminders(t);
+          setReminders(defaultReminders);
+        }
+      } catch (e) {
+        logger.error('Error verificando datos de notificaciones:', e);
+      }
+    }
+  }, []); // Solo al montar
+
   // Verificar soporte
   useEffect(() => {
     const checkSupport = async () => {
@@ -208,6 +234,28 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
         logger.error('Error cargando recordatorios:', e);
       }
     }
+  }, [t]);
+
+  // Actualizar traducciones de recordatorios cuando cambie el idioma
+  useEffect(() => {
+    setReminders(prev => {
+      const defaultReminders = createDefaultReminders(t);
+      return prev.map(reminder => {
+        const defaultRem = defaultReminders.find(dr => dr.id === reminder.id);
+        if (defaultRem) {
+          // Detectar si el título es una clave de traducción (contiene "notifications.")
+          const isTranslationKey = reminder.title.includes('notifications.') || reminder.title.includes('notificacions.');
+          
+          // Mantener configuraciones del usuario pero actualizar traducciones
+          return {
+            ...reminder,
+            title: defaultRem.title,
+            body: defaultRem.body,
+          };
+        }
+        return reminder;
+      });
+    });
   }, [t]);
 
   // Cargar settings desde Firestore (fuente primaria)

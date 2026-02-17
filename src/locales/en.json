@@ -805,6 +805,11 @@
     "seguido": "Often",
     "siempre": "Always"
   },
+  "difficulty": {
+    "easy": "Easy",
+    "medium": "Medium",
+    "hard": "Hard"
+  },
   "goals": {
     "loseWeight": "Lose weight",
     "gainWeight": "Gain weight",

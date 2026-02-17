@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import { initSentry } from './utils/sentry';
+import './utils/cleanNotifications'; // Inicializar utilidades de limpieza de notificaciones
 
 // Inicializar Sentry antes de montar la app
 initSentry();

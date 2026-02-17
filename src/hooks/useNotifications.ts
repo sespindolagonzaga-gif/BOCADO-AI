@@ -74,6 +74,32 @@ export const useNotifications = (): UseNotificationsReturn => {
   const [lastMessage, setLastMessage] = useState<any>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Limpiar datos corruptos con claves de traducción al inicio
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const hasCorruptedData = parsed.some((item: any) => 
+          item.title?.includes('notifications.') || 
+          item.title?.includes('notificacions.') ||
+          item.body?.includes('notifications.') || 
+          item.body?.includes('notificacions.')
+        );
+        
+        if (hasCorruptedData) {
+          logger.info('Limpiando datos de notificaciones corruptos');
+          localStorage.removeItem(STORAGE_KEY);
+          // Regenerar con traducciones correctas
+          const defaultSchedules = createDefaultSchedules(t);
+          setSchedules(defaultSchedules);
+        }
+      } catch (e) {
+        logger.error('Error verificando datos de notificaciones:', e);
+      }
+    }
+  }, []); // Solo al montar
+
   // Verificar soporte al inicio
   useEffect(() => {
     const checkSupport = async () => {
@@ -102,6 +128,28 @@ export const useNotifications = (): UseNotificationsReturn => {
         logger.error('Error cargando horarios de notificaciones:', e);
       }
     }
+  }, [t]);
+
+  // Actualizar traducciones de horarios cuando cambie el idioma
+  useEffect(() => {
+    setSchedules(prev => {
+      const defaultSchedules = createDefaultSchedules(t);
+      return prev.map(schedule => {
+        const defaultSch = defaultSchedules.find(ds => ds.id === schedule.id);
+        if (defaultSch) {
+          // Detectar si el título es una clave de traducción (contiene "notifications.")
+          const isTranslationKey = schedule.title.includes('notifications.') || schedule.title.includes('notificacions.');
+          
+          // Mantener configuraciones del usuario pero actualizar traducciones
+          return {
+            ...schedule,
+            title: defaultSch.title,
+            body: defaultSch.body,
+          };
+        }
+        return schedule;
+      });
+    });
   }, [t]);
 
   // Guardar horarios cuando cambien

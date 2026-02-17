@@ -936,6 +936,11 @@
     "seguido": "Seguido",
     "siempre": "Siempre"
   },
+  "difficulty": {
+    "easy": "Fácil",
+    "medium": "Media",
+    "hard": "Difícil"
+  },
   "goals": {
     "loseWeight": "Bajar de peso",
     "gainWeight": "Subir de peso",
