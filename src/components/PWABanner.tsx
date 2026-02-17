@@ -41,6 +41,7 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
   });
   
   const [dismissedUpdate, setDismissedUpdate] = React.useState(false);
+  const [isUpdating, setIsUpdating] = React.useState(false);
 
   const handleDismissInstall = () => {
     setDismissedInstall(true);
@@ -72,10 +73,19 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={updateApp}
-              className="px-3 py-1.5 bg-white text-blue-500 text-sm font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+              onClick={() => {
+                if (isUpdating) return;
+                setIsUpdating(true);
+                updateApp();
+              }}
+              disabled={isUpdating}
+              className="px-3 py-1.5 bg-white text-blue-500 text-sm font-semibold rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {t('pwaBanner.update')}
+              {isUpdating ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                t('pwaBanner.update')
+              )}
             </button>
             <button
               onClick={handleDismissUpdate}

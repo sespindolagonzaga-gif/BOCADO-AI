@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { logger } from '../utils/logger';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -33,6 +33,9 @@ export const usePWA = () => {
     isIOS: false,
     isAndroid: false,
   });
+
+  // Ref to prevent SW detection from re-enabling banner while update is in progress
+  const updatingRef = useRef(false);
 
   useEffect(() => {
     const ua = navigator.userAgent || '';
@@ -133,7 +136,7 @@ export const usePWA = () => {
       // Escuchar cuando hay un nuevo service worker esperando
       const checkForUpdates = () => {
         navigator.serviceWorker.ready.then((registration) => {
-          if (registration.waiting) {
+          if (registration.waiting && !updatingRef.current) {
             setState(prev => ({ ...prev, updateAvailable: true }));
             logger.info('PWA: New service worker waiting to activate');
           }
@@ -143,7 +146,7 @@ export const usePWA = () => {
             const newWorker = registration.installing;
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller && !updatingRef.current) {
                   // Hay un nuevo service worker instalado mientras uno viejo sigue activo
                   setState(prev => ({ ...prev, updateAvailable: true }));
                   logger.info('PWA: New service worker installed');
@@ -202,6 +205,10 @@ export const usePWA = () => {
 
   // Función para recargar y actualizar
   const updateApp = useCallback(() => {
+    // Prevent double-clicks / rapid re-entry
+    if (updatingRef.current) return;
+    updatingRef.current = true;
+
     // Ocultar banner inmediatamente
     setState(prev => ({ ...prev, updateAvailable: false }));
     
@@ -220,19 +227,21 @@ export const usePWA = () => {
             if (!refreshing) {
               logger.info('PWA: Controller changed, reloading page');
               refreshing = true;
+              navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
               window.location.reload();
             }
           };
           
           navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
           
-          // Fallback: Si no hay controllerchange en 2 segundos, recargar de todos modos
+          // Fallback: Si no hay controllerchange en 3 segundos, recargar de todos modos
           setTimeout(() => {
             if (!refreshing) {
               logger.info('PWA: Fallback reload after timeout');
+              navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
               window.location.reload();
             }
-          }, 2000);
+          }, 3000);
         } else {
           logger.info('PWA: No waiting service worker, just reloading');
           // Si no hay uno esperando, simplemente recargar
