@@ -44,8 +44,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'breakfast',
     type: 'meal',
-    title: t('notifications.breakfast.title'),
-    body: t('notifications.breakfast.body'),
+    title: t('notifications.settings.breakfast.title'),
+    body: t('notifications.settings.breakfast.body'),
     hour: 8,
     minute: 0,
     enabled: true,
@@ -55,8 +55,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'lunch',
     type: 'meal',
-    title: t('notifications.lunch.title'),
-    body: t('notifications.lunch.body'),
+    title: t('notifications.settings.lunch.title'),
+    body: t('notifications.settings.lunch.body'),
     hour: 13,
     minute: 30,
     enabled: true,
@@ -66,8 +66,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'dinner',
     type: 'meal',
-    title: t('notifications.dinner.title'),
-    body: t('notifications.dinner.body'),
+    title: t('notifications.settings.dinner.title'),
+    body: t('notifications.settings.dinner.body'),
     hour: 19,
     minute: 30,
     enabled: true,
@@ -78,8 +78,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'pantry_update',
     type: 'pantry',
-    title: t('notifications.pantryUpdate.title'),
-    body: t('notifications.pantryUpdate.body'),
+    title: t('notifications.settings.pantryUpdate.title'),
+    body: t('notifications.settings.pantryUpdate.body'),
     hour: 10,
     minute: 0,
     enabled: true,
@@ -89,8 +89,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'rate_recipes',
     type: 'rating',
-    title: t('notifications.rateRecipes.title'),
-    body: t('notifications.rateRecipes.body'),
+    title: t('notifications.settings.rateRecipes.title'),
+    body: t('notifications.settings.rateRecipes.body'),
     hour: 15,
     minute: 0,
     enabled: true,
@@ -100,8 +100,8 @@ const createDefaultReminders = (t: (key: string) => string): SmartReminder[] => 
   {
     id: 'come_back',
     type: 'engagement',
-    title: t('notifications.comeBack.title'),
-    body: t('notifications.comeBack.body'),
+    title: t('notifications.settings.comeBack.title'),
+    body: t('notifications.settings.comeBack.body'),
     hour: 12,
     minute: 0,
     enabled: true,
@@ -479,7 +479,7 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
     
     onForegroundMessage((payload) => {
       if (Notification.permission === 'granted') {
-        new Notification(payload.notification?.title || t('notifications.appName'), {
+        new Notification(payload.notification?.title || t('notifications.settings.appName'), {
           body: payload.notification?.body,
           icon: '/icons/icon-192x192.png',
           badge: '/icons/icon-72x72.png',
@@ -549,8 +549,8 @@ export const useSmartNotifications = (userUid: string | undefined): UseSmartNoti
     }
 
     try {
-      new Notification(t('notifications.testNotification.title'), {
-        body: t('notifications.testNotification.body'),
+      new Notification(t('notifications.settings.testNotification.title'), {
+        body: t('notifications.settings.testNotification.body'),
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-72x72.png',
         tag: 'test',

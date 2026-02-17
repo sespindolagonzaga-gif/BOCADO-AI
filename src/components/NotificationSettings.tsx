@@ -155,10 +155,19 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden animate-fade-in">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-hidden"
+      style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onTouchMove={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
+    >
+      <div
+        className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden animate-fade-in flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="p-6 border-b border-bocado-border">
+        <div className="p-6 border-b border-bocado-border flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-bocado-green/10 rounded-xl flex items-center justify-center">
@@ -179,7 +188,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
         </div>
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[60vh]">
+        <div className="overflow-y-auto flex-1 min-h-0" style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
           {/* Estado de permisos */}
           {permission !== 'granted' ? (
             <div className="mx-6 mt-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
@@ -396,7 +405,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-bocado-border bg-gray-50">
+        <div className="p-4 border-t border-bocado-border bg-gray-50 flex-shrink-0">
           <div className="flex items-start gap-2 text-xs text-bocado-gray">
             <span className="flex-shrink-0">💡</span>
             <p className="leading-relaxed">
