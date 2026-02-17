@@ -27,18 +27,32 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
     isAndroid,
   } = usePWA();
 
-  const [dismissed, setDismissed] = React.useState(false);
+  const [dismissedInstall, setDismissedInstall] = React.useState(() => {
+    // Persistir el dismissed en sessionStorage para la sesión actual
+    return sessionStorage.getItem('pwa-install-dismissed') === 'true';
+  });
+  
+  const [dismissedUpdate, setDismissedUpdate] = React.useState(false);
+
+  const handleDismissInstall = () => {
+    setDismissedInstall(true);
+    sessionStorage.setItem('pwa-install-dismissed', 'true');
+  };
+
+  const handleDismissUpdate = () => {
+    setDismissedUpdate(true);
+  };
 
   // No mostrar si no hay nada que notificar o si fue descartado
   const isMobile = isIOS || isAndroid;
-  const showInstallBanner = showInstall && isInstallable && !isInstalled && isMobile;
+  const showInstallBanner = showInstall && isInstallable && !isInstalled && isMobile && !dismissedInstall;
 
-  if (dismissed || (!showInstallBanner && !isOffline && !updateAvailable)) {
+  if ((!showInstallBanner && !isOffline && !updateAvailable) || (updateAvailable && dismissedUpdate)) {
     return null;
   }
 
   // Banner de actualización (prioridad alta)
-  if (updateAvailable) {
+  if (updateAvailable && !dismissedUpdate) {
     return (
       <div className="absolute top-0 left-0 right-0 z-50 bg-blue-500 text-white px-safe pt-safe py-3 shadow-lg">
         <div className="flex items-center justify-between max-w-xl mx-auto">
@@ -56,7 +70,7 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
               {t('pwaBanner.update')}
             </button>
             <button
-              onClick={() => setDismissed(true)}
+              onClick={handleDismissUpdate}
               className="p-1.5 hover:bg-blue-600 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
@@ -92,7 +106,7 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
           <div className="flex items-center gap-2">
             {isManualInstall ? (
               <button
-                onClick={() => setDismissed(true)}
+                onClick={handleDismissInstall}
                 className="px-3 py-2 bg-white/10 text-white text-sm font-bold rounded-xl hover:bg-white/20 transition-colors"
               >
                 {t('pwaBanner.understood')}
@@ -106,7 +120,7 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
               </button>
             )}
             <button
-              onClick={() => setDismissed(true)}
+              onClick={handleDismissInstall}
               className="p-2 hover:bg-white/10 rounded-xl transition-colors"
             >
               <X className="w-4 h-4" />

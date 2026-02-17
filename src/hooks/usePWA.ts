@@ -139,12 +139,12 @@ export const usePWA = () => {
 
       checkForUpdates();
 
-      // También revisar periódicamente por actualizaciones
+      // Revisar actualizaciones menos frecuentemente (cada 5 minutos en vez de 1)
       const interval = setInterval(() => {
         navigator.serviceWorker.ready.then((registration) => {
           registration.update();
         });
-      }, 60000); // Cada minuto
+      }, 300000); // Cada 5 minutos
 
       return () => clearInterval(interval);
     }
@@ -183,6 +183,9 @@ export const usePWA = () => {
 
   // Función para recargar y actualizar
   const updateApp = useCallback(() => {
+    // Ocultar banner inmediatamente
+    setState(prev => ({ ...prev, updateAvailable: false }));
+    
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
         // Si hay un service worker esperando, activarlo
@@ -212,24 +215,9 @@ export const usePWA = () => {
             }
           }, 2000);
         } else {
-          logger.info('PWA: No waiting service worker, forcing update check');
-          // Si no hay uno esperando, intentar buscar actualización
-          registration.update().then(() => {
-            // Dar tiempo para que se instale el nuevo SW
-            setTimeout(() => {
-              if (registration.waiting) {
-                logger.info('PWA: New service worker found after update');
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                setTimeout(() => window.location.reload(), 500);
-              } else {
-                logger.info('PWA: No new version found, reloading anyway');
-                window.location.reload();
-              }
-            }, 1000);
-          }).catch((error) => {
-            logger.error('PWA: Error checking for updates', error);
-            window.location.reload();
-          });
+          logger.info('PWA: No waiting service worker, just reloading');
+          // Si no hay uno esperando, simplemente recargar
+          window.location.reload();
         }
       }).catch((error) => {
         logger.error('PWA: Error getting service worker registration', error);
