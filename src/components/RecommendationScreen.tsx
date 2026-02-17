@@ -380,8 +380,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
     <div className="flex-1 flex flex-col px-4 py-4 min-h-0">
       {/* Header */}
       <div className="text-center mb-4 shrink-0">
-        <div className="w-32 h-20 mx-auto mb-2">
-          <BocadoLogo className="w-full h-full" />
+        <div className="w-40 mx-auto mb-2">
+          <BocadoLogo className="w-full" />
         </div>
         <h1 className="text-xl font-bold text-bocado-dark-green">{t('recommendation.welcome', { userName: userName || 'Comensal' })}</h1>
         <p className="text-sm text-bocado-gray mt-1">{t('recommendation.subtitle')}</p>
@@ -402,7 +402,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
       {/* Banner de notificaciones (solo si no están activadas y el usuario no lo cerró) */}
       {showNotificationBanner && notificationPermission !== 'granted' && (
-        <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-lg shadow-sm animate-fade-in">
+        <div className="mb-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 rounded-lg shadow-sm animate-fade-in shrink-0">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0">
               <Bell className="w-5 h-5 text-amber-700" />

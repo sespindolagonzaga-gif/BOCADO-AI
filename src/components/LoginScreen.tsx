@@ -300,8 +300,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
   const renderLoginView = () => (
     <>
       <div className="text-center mb-6">
-        <div className="w-32 h-32 mx-auto mb-2">
-          <BocadoLogo className="w-full h-full" />
+        <div className="w-40 mx-auto mb-2">
+          <BocadoLogo className="w-full" />
         </div>
         <h1 className="text-xl font-bold text-bocado-dark-green">{t('login.title')}</h1>
         <p className="text-sm text-bocado-gray mt-1">{t('login.subtitle')}</p>

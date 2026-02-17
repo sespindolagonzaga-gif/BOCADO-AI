@@ -17,7 +17,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
     {
       title: t('tutorial.welcome', { userName: userName ? `, ${userName}` : '' }),
       description: t('tutorial.subtitle'),
-      icon: <div className="w-32 h-20"><BocadoLogo className="w-full h-full" /></div>,
+      icon: <div className="w-40 mx-auto"><BocadoLogo className="w-full" /></div>,
       color: "bg-white",
       textColor: "text-bocado-green",
       id: "welcome"

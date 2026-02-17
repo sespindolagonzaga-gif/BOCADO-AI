@@ -71,8 +71,8 @@ const RegistrationMethodScreen: React.FC<RegistrationMethodScreenProps> = ({
     <div className="min-h-full flex items-center justify-center px-4 py-8 pt-safe pb-safe">
       <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-bocado w-full max-w-sm animate-fade-in">
         <div className="text-center mb-6">
-          <div className="w-32 h-32 mx-auto mb-2">
-            <BocadoLogo className="w-full h-full" />
+          <div className="w-40 mx-auto mb-2">
+            <BocadoLogo className="w-full" />
           </div>
           <h1 className="text-xl font-bold text-bocado-dark-green">
             {t('registration.title') || 'Crear cuenta'}

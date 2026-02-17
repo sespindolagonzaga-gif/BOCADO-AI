@@ -140,6 +140,19 @@
       "deleteInfo": "Delete information",
       "deleteDataDesc": "Download a copy of all your data",
       "deleteAccountDesc": "Delete account permanently"
+    },
+    "loginMethods": {
+      "title": "Login Methods",
+      "emailPassword": "Email and password",
+      "google": "Google",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "active": "Active",
+      "unlinkGoogle": "Unlink Google",
+      "unlinking": "Unlinking...",
+      "linkGoogle": "Link Google",
+      "linking": "Linking...",
+      "cannotUnlink": "You cannot unlink Google because it is your only login method."
     }
   },
   "tabs": {
@@ -150,58 +163,10 @@
     "profile": "Profile"
   },
   "registration": {
-    "title": "Sign Up",
-    "email": "Email",
-    "password": "Password",
-    "confirmPassword": "Confirm password",
-    "name": "First name",
-    "lastName": "Last name",
-    "gender": "Gender",
-    "age": "Age",
-    "weight": "Weight (kg)",
-    "height": "Height (cm)",
-    "country": "Country",
-    "city": "City",
-    "createAccount": "Create account",
-    "alreadyHaveAccount": "Already have an account?",
-    "goToLogin": "Sign in",
-    "backToHome": "Back to home",
-    "verifyEmail": "Verify your email!",
-    "emailSentTo": "Sent to",
-    "alreadyVerified": "I already verified my email",
-    "useOtherAccount": "Use another account",
-    "bodyDataOptional": "Body data (optional)",
-    "chronicDiseases": "Chronic diseases? (optional)",
-    "allergiesIntolerances": "Allergies or intolerances? (optional)",
-    "specify": "Specify:",
-    "nutritionalGoal": "Nutritional goal",
-    "multipleGoalsNote": "You can select multiple (except gain/lose weight together)",
-    "physicalActivity": "Physical activity",
-    "frequency": "Frequency",
-    "dislikedIngredients": "Ingredients you DON'T like",
-    "dislikedNote": "We'll avoid these foods in your plans",
-    "addedManually": "Added manually:",
-    "addAnotherIngredient": "+ Add another ingredient",
-    "placeholders": {
-      "name": "John",
-      "lastName": "Doe",
-      "age": "25",
-      "weight": "70",
-      "height": "175",
-      "city": "Your city...",
-      "cityNeedCountry": "Choose country first",
-      "password": "8+ characters",
-      "confirmPassword": "Repeat",
-      "allergies": "Seafood, nuts...",
-      "activities": "Yoga, Crossfit...",
-      "searchFood": "Search food...",
-      "ingredient": "Ingredient..."
-    },
-    "errors": {
-      "emailInUse": "This email is already registered",
-      "createFailed": "Error creating account. Try again.",
-      "profileIncomplete": "Incomplete profile. Please contact support."
-    }
+    "title": "Create account",
+    "subtitle": "Choose how you want to sign up",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithEmail": "Continue with Email"
   },
   "login": {
     "title": "Sign In",
@@ -243,12 +208,6 @@
       "resetEmailSent": "An email has been sent to {email} with instructions.",
       "profileIncomplete": "Incomplete profile. Please contact support."
     }
-  },
-  "registration": {
-    "title": "Create account",
-    "subtitle": "Choose how you want to sign up",
-    "continueWithGoogle": "Continue with Google",
-    "continueWithEmail": "Continue with Email"
   },
   "savedRestaurants": {
     "title": "Saved Restaurants",
@@ -976,6 +935,7 @@
     "installTitle": "Install Bocado",
     "installManualIOS": "On iPhone/iPad: tap Share and then \"Add to Home Screen\"",
     "installQuickAccess": "Quick access from your home screen",
+    "installDesktop": "Install the app on your desktop for quick access",
     "understood": "Got it",
     "offlineMessage": "No connection. Some features may not be available."
   },

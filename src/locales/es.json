@@ -140,6 +140,19 @@
       "deleteInfo": "Eliminar información",
       "deleteDataDesc": "Descarga una copia de todos tus datos",
       "deleteAccountDesc": "Eliminar cuenta permanentemente"
+    },
+    "loginMethods": {
+      "title": "Métodos de inicio de sesión",
+      "emailPassword": "Email y contraseña",
+      "google": "Google",
+      "connected": "Conectado",
+      "notConnected": "No conectado",
+      "active": "Activo",
+      "unlinkGoogle": "Desvincular Google",
+      "unlinking": "Desvinculando...",
+      "linkGoogle": "Vincular Google",
+      "linking": "Vinculando...",
+      "cannotUnlink": "No puedes desvincular Google porque es tu único método de inicio de sesión."
     }
   },
   "tabs": {
@@ -150,58 +163,10 @@
     "profile": "Perfil"
   },
   "registration": {
-    "title": "Registro",
-    "email": "Correo electrónico",
-    "password": "Contraseña",
-    "confirmPassword": "Confirmar contraseña",
-    "name": "Nombre",
-    "lastName": "Apellido",
-    "gender": "Género",
-    "age": "Edad",
-    "weight": "Peso (kg)",
-    "height": "Estatura (cm)",
-    "country": "País",
-    "city": "Ciudad",
-    "createAccount": "Crear cuenta",
-    "alreadyHaveAccount": "¿Ya tienes cuenta?",
-    "goToLogin": "Inicia sesión",
-    "backToHome": "Volver al inicio",
-    "verifyEmail": "¡Verifica tu correo!",
-    "emailSentTo": "Enviado a",
-    "alreadyVerified": "Ya verifiqué mi correo",
-    "useOtherAccount": "Usar otra cuenta",
-    "bodyDataOptional": "Datos corporales (opcional)",
-    "chronicDiseases": "¿Enfermedades crónicas? (opcional)",
-    "allergiesIntolerances": "¿Alergias o intolerancias? (opcional)",
-    "specify": "Especifica:",
-    "nutritionalGoal": "Objetivo nutricional",
-    "multipleGoalsNote": "Puedes seleccionar varios (excepto subir/bajar peso juntos)",
-    "physicalActivity": "Actividad física",
-    "frequency": "Frecuencia",
-    "dislikedIngredients": "Ingredientes que NO te gustan",
-    "dislikedNote": "Evitaremos estos alimentos en tus planes",
-    "addedManually": "Añadidos manualmente:",
-    "addAnotherIngredient": "+ Añadir otro ingrediente",
-    "placeholders": {
-      "name": "Juan",
-      "lastName": "Pérez",
-      "age": "25",
-      "weight": "70",
-      "height": "175",
-      "city": "Tu ciudad...",
-      "cityNeedCountry": "Elige país primero",
-      "password": "8+ caracteres",
-      "confirmPassword": "Repite",
-      "allergies": "Mariscos, frutos secos...",
-      "activities": "Yoga, Crossfit...",
-      "searchFood": "Buscar alimento...",
-      "ingredient": "Ingrediente..."
-    },
-    "errors": {
-      "emailInUse": "Este correo ya está registrado",
-      "createFailed": "Error al crear cuenta. Intenta de nuevo.",
-      "profileIncomplete": "Perfil incompleto. Por favor contacta soporte."
-    }
+    "title": "Crear cuenta",
+    "subtitle": "Elige cómo quieres registrarte",
+    "continueWithGoogle": "Continuar con Google",
+    "continueWithEmail": "Continuar con Email"
   },
   "login": {
     "title": "Iniciar Sesión",
@@ -243,12 +208,6 @@
       "resetEmailSent": "Se ha enviado un correo a {email} con instrucciones.",
       "profileIncomplete": "Perfil incompleto. Por favor contacta soporte."
     }
-  },
-  "registration": {
-    "title": "Crear cuenta",
-    "subtitle": "Elige cómo quieres registrarte",
-    "continueWithGoogle": "Continuar con Google",
-    "continueWithEmail": "Continuar con Email"
   },
   "savedRestaurants": {
     "title": "Restaurantes guardados",
@@ -1107,6 +1066,7 @@
     "installTitle": "Instalar Bocado",
     "installManualIOS": "En iPhone/iPad: toca Compartir y luego \"Agregar a pantalla de inicio\"",
     "installQuickAccess": "Acceso rápido desde tu pantalla de inicio",
+    "installDesktop": "Instala la app en tu escritorio para acceso rápido",
     "understood": "Entendido",
     "offlineMessage": "Sin conexión. Algunas funciones pueden no estar disponibles."
   },

@@ -116,7 +116,7 @@ const MainApp: React.FC<MainAppProps> = ({
 
       {/* Contenido - ocupa todo el espacio restante */}
       <main className="flex-1 overflow-y-auto min-h-0 pb-20 flex flex-col no-scrollbar">
-        <div className="h-full max-w-md md:max-w-lg mx-auto flex flex-col">
+        <div className="min-h-full max-w-md md:max-w-lg mx-auto flex flex-col">
           <ErrorBoundary>
             {activeTab === 'recommendation' && (
               <RecommendationScreen 

@@ -45,7 +45,7 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
 
   // No mostrar si no hay nada que notificar o si fue descartado
   const isMobile = isIOS || isAndroid;
-  const showInstallBanner = showInstall && isInstallable && !isInstalled && isMobile && !dismissedInstall;
+  const showInstallBanner = showInstall && isInstallable && !isInstalled && !dismissedInstall;
 
   if ((!showInstallBanner && !isOffline && !updateAvailable) || (updateAvailable && dismissedUpdate)) {
     return null;
@@ -85,25 +85,28 @@ const PWABanner: React.FC<PWABannerProps> = ({ showInstall = true }) => {
   if (showInstallBanner) {
     const isManualInstall = isIOS && !installPrompt;
 
+    // Determinar el texto descriptivo según plataforma
+    const getInstallDescription = () => {
+      if (isManualInstall) return t('pwaBanner.installManualIOS');
+      if (!isMobile) return t('pwaBanner.installDesktop');
+      return t('pwaBanner.installQuickAccess');
+    };
+
     return (
-      <div className="absolute bottom-4 left-0 right-0 z-50 bg-bocado-green text-white px-safe py-4 rounded-2xl shadow-xl max-w-sm md:max-w-md mx-auto">
+      <div className="absolute bottom-4 left-4 right-4 z-50 bg-bocado-green text-white px-safe py-4 rounded-2xl shadow-xl max-w-sm md:max-w-md mx-auto">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
               <Download className="w-5 h-5" />
             </div>
             <div>
               <p className="text-sm font-bold">{t('pwaBanner.installTitle')}</p>
-              {isManualInstall ? (
-                <p className="text-xs text-white/80">
-                  {t('pwaBanner.installManualIOS')}
-                </p>
-              ) : (
-                <p className="text-xs text-white/80">{t('pwaBanner.installQuickAccess')}</p>
-              )}
+              <p className="text-xs text-white/80">
+                {getInstallDescription()}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {isManualInstall ? (
               <button
                 onClick={handleDismissInstall}

@@ -643,7 +643,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     
     // No permitir desvincular si es el único método
     if (providers.length <= 1) {
-      setError('No puedes desvincular Google porque es tu único método de inicio de sesión.');
+      setError(t('profile.loginMethods.cannotUnlink'));
       return;
     }
     
@@ -1259,7 +1259,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                  <div className="mt-6 pt-6 border-t border-bocado-border">
                     <div className="flex items-center gap-2 mb-3">
                         <User className="w-4 h-4 text-bocado-gray" />
-                        <h3 className="font-bold text-bocado-dark-green text-2xs uppercase tracking-wider">Métodos de inicio de sesión</h3>
+                        <h3 className="font-bold text-bocado-dark-green text-2xs uppercase tracking-wider">{t('profile.loginMethods.title')}</h3>
                     </div>
                     <div className="space-y-3">
                         {/* Email/Password */}
@@ -1271,11 +1271,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                                   <Lock className="w-4 h-4 text-blue-600" />
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-bocado-text">Email y contraseña</p>
+                                  <p className="text-sm font-medium text-bocado-text">{t('profile.loginMethods.emailPassword')}</p>
                                   <p className="text-xs text-bocado-gray">{auth.currentUser?.email}</p>
                                 </div>
                               </div>
-                              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Activo</span>
+                              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">{t('profile.loginMethods.active')}</span>
                             </div>
                           </div>
                         )}
@@ -1294,12 +1294,12 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                                   </svg>
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-bocado-text">Google</p>
-                                  <p className="text-xs text-bocado-gray">Conectado</p>
+                                  <p className="text-sm font-medium text-bocado-text">{t('profile.loginMethods.google')}</p>
+                                  <p className="text-xs text-bocado-gray">{t('profile.loginMethods.connected')}</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Activo</span>
+                                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">{t('profile.loginMethods.active')}</span>
                               </div>
                             </div>
                             {auth.currentUser?.providerData.length > 1 && (
@@ -1308,7 +1308,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                                 disabled={isUnlinkingGoogle}
                                 className="w-full mt-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                               >
-                                {isUnlinkingGoogle ? 'Desvinculando...' : 'Desvincular Google'}
+                                 {isUnlinkingGoogle ? t('profile.loginMethods.unlinking') : t('profile.loginMethods.unlinkGoogle')}
                               </button>
                             )}
                           </div>
@@ -1325,8 +1325,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                                   </svg>
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium text-bocado-text">Google</p>
-                                  <p className="text-xs text-bocado-gray">No conectado</p>
+                                   <p className="text-sm font-medium text-bocado-text">{t('profile.loginMethods.google')}</p>
+                                   <p className="text-xs text-bocado-gray">{t('profile.loginMethods.notConnected')}</p>
                                 </div>
                               </div>
                             </div>
@@ -1335,7 +1335,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                               disabled={isLinkingGoogle}
                               className="w-full mt-2 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
                             >
-                              {isLinkingGoogle ? 'Vinculando...' : 'Vincular Google'}
+                               {isLinkingGoogle ? t('profile.loginMethods.linking') : t('profile.loginMethods.linkGoogle')}
                             </button>
                           </div>
                         )}
