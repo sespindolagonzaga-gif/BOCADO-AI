@@ -3,7 +3,11 @@ import {
   createUserWithEmailAndPassword, 
   updateProfile, 
   signInWithPopup, 
-  GoogleAuthProvider 
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  linkWithPopup,
+  unlink,
+  User
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { FormData, UserProfile } from '../types';
@@ -99,4 +103,49 @@ export const signInWithGoogle = async (): Promise<{
     isNewUser,
     email: user.email 
   };
+};
+
+/**
+ * Detecta qué proveedores de autenticación tiene conectados el usuario
+ */
+export const getUserProviders = (user: User): string[] => {
+  return user.providerData.map(provider => provider.providerId);
+};
+
+/**
+ * Verifica si el usuario tiene un proveedor específico
+ */
+export const hasProvider = (user: User, providerId: string): boolean => {
+  return getUserProviders(user).includes(providerId);
+};
+
+/**
+ * Reautentica al usuario con Google
+ */
+export const reauthenticateWithGoogle = async (user: User): Promise<void> => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  
+  await reauthenticateWithPopup(user, provider);
+};
+
+/**
+ * Linkea la cuenta actual con Google
+ */
+export const linkGoogleAccount = async (user: User): Promise<void> => {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
+  
+  await linkWithPopup(user, provider);
+};
+
+/**
+ * Desvincula Google de la cuenta
+ */
+export const unlinkGoogleAccount = async (user: User): Promise<void> => {
+  await unlink(user, 'google.com');
 };

@@ -15,7 +15,11 @@ import {
   updateEmail, 
   sendEmailVerification, 
   updateProfile,
-  deleteUser
+  deleteUser,
+  GoogleAuthProvider,
+  reauthenticateWithPopup,
+  linkWithPopup,
+  unlink
 } from 'firebase/auth';
 import { sanitizeProfileData, separateUserData, safeLog } from '../utils/profileSanitizer';
 import { useUserProfile, useUpdateUserProfile } from '../hooks/useUser';
@@ -118,6 +122,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [exportedData, setExportedData] = useState<any>(null);
+  
+  // Estados para account linking
+  const [isLinkingGoogle, setIsLinkingGoogle] = useState(false);
+  const [isUnlinkingGoogle, setIsUnlinkingGoogle] = useState(false);
   
   const [cityOptions, setCityOptions] = useState<PlacePrediction[]>([]);
   const [isSearchingCity, setIsSearchingCity] = useState(false);
@@ -489,7 +497,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     }
     
     const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.email) {
+    if (!currentUser) {
       setError(t('profile.errors.sessionExpired'));
       return;
     }
@@ -499,9 +507,26 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
     try {
       trackEvent('profile_delete_account_start');
       
-      // 1. Reautenticar
-      const credential = EmailAuthProvider.credential(currentUser.email, deletePassword);
-      await reauthenticateWithCredential(currentUser, credential);
+      // 1. Reautenticar según el proveedor
+      const providers = currentUser.providerData.map(p => p.providerId);
+      const hasPassword = providers.includes('password');
+      const hasGoogle = providers.includes('google.com');
+      
+      if (hasPassword) {
+        // Reautenticar con contraseña
+        if (!currentUser.email) {
+          setError(t('profile.errors.sessionExpired'));
+          setIsDeleting(false);
+          return;
+        }
+        const credential = EmailAuthProvider.credential(currentUser.email, deletePassword);
+        await reauthenticateWithCredential(currentUser, credential);
+      } else if (hasGoogle) {
+        // Reautenticar con Google
+        const provider = new GoogleAuthProvider();
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await reauthenticateWithPopup(currentUser, provider);
+      }
       
       // 2. Eliminar datos de Firestore
       // Eliminar perfil
@@ -552,10 +577,104 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
         setError('Contraseña incorrecta.');
       } else if (err.code === 'auth/requires-recent-login') {
         setError('Por seguridad, cierra sesión y vuelve a iniciar sesión antes de eliminar tu cuenta.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Reautenticación cancelada. Debes confirmar tu identidad para eliminar la cuenta.');
       } else {
         setError('Error al eliminar la cuenta. Contacta a soporte.');
       }
       setIsDeleting(false);
+    }
+  };
+
+  const handleLinkGoogle = async () => {
+    setError('');
+    setSuccessMessage('');
+    setIsLinkingGoogle(true);
+    
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setError(t('profile.errors.sessionExpired'));
+        return;
+      }
+      
+      trackEvent('profile_link_google_start');
+      
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      
+      await linkWithPopup(currentUser, provider);
+      
+      trackEvent('profile_link_google_success');
+      setSuccessMessage('Cuenta de Google vinculada exitosamente.');
+      
+      // Refrescar el usuario para obtener los proveedores actualizados
+      await currentUser.reload();
+      
+    } catch (err: any) {
+      safeLog('error', 'Error linking Google:', err);
+      trackEvent('profile_link_google_error', { code: err.code });
+      
+      if (err.code === 'auth/credential-already-in-use') {
+        setError('Esta cuenta de Google ya está en uso por otro usuario.');
+      } else if (err.code === 'auth/provider-already-linked') {
+        setError('Google ya está vinculado a esta cuenta.');
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setError('Vinculación cancelada.');
+      } else {
+        setError('Error al vincular Google. Intenta de nuevo.');
+      }
+    } finally {
+      setIsLinkingGoogle(false);
+    }
+  };
+
+  const handleUnlinkGoogle = async () => {
+    setError('');
+    setSuccessMessage('');
+    
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      setError(t('profile.errors.sessionExpired'));
+      return;
+    }
+    
+    const providers = currentUser.providerData.map(p => p.providerId);
+    
+    // No permitir desvincular si es el único método
+    if (providers.length <= 1) {
+      setError('No puedes desvincular Google porque es tu único método de inicio de sesión.');
+      return;
+    }
+    
+    if (!window.confirm('¿Estás seguro de que quieres desvincular Google? Podrás volver a vincularlo después.')) {
+      return;
+    }
+    
+    setIsUnlinkingGoogle(true);
+    
+    try {
+      trackEvent('profile_unlink_google_start');
+      
+      await unlink(currentUser, 'google.com');
+      
+      trackEvent('profile_unlink_google_success');
+      setSuccessMessage('Google desvinculado exitosamente.');
+      
+      // Refrescar el usuario
+      await currentUser.reload();
+      
+    } catch (err: any) {
+      safeLog('error', 'Error unlinking Google:', err);
+      trackEvent('profile_unlink_google_error', { code: err.code });
+      
+      if (err.code === 'auth/no-such-provider') {
+        setError('Google no está vinculado a esta cuenta.');
+      } else {
+        setError('Error al desvincular Google. Intenta de nuevo.');
+      }
+    } finally {
+      setIsUnlinkingGoogle(false);
     }
   };
 
@@ -980,18 +1099,21 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                 />
               </div>
               
-              <div>
-                <label className="block text-2xs font-bold text-bocado-dark-gray mb-1.5 uppercase tracking-wider">
-                  {t('profile.currentPassword')}
-                </label>
-                <input 
-                  type="password" 
-                  value={deletePassword} 
-                  onChange={(e) => setDeletePassword(e.target.value)} 
-                  className="w-full px-4 py-3 bg-bocado-background border border-bocado-border rounded-xl text-sm focus:outline-none focus:border-bocado-green focus:ring-2 focus:ring-bocado-green/20" 
-                  placeholder="••••••••"
-                />
-              </div>
+              {/* Solo mostrar campo de contraseña si el usuario tiene autenticación con password */}
+              {auth.currentUser?.providerData.some(p => p.providerId === 'password') && (
+                <div>
+                  <label className="block text-2xs font-bold text-bocado-dark-gray mb-1.5 uppercase tracking-wider">
+                    {t('profile.currentPassword')}
+                  </label>
+                  <input 
+                    type="password" 
+                    value={deletePassword} 
+                    onChange={(e) => setDeletePassword(e.target.value)} 
+                    className="w-full px-4 py-3 bg-bocado-background border border-bocado-border rounded-xl text-sm focus:outline-none focus:border-bocado-green focus:ring-2 focus:ring-bocado-green/20" 
+                    placeholder="••••••••"
+                  />
+                </div>
+              )}
               
               {error && <p className="text-red-500 text-xs text-center bg-red-50 p-2 rounded-lg">{error}</p>}
               
@@ -1011,7 +1133,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                 </button>
                 <button 
                   type="submit" 
-                  disabled={isDeleting || deleteConfirmText !== 'ELIMINAR' || !deletePassword}
+                  disabled={
+                    isDeleting || 
+                    deleteConfirmText !== 'ELIMINAR' || 
+                    (auth.currentUser?.providerData.some(p => p.providerId === 'password') && !deletePassword)
+                  }
                   className="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-red-700 active:scale-95 transition-all disabled:bg-red-300 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isDeleting ? (
@@ -1035,6 +1161,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
       default:
         return (
              <div className="space-y-4">
+                 {error && <p className="text-red-500 text-xs text-center bg-red-50 p-3 rounded-xl animate-fade-in font-medium">{error}</p>}
                  {successMessage && <p className="text-green-600 text-xs text-center bg-green-50 p-3 rounded-xl animate-fade-in font-medium">{successMessage}</p>}
                  
                  <InfoSection title={t('profile.personalInfo')}>
@@ -1099,26 +1226,119 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout, onProfileUpdate
                         <h3 className="font-bold text-bocado-dark-green text-2xs uppercase tracking-wider">{t('profile.security')}</h3>
                     </div>
                     <div className="space-y-2">
-                        <button 
-                          onClick={() => {
-                            trackEvent('profile_security_mode_change', { mode: 'password' });
-                            setViewMode('changePassword');
-                          }} 
-                          className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
-                        >
-                            <span>{t('profile.changePassword')}</span>
-                            <span className="text-bocado-gray">›</span>
-                        </button>
-                        <button 
-                          onClick={() => {
-                            trackEvent('profile_security_mode_change', { mode: 'email' });
-                            setViewMode('changeEmail');
-                          }} 
-                          className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
-                        >
-                            <span>{t('profile.changeEmail')}</span>
-                            <span className="text-bocado-gray">›</span>
-                        </button>
+                        {/* Solo mostrar cambio de contraseña si tiene método de password */}
+                        {auth.currentUser?.providerData.some(p => p.providerId === 'password') && (
+                          <button 
+                            onClick={() => {
+                              trackEvent('profile_security_mode_change', { mode: 'password' });
+                              setViewMode('changePassword');
+                            }} 
+                            className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
+                          >
+                              <span>{t('profile.changePassword')}</span>
+                              <span className="text-bocado-gray">›</span>
+                          </button>
+                        )}
+                        {/* Solo mostrar cambio de email si tiene método de password */}
+                        {auth.currentUser?.providerData.some(p => p.providerId === 'password') && (
+                          <button 
+                            onClick={() => {
+                              trackEvent('profile_security_mode_change', { mode: 'email' });
+                              setViewMode('changeEmail');
+                            }} 
+                            className="w-full flex items-center justify-between px-4 py-3 bg-bocado-background rounded-xl text-sm font-medium text-bocado-text hover:bg-bocado-border active:scale-95 transition-all"
+                          >
+                              <span>{t('profile.changeEmail')}</span>
+                              <span className="text-bocado-gray">›</span>
+                          </button>
+                        )}
+                    </div>
+                 </div>
+                 
+                 {/* Métodos de inicio de sesión */}
+                 <div className="mt-6 pt-6 border-t border-bocado-border">
+                    <div className="flex items-center gap-2 mb-3">
+                        <User className="w-4 h-4 text-bocado-gray" />
+                        <h3 className="font-bold text-bocado-dark-green text-2xs uppercase tracking-wider">Métodos de inicio de sesión</h3>
+                    </div>
+                    <div className="space-y-3">
+                        {/* Email/Password */}
+                        {auth.currentUser?.providerData.some(p => p.providerId === 'password') && (
+                          <div className="px-4 py-3 bg-bocado-background rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <Lock className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-bocado-text">Email y contraseña</p>
+                                  <p className="text-xs text-bocado-gray">{auth.currentUser?.email}</p>
+                                </div>
+                              </div>
+                              <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Activo</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Google */}
+                        {auth.currentUser?.providerData.some(p => p.providerId === 'google.com') ? (
+                          <div className="px-4 py-3 bg-bocado-background rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                                    <path fill="#EA4335" d="M5.26620003,9.76452941 C6.19878754,6.93863203 8.85444915,4.90909091 12,4.90909091 C13.6909091,4.90909091 15.2181818,5.50909091 16.4181818,6.49090909 L19.9090909,3 C17.7818182,1.14545455 15.0545455,0 12,0 C7.27006974,0 3.1977497,2.69829785 1.23999023,6.65002441 L5.26620003,9.76452941 Z"/>
+                                    <path fill="#34A853" d="M16.0407269,18.0125889 C14.9509167,18.7163016 13.5660892,19.0909091 12,19.0909091 C8.86648613,19.0909091 6.21911939,17.076871 5.27698177,14.2678769 L1.23746264,17.3349879 C3.19279051,21.2936293 7.26500293,24 12,24 C14.9328362,24 17.7353462,22.9573905 19.834192,20.9995801 L16.0407269,18.0125889 Z"/>
+                                    <path fill="#4A90E2" d="M19.834192,20.9995801 C22.0291676,18.9520994 23.4545455,15.903663 23.4545455,12 C23.4545455,11.2909091 23.3454545,10.5272727 23.1818182,9.81818182 L12,9.81818182 L12,14.4545455 L18.4363636,14.4545455 C18.1187732,16.013626 17.2662994,17.2212117 16.0407269,18.0125889 L19.834192,20.9995801 Z"/>
+                                    <path fill="#FBBC05" d="M5.27698177,14.2678769 C5.03832634,13.556323 4.90909091,12.7937589 4.90909091,12 C4.90909091,11.2182781 5.03443647,10.4668121 5.26620003,9.76452941 L1.23999023,6.65002441 C0.43658717,8.26043162 0,10.0753848 0,12 C0,13.9195484 0.444780743,15.7301709 1.23746264,17.3349879 L5.27698177,14.2678769 Z"/>
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-bocado-text">Google</p>
+                                  <p className="text-xs text-bocado-gray">Conectado</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded">Activo</span>
+                              </div>
+                            </div>
+                            {auth.currentUser?.providerData.length > 1 && (
+                              <button
+                                onClick={handleUnlinkGoogle}
+                                disabled={isUnlinkingGoogle}
+                                className="w-full mt-2 py-2 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                              >
+                                {isUnlinkingGoogle ? 'Desvinculando...' : 'Desvincular Google'}
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="px-4 py-3 bg-bocado-background rounded-xl">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                                    <path fill="#9CA3AF" d="M5.26620003,9.76452941 C6.19878754,6.93863203 8.85444915,4.90909091 12,4.90909091 C13.6909091,4.90909091 15.2181818,5.50909091 16.4181818,6.49090909 L19.9090909,3 C17.7818182,1.14545455 15.0545455,0 12,0 C7.27006974,0 3.1977497,2.69829785 1.23999023,6.65002441 L5.26620003,9.76452941 Z"/>
+                                    <path fill="#9CA3AF" d="M16.0407269,18.0125889 C14.9509167,18.7163016 13.5660892,19.0909091 12,19.0909091 C8.86648613,19.0909091 6.21911939,17.076871 5.27698177,14.2678769 L1.23746264,17.3349879 C3.19279051,21.2936293 7.26500293,24 12,24 C14.9328362,24 17.7353462,22.9573905 19.834192,20.9995801 L16.0407269,18.0125889 Z"/>
+                                    <path fill="#9CA3AF" d="M19.834192,20.9995801 C22.0291676,18.9520994 23.4545455,15.903663 23.4545455,12 C23.4545455,11.2909091 23.3454545,10.5272727 23.1818182,9.81818182 L12,9.81818182 L12,14.4545455 L18.4363636,14.4545455 C18.1187732,16.013626 17.2662994,17.2212117 16.0407269,18.0125889 L19.834192,20.9995801 Z"/>
+                                    <path fill="#9CA3AF" d="M5.27698177,14.2678769 C5.03832634,13.556323 4.90909091,12.7937589 4.90909091,12 C4.90909091,11.2182781 5.03443647,10.4668121 5.26620003,9.76452941 L1.23999023,6.65002441 C0.43658717,8.26043162 0,10.0753848 0,12 C0,13.9195484 0.444780743,15.7301709 1.23746264,17.3349879 L5.27698177,14.2678769 Z"/>
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-bocado-text">Google</p>
+                                  <p className="text-xs text-bocado-gray">No conectado</p>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={handleLinkGoogle}
+                              disabled={isLinkingGoogle}
+                              className="w-full mt-2 py-2 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                              {isLinkingGoogle ? 'Vinculando...' : 'Vincular Google'}
+                            </button>
+                          </div>
+                        )}
                     </div>
                  </div>
                  
