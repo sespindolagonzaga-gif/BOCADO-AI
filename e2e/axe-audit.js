@@ -1,5 +1,4 @@
 import { chromium } from 'playwright';
-import axe from 'axe-core';
 
 (async () => {
   const url = process.env.AUDIT_URL || 'http://localhost:3000';
@@ -10,18 +9,17 @@ import axe from 'axe-core';
 
   try {
     await page.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
-    // Inject axe
-    await page.addScriptTag({ content: axe.source });
+    // Load axe from CDN to avoid installing as a dependency in build environments
+    // Use unpkg which serves the package bundle
+    await page.addScriptTag({ url: 'https://unpkg.com/axe-core/axe.min.js' });
 
-    // Run axe
+    // Run axe in the page context
     const results = await page.evaluate(async () => {
-      return await new Promise((resolve) => {
-        // @ts-ignore
-        axe.run(document, { runOnly: { type: 'tag', values: ['wcag2aa'] } }, (err, results) => {
-          if (err) resolve({ error: err.message });
-          else resolve(results);
-        });
-      });
+      // @ts-ignore
+      if (typeof window.axe === 'undefined' && typeof (window as any).axe === 'undefined') {
+        return { error: 'axe not loaded' };
+      }
+      return await (window as any).axe.run(document, { runOnly: { type: 'tag', values: ['wcag2aa'] } });
     });
 
     // Save results to file
