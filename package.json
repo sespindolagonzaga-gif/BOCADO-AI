@@ -17,6 +17,7 @@
     "test:e2e:install-deps": "npx playwright install-deps chromium",
     "test:e2e:install-browsers": "npx playwright install",
     "generate-icons": "node scripts/generate-pwa-icons.js",
+    "audit:axe": "node e2e/axe-audit.js",
     "migrate-to-notion": "node scripts/migrate-to-notion-incremental.js",
     "migrate-to-notion:full": "node scripts/migrate-to-notion-v2.js",
     "storybook": "node scripts/with-esbuild.cjs -- storybook dev -p 6006",

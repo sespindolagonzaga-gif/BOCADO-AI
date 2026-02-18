@@ -16,6 +16,7 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
   return (
     <nav 
       className="fixed bottom-0 left-0 right-0 z-50 px-safe pb-safe bg-bocado-background dark:bg-gray-800 border-t border-bocado-border/30 dark:border-gray-700"
+      aria-label="Bottom navigation"
       style={{
         // ✅ FIX #8: Better iOS keyboard handling
         position: 'fixed',
@@ -29,12 +30,15 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
       <div className="mx-auto max-w-md md:max-w-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] overflow-visible">
         
         {/* Contenedor flex simple: 5 elementos, mismo tamaño, centrados verticalmente */}
-        <div className="flex items-center justify-between h-16 px-2 relative">
+        <div className="flex items-center justify-between h-16 px-2 relative" role="tablist" aria-label="Primary">
           
           {/* 1. Guardados (Recetas) */}
           <button
             data-testid="nav-saved"
             onClick={() => onTabChange('saved')}
+            role="tab"
+            aria-label={t('tabs.recipes')}
+            aria-current={isActive('saved') ? 'page' : undefined}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 min-h-[48px] touch-manipulation ${isActive('saved') ? 'text-bocado-green' : 'text-bocado-gray dark:text-gray-400'}`}
             style={{ 
               WebkitTapHighlightColor: 'transparent',
@@ -49,6 +53,9 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
           <button
             data-testid="nav-restaurants"
             onClick={() => onTabChange('restaurants')}
+            role="tab"
+            aria-label={t('tabs.restaurants')}
+            aria-current={isActive('restaurants') ? 'page' : undefined}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 min-h-[48px] touch-manipulation ${isActive('restaurants') ? 'text-bocado-green' : 'text-bocado-gray dark:text-gray-400'}`}
             style={{ 
               WebkitTapHighlightColor: 'transparent',
@@ -64,6 +71,9 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
             <button
               data-testid="nav-recommendation"
               onClick={() => onTabChange('recommendation')}
+              role="tab"
+              aria-label={t('tabs.home')}
+              aria-current={isActive('recommendation') ? 'page' : undefined}
               className={`w-14 h-14 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-700 shadow-md -mt-4 transition-transform touch-manipulation ${isActive('recommendation') ? 'bg-bocado-green text-white scale-110' : 'bg-bocado-dark-green text-white'}`}
               style={{ 
                 WebkitTapHighlightColor: 'transparent',
@@ -83,6 +93,9 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
           <button
             data-testid="nav-pantry"
             onClick={() => onTabChange('pantry')}
+            role="tab"
+            aria-label={t('tabs.pantry')}
+            aria-current={isActive('pantry') ? 'page' : undefined}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 min-h-[48px] touch-manipulation ${isActive('pantry') ? 'text-bocado-green' : 'text-bocado-gray dark:text-gray-400'}`}
             style={{ 
               WebkitTapHighlightColor: 'transparent',
@@ -97,6 +110,9 @@ const BottomTabBar: React.FC<BottomTabBarProps> = ({ activeTab, onTabChange }) =
           <button
             data-testid="nav-profile"
             onClick={() => onTabChange('profile')}
+            role="tab"
+            aria-label={t('tabs.profile')}
+            aria-current={isActive('profile') ? 'page' : undefined}
             className={`flex flex-col items-center justify-center flex-1 h-full space-y-1 min-h-[48px] touch-manipulation ${isActive('profile') ? 'text-bocado-green' : 'text-bocado-gray dark:text-gray-400'}`}
             style={{ 
               WebkitTapHighlightColor: 'transparent',

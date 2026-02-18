@@ -377,7 +377,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
   }
 
   return (
-    <div className="flex-1 flex flex-col px-4 py-4 min-h-0">
+    <div className="flex-1 flex flex-col px-4 py-4 min-h-0 overflow-y-auto" role="main">
       {/* Header */}
       <div className="text-center mb-4 shrink-0">
         <div className="w-40 mx-auto mb-2">
@@ -389,7 +389,7 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
 
       {/* ✅ NUEVO: Mensaje de error */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm animate-fade-in">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm animate-fade-in" role="alert" aria-live="assertive">
           <p className="font-medium">⚠️ {error}</p>
           <button 
             onClick={() => setError(null)} 
@@ -652,6 +652,8 @@ const RecommendationScreen: React.FC<RecommendationScreenProps> = ({ userName, o
           {/* Botón acción con rate limit - siempre visible */}
           <div className="mt-6 transition-all duration-300">
             <button
+              data-testid="generate-recommendation"
+              aria-label={t('recommendation.generateAria', { default: 'Generar recomendación' })}
               onClick={handleGenerateRecommendation}
               disabled={!isSelectionMade || isGenerating || isRateLimited}
               className="w-full bg-bocado-green text-white font-bold py-4 rounded-full text-base shadow-bocado hover:bg-bocado-dark-green active:scale-95 transition-all disabled:bg-bocado-gray disabled:cursor-not-allowed flex items-center justify-center gap-2"

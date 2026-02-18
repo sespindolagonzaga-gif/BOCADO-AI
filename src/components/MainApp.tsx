@@ -108,7 +108,7 @@ const MainApp: React.FC<MainAppProps> = ({
 
   return (
     // ✅ h-full para ocupar todo el espacio del contenedor padre
-    <div className="h-full w-full flex flex-col bg-bocado-background overflow-hidden pt-safe">
+    <div className="h-full w-full flex flex-col bg-bocado-background overflow-visible pt-safe">
       
       {isTutorialOpen && (
         <TutorialModal onClose={handleTutorialClose} userName={userName} />

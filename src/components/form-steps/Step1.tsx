@@ -384,12 +384,15 @@ const Step1: React.FC<ExtendedStep1Props> = ({
           </div>
 
           {cityOptions.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-bocado max-h-40 overflow-y-auto">
-              {cityOptions.map((city) => (
+            <div className="absolute z-50 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-bocado max-h-40 overflow-y-auto" role="listbox" aria-label={t('step1.citySuggestions')}>
+              {cityOptions.map((city, idx) => (
                 <button
                   key={city.placeId}
                   type="button"
                   onClick={() => handleSelectCity(city)}
+                  role="option"
+                  aria-selected={false}
+                  tabIndex={0}
                   className="w-full text-left px-3 py-2 text-sm hover:bg-bocado-background border-b border-bocado-border/50 last:border-0 flex flex-col active:bg-bocado-green/10"
                 >
                   <span className="font-medium text-bocado-text">{city.mainText}</span>
@@ -419,10 +422,12 @@ const Step1: React.FC<ExtendedStep1Props> = ({
           } ${disableEmail ? 'bg-bocado-background' : 'bg-white'}`} 
         />
         {showEmailSuggestions && emailSuggestions.length > 0 && (
-          <div className="absolute z-10 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-bocado overflow-hidden">
+          <div className="absolute z-10 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-bocado overflow-hidden" role="listbox" aria-label={t('step1.emailSuggestions')}>
             {emailSuggestions.map((s) => (
               <div 
                 key={s} 
+                role="option"
+                tabIndex={0}
                 onClick={() => { 
                   trackEvent('registration_email_suggestion_click');
                   updateData('email', s); 

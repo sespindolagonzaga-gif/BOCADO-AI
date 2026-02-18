@@ -87,8 +87,8 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
   const content = steps[currentStep];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-safe animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-bocado w-full max-w-sm overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-safe animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+      <div className="bg-white rounded-3xl shadow-bocado w-full max-w-sm overflow-visible flex flex-col max-h-[90vh]">
         
         {/* Visual Area */}
         <div className={`${content.color} h-48 flex items-center justify-center transition-colors duration-300 shrink-0`}>
@@ -100,7 +100,7 @@ const TutorialModal: React.FC<TutorialModalProps> = ({ onClose, userName }) => {
         {/* Content Area */}
         <div className="p-6 text-center flex-1 flex flex-col justify-between overflow-y-auto">
           <div>
-            <h2 className={`text-xl font-bold mb-3 ${content.textColor}`}>{content.title}</h2>
+            <h2 id="tutorial-title" className={`text-xl font-bold mb-3 ${content.textColor}`}>{content.title}</h2>
             <p className="text-bocado-gray leading-relaxed text-sm">
               {content.description}
             </p>

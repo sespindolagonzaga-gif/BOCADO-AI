@@ -40,12 +40,12 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
   if (!isSupported) {
     return createPortal(
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 pt-safe pb-safe">
-        <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-fade-in">
+        <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-fade-in" role="dialog" aria-modal="true" aria-labelledby="notification-settings-title">
           <div className="text-center">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <BellOff className="w-8 h-8 text-gray-400" />
             </div>
-            <h2 className="text-xl font-bold text-gray-800 mb-2">{t('notifications.settings.notAvailable')}</h2>
+            <h2 id="notification-settings-title" className="text-xl font-bold text-gray-800 mb-2">{t('notifications.settings.notAvailable')}</h2>
             <p className="text-sm text-gray-500 mb-6">
               {t('notifications.settings.notSupportedMessage')}
             </p>
@@ -164,7 +164,7 @@ export const NotificationSettings: React.FC<NotificationSettingsProps> = ({ isOp
       onTouchMove={(e) => { if (e.target === e.currentTarget) e.preventDefault(); }}
     >
       <div
-        className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-hidden animate-fade-in flex flex-col"
+        className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-visible animate-fade-in flex flex-col"
         onClick={(e) => e.stopPropagation()}
         onTouchMove={(e) => e.stopPropagation()}
       >

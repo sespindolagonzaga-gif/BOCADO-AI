@@ -346,11 +346,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onGoHome }) =
             disabled={isLoading}
           />
           {showEmailSuggestions && emailSuggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-lg overflow-hidden">
+            <div className="absolute z-10 w-full mt-1 bg-white border border-bocado-border rounded-xl shadow-lg overflow-hidden" role="listbox" aria-label={t('login.emailSuggestions')}>
               <ul className="max-h-48 overflow-auto">
                 {emailSuggestions.map((suggestion) => (
                   <li 
                     key={suggestion}
+                    role="option"
+                    tabIndex={0}
                     onMouseDown={() => handleEmailSuggestionClick(suggestion)}
                     className="px-4 py-2 text-sm text-bocado-text cursor-pointer hover:bg-bocado-background active:bg-bocado-green/10"
                   >
