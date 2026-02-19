@@ -1,11 +1,23 @@
 // Logger utility for Bocado AI
 // Sanitizes logs in production to prevent data leaks
+// Supports structured logging for production monitoring
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LoggerConfig {
   level: LogLevel;
   enableConsole: boolean;
+  enableStructured: boolean; // Send to Sentry/external services
+}
+
+interface StructuredLogEntry {
+  timestamp: string;
+  level: LogLevel;
+  component?: string;
+  message: string;
+  context?: Record<string, any>;
+  stack?: string;
+  duration?: number;
 }
 
 const LOG_LEVELS: Record<LogLevel, number> = {
@@ -18,8 +30,9 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 const isDev = import.meta.env.DEV || import.meta.env.MODE === "development";
 
 const config: LoggerConfig = {
-  level: isDev ? "debug" : "warn", // Solo warn y error en producción
+  level: isDev ? "debug" : "warn",
   enableConsole: true,
+  enableStructured: !isDev,
 };
 
 // Patterns que podrían indicar datos sensibles
@@ -49,6 +62,34 @@ const sanitizeArgs = (args: any[]): any[] => {
     }
     return arg;
   });
+};
+
+/**
+ * 📊 Envía logs estructurados a Sentry (en producción)
+ */
+const sendStructuredLog = (entry: StructuredLogEntry) => {
+  if (!config.enableStructured || isDev) return;
+
+  try {
+    // Importar dinámicamente para no añadir peso en dev
+    import("../utils/sentry").then(({ captureError, addBreadcrumb }) => {
+      if (entry.level === "error") {
+        captureError(new Error(entry.message), {
+          extra: entry.context,
+          tags: { component: entry.component },
+        });
+      } else {
+        addBreadcrumb({
+          message: entry.message,
+          level: entry.level,
+          data: entry.context,
+          category: entry.component,
+        });
+      }
+    });
+  } catch (err) {
+    console.warn("[Logger] Failed to send structured log:", err);
+  }
 };
 
 export const logger = {
@@ -99,6 +140,30 @@ export const logger = {
   critical: (...args: any[]) => {
     console.error("[BOCADO:CRITICAL]", ...args);
   },
+
+  /**
+   * 📊 Structured logging con contexto (para análisis en producción)
+   */
+  structured: (
+    level: LogLevel,
+    message: string,
+    context?: Record<string, any>,
+    component?: string,
+  ) => {
+    const entry: StructuredLogEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      component,
+      context,
+    };
+
+    // Log a console primero
+    logger[level](message, context);
+
+    // Enviar a Sentry en producción
+    sendStructuredLog(entry);
+  },
 };
 
 // Hook para logging en desarrollo
@@ -108,6 +173,13 @@ export const useLogger = (component: string) => {
     info: (...args: any[]) => logger.info(`[${component}]`, ...args),
     warn: (...args: any[]) => logger.warn(`[${component}]`, ...args),
     error: (...args: any[]) => logger.error(`[${component}]`, ...args),
+    
+    /**
+     * Structured logging con component automático
+     */
+    structured: (level: LogLevel, message: string, context?: Record<string, any>) => {
+      logger.structured(level, message, context, component);
+    },
   };
 };
 
