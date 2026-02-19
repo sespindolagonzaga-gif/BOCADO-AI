@@ -5,8 +5,13 @@
  *   npx tsx scripts/seed-ingredients.ts
  *
  * Requires FIREBASE_SERVICE_ACCOUNT_KEY env var or a local serviceAccountKey.json
+<<<<<<< HEAD
  *
  * This replaces the Airtable ingredients database with a Firestore collection.
+=======
+ * 
+ * Llena la colección de ingredientes en Firestore.
+>>>>>>> 74a8734 (FastApi)
  * Each document represents one ingredient with diet flags and nutrition data.
  */
 

@@ -1,14 +1,11 @@
-import {
-  GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} from "@google/generative-ai";
-import { initializeApp, getApps, cert } from "firebase-admin/app";
-import { getAuth as getAdminAuth } from "firebase-admin/auth";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import * as crypto from "crypto";
-import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG } from "../src/data/budgets.js";
-import { profileCache, pantryCache, historyCache } from "./utils/cache.js";
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getAuth as getAdminAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import * as crypto from 'crypto';
+import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG } from '../src/data/budgets.js';
+import { profileCache, pantryCache, historyCache } from './utils/cache.js';
+import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
@@ -40,129 +37,6 @@ const RECIPE_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","receta":{
 
 const RESTAURANT_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicar por qué","hack_saludable":"consejo práctico"}]}`;
 
-// ============================================
-// INGREDIENTS FROM FIRESTORE (replaces Airtable)
-// ============================================
-
-interface FirestoreIngredient {
-  name: string;
-  regional: { mx: string; es: string; us: string };
-  diet: {
-    vegan: boolean;
-    vegetarian: boolean;
-    glutenFree: boolean;
-    lactoseFree: boolean;
-    nutFree: boolean;
-  };
-  nutrition: {
-    glycemicIndex: number;
-    sodium: number;
-    cholesterol: number;
-    iodine: number;
-    fiber: number;
-    sugars: number;
-    saturatedFat: number;
-  };
-}
-
-// In-memory cache for ingredients (they rarely change)
-let ingredientsCache: FirestoreIngredient[] | null = null;
-let ingredientsCacheTime = 0;
-const INGREDIENTS_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour in-memory
-
-/**
- * Fetches all ingredients from Firestore with in-memory cache.
- * Much faster than Airtable: ~50ms vs ~500ms, no rate limits.
- */
-async function getAllIngredients(): Promise<FirestoreIngredient[]> {
-  const now = Date.now();
-  if (
-    ingredientsCache &&
-    now - ingredientsCacheTime < INGREDIENTS_CACHE_TTL_MS
-  ) {
-    safeLog(
-      "log",
-      `[Ingredients] Memory cache HIT (${ingredientsCache.length} items)`,
-    );
-    return ingredientsCache;
-  }
-
-  const snapshot = await db.collection("ingredients").get();
-  ingredientsCache = snapshot.docs.map(
-    (doc) => doc.data() as FirestoreIngredient,
-  );
-  ingredientsCacheTime = now;
-  safeLog(
-    "log",
-    `[Ingredients] Loaded ${ingredientsCache.length} from Firestore`,
-  );
-  return ingredientsCache;
-}
-
-/**
- * Filters ingredients based on user dietary restrictions and health conditions.
- * Replaces buildAirtableFormula — same logic, but runs in JS instead of Airtable formulas.
- */
-function filterIngredients(
-  ingredients: FirestoreIngredient[],
-  user: UserProfile,
-): FirestoreIngredient[] {
-  const prefs = ensureArray(user.allergies);
-  const eatingHabit = user.eatingHabit || "";
-  const illnesses = ensureArray(user.diseases);
-  const dislikes = ensureArray(user.dislikedFoods);
-
-  return ingredients.filter((item) => {
-    // Diet filters
-    if (
-      (prefs.includes("Vegano") || eatingHabit.includes("Vegano")) &&
-      !item.diet.vegan
-    )
-      return false;
-    if (
-      (prefs.includes("Vegetariano") || eatingHabit.includes("Vegetariano")) &&
-      !item.diet.vegetarian
-    )
-      return false;
-    if (prefs.includes("Celíaco") && !item.diet.glutenFree) return false;
-    if (prefs.includes("Intolerante a la lactosa") && !item.diet.lactoseFree)
-      return false;
-    if (prefs.includes("Alergia a frutos secos") && !item.diet.nutFree)
-      return false;
-
-    // Health condition filters (same thresholds as old Airtable formula)
-    const n = item.nutrition;
-    if (
-      illnesses.includes("Diabetes") &&
-      (n.glycemicIndex >= 55 || n.sugars >= 10)
-    )
-      return false;
-    if (illnesses.includes("Hipertensión") && n.sodium >= 140) return false;
-    if (
-      illnesses.includes("Colesterol") &&
-      (n.cholesterol >= 20 || n.saturatedFat >= 1.5)
-    )
-      return false;
-    if (illnesses.includes("Hipotiroidismo") && n.iodine <= 10) return false;
-    if (illnesses.includes("Hipertiroidismo") && n.iodine >= 50) return false;
-    if (
-      illnesses.includes("Intestino irritable") &&
-      (n.fiber <= 1 || n.fiber >= 10)
-    )
-      return false;
-
-    // Disliked foods filter
-    if (dislikes.length > 0) {
-      const allNames =
-        `${item.name} ${item.regional.mx} ${item.regional.es} ${item.regional.us}`.toLowerCase();
-      for (const foodItem of dislikes) {
-        const pattern = createRegexPattern(foodItem);
-        if (new RegExp(pattern, "i").test(allNames)) return false;
-      }
-    }
-
-    return true;
-  });
 }
 
 // ============================================
@@ -637,7 +511,7 @@ const RestaurantResponseSchema = z.object({
   recomendaciones: z.array(RestaurantSchema).max(10),
 });
 
-// (AirtableIngredient removed — replaced by FirestoreIngredient above)
+
 
 // ============================================
 // 3. FUNCIONES DE UTILIDAD
@@ -747,7 +621,7 @@ const formatList = (data: any): string => {
 // ============================================
 // 4. FILTROS DE SEGURIDAD ALIMENTARIA
 // ============================================
-// (Moved to filterIngredients() above — JS-based filtering replaces Airtable formulas)
+
 
 // ============================================
 // 5. SISTEMA DE SCORING
@@ -1678,8 +1552,13 @@ export default async function handler(req: any, res: any) {
     let finalPrompt = "";
     let parsedData: any;
 
+<<<<<<< HEAD
     if (type === "En casa") {
       // ✅ Fetch from Firestore (replaces Airtable)
+=======
+    if (type === 'En casa') {
+
+>>>>>>> 74a8734 (FastApi)
       let filteredItems: FirestoreIngredient[] = [];
       try {
         const allIngredients = await getAllIngredients();
