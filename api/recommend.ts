@@ -7,7 +7,8 @@ import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG } from '../src/data/budgets.js';
 import { profileCache, pantryCache, historyCache } from './utils/cache.js';
 // 📝 FatSecret integración (opcional - requiere API key premium free)
 // Para habilitar: descomenta y configura FATSECRET_KEY & FATSECRET_SECRET
-// import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
+import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
+import { searchFatSecretIngredients } from './utils/fatsecret';
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
@@ -736,23 +737,32 @@ async function getAllIngredientes(): Promise<FirestoreIngredient[]> {
       } as FirestoreIngredient));
     }
 
-    // Layer 2: FatSecret (opcional - si está habilitado)
-    // Descomenta esto si tienes credenciales premium free de FatSecret
-    // try {
-    //   const fatsecretResult = await getFatSecretIngredientsWithCache(db, user, 'es');
-    //   if (fatsecretResult.priorityList) {
-    //     const items = fatsecretResult.priorityList.split(',').map(name => ({
-    //       id: `fs_${name}`,
-    //       name: name.trim(),
-    //       category: 'FatSecret',
-    //       regional: { es: name.trim() },
-    //     }));
-    //     safeLog("log", `[Ingredients] Loaded ${items.length} from FatSecret`);
-    //     return items;
-    //   }
-    // } catch (fatsecretError) {
-    //   safeLog("warn", "[Ingredients] FatSecret error, using fallback", fatsecretError);
-    // }
+    // Layer 2: FatSecret (si está habilitado - requiere FATSECRET_KEY & FATSECRET_SECRET)
+    if (process.env.FATSECRET_KEY && process.env.FATSECRET_SECRET) {
+      try {
+        safeLog("log", "[Ingredients] Local DB empty, trying FatSecret...");
+        const fatsecretResults = await searchFatSecretIngredients("*", 500); // Buscar alimentos comunes
+        
+        if (fatsecretResults && Array.isArray(fatsecretResults) && fatsecretResults.length > 0) {
+          const items: FirestoreIngredient[] = fatsecretResults.map((fs: any) => ({
+            id: `fs_${fs.food_id}`,
+            name: fs.food_name,
+            category: fs.food_type || "Generic",
+            regional: { 
+              es: fs.food_name,
+              mx: fs.food_name 
+            },
+          }));
+          
+          safeLog("log", `[Ingredients] Loaded ${items.length} from FatSecret`);
+          return items;
+        }
+      } catch (fatsecretError) {
+        safeLog("warn", "[Ingredients] FatSecret error, using fallback", fatsecretError);
+      }
+    } else {
+      safeLog("log", "[Ingredients] FatSecret not configured (FATSECRET_KEY/SECRET missing)");
+    }
 
     // Fallback: ingredientes básicos
     safeLog("warn", "[Ingredients] No ingredients found, using basic fallback");
