@@ -7,8 +7,8 @@ import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG } from '../src/data/budgets.js';
 import { profileCache, pantryCache, historyCache } from './utils/cache.js';
 // 📝 FatSecret integración (opcional - requiere API key premium free)
 // Para habilitar: descomenta y configura FATSECRET_KEY & FATSECRET_SECRET
-import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
-import { searchFatSecretIngredients } from './utils/fatsecret';
+import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic.js';
+import { searchFatSecretIngredients } from './utils/fatsecret.js';
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
