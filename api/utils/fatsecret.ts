@@ -1,8 +1,10 @@
-import fetch from 'node-fetch';
-import qs from 'querystring';
+// Helper to stringify URL parameters (replacing qs.stringify)
+function stringifyParams(params: Record<string, any>): string {
+  return new URLSearchParams(params).toString();
+}
 
-const FATSECRET_KEY = process.env.FATSECRET_KEY!;
-const FATSECRET_SECRET = process.env.FATSECRET_SECRET!;
+const FATSECRET_KEY = process.env.FATSECRET_KEY || '';
+const FATSECRET_SECRET = process.env.FATSECRET_SECRET || '';
 
 let fatSecretToken: { access_token: string, expires_at: number } | null = null;
 
@@ -13,7 +15,7 @@ export async function getFatSecretToken() {
   const res = await fetch('https://oauth.fatsecret.com/connect/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: qs.stringify({
+    body: stringifyParams({
       grant_type: 'client_credentials',
       scope: 'basic',
       client_id: FATSECRET_KEY,
@@ -31,13 +33,13 @@ export async function getFatSecretToken() {
 
 export async function searchFatSecretIngredients(query: string, maxResults = 50) {
   const token = await getFatSecretToken();
-  const res = await fetch(`https://platform.fatsecret.com/rest/server.api?${qs.stringify({
+  const params = stringifyParams({
     method: 'foods.search',
     search_expression: query,
     max_results: maxResults,
     format: 'json',
-  })}`,
-  {
+  });
+  const res = await fetch(`https://platform.fatsecret.com/rest/server.api?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('FatSecret search failed');
@@ -47,12 +49,12 @@ export async function searchFatSecretIngredients(query: string, maxResults = 50)
 
 export async function getFatSecretFood(foodId: string) {
   const token = await getFatSecretToken();
-  const res = await fetch(`https://platform.fatsecret.com/rest/server.api?${qs.stringify({
+  const params = stringifyParams({
     method: 'food.get',
     food_id: foodId,
     format: 'json',
-  })}`,
-  {
+  });
+  const res = await fetch(`https://platform.fatsecret.com/rest/server.api?${params}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error('FatSecret food.get failed');
