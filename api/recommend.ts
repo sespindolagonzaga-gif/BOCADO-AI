@@ -5,7 +5,9 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import * as crypto from 'crypto';
 import { COUNTRY_TO_CURRENCY, CURRENCY_CONFIG } from '../src/data/budgets.js';
 import { profileCache, pantryCache, historyCache } from './utils/cache.js';
-import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
+// 📝 FatSecret integración (opcional - requiere API key premium free)
+// Para habilitar: descomenta y configura FATSECRET_KEY & FATSECRET_SECRET
+// import { getFatSecretIngredientsWithCache } from './utils/fatsecret-logic';
 
 // ============================================
 // 1. INICIALIZACIÓN DE FIREBASE
@@ -36,8 +38,6 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 const RECIPE_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","receta":{"recetas":[{"id":1,"titulo":"nombre","tiempo":"XX min","dificultad":"Fácil|Media|Difícil","coincidencia":"ingrediente casa o Ninguno","ingredientes":["cantidad+ingrediente"],"pasos_preparacion":["paso 1","paso 2"],"macros_por_porcion":{"kcal":0,"proteinas_g":0,"carbohidratos_g":0,"grasas_g":0}}]}}`;
 
 const RESTAURANT_JSON_TEMPLATE = `{"saludo_personalizado":"msg motivador","recomendaciones":[{"id":1,"nombre_restaurante":"nombre real","tipo_comida":"ej: Italiana","direccion_aproximada":"Calle Número, Colonia","plato_sugerido":"nombre plato","por_que_es_bueno":"explicar por qué","hack_saludable":"consejo práctico"}]}`;
-
-}
 
 // ============================================
 // 💰 FINOPS: CACHED USER PROFILE RETRIEVAL
@@ -685,6 +685,220 @@ const scoreIngredients = (
 
   return { priorityList, marketList, hasPantryItems: priorityList.length > 0 };
 };
+
+// ============================================
+// TIPOS PARA INGREDIENTES
+// ============================================
+
+interface FirestoreIngredient {
+  id: string;
+  name: string;
+  category: string;
+  regional: {
+    es?: string;
+    mx?: string;
+    en?: string;
+  };
+  nutrients?: {
+    calories?: number;
+    protein?: number;
+    carbs?: number;
+    fat?: number;
+  };
+}
+
+// ============================================
+// 5B. OBTENER Y FILTRAR INGREDIENTES
+// ============================================
+
+/**
+ * 🔍 Obtiene todos los ingredientes disponibles de Firestore
+ * 
+ * Fuentes (en orden de preferencia):
+ * 1. google_ingredients collection (base de datos local)
+ * 2. FatSecret (si está habilitado y tienen credenciales premium)
+ * 
+ * @returns Array de ingredientes disponibles
+ */
+async function getAllIngredientes(): Promise<FirestoreIngredient[]> {
+  try {
+    // Layer 1: Intentar base de datos local (más rápido)
+    const localSnap = await db
+      .collection("ingredients")
+      .limit(1000) // Máximo ingredientes a cargar
+      .get();
+
+    if (!localSnap.empty) {
+      safeLog("log", `[Ingredients] Loaded ${localSnap.size} from local DB`);
+      return localSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as FirestoreIngredient));
+    }
+
+    // Layer 2: FatSecret (opcional - si está habilitado)
+    // Descomenta esto si tienes credenciales premium free de FatSecret
+    // try {
+    //   const fatsecretResult = await getFatSecretIngredientsWithCache(db, user, 'es');
+    //   if (fatsecretResult.priorityList) {
+    //     const items = fatsecretResult.priorityList.split(',').map(name => ({
+    //       id: `fs_${name}`,
+    //       name: name.trim(),
+    //       category: 'FatSecret',
+    //       regional: { es: name.trim() },
+    //     }));
+    //     safeLog("log", `[Ingredients] Loaded ${items.length} from FatSecret`);
+    //     return items;
+    //   }
+    // } catch (fatsecretError) {
+    //   safeLog("warn", "[Ingredients] FatSecret error, using fallback", fatsecretError);
+    // }
+
+    // Fallback: ingredientes básicos
+    safeLog("warn", "[Ingredients] No ingredients found, using basic fallback");
+    return [
+      { id: "1", name: "Pollo pechuga", category: "proteína", regional: { es: "Pollo pechuga", mx: "Pechuga de pollo" } },
+      { id: "2", name: "Arroz integral", category: "grano", regional: { es: "Arroz integral", mx: "Arroz integral" } },
+      { id: "3", name: "Brócoli", category: "verdura", regional: { es: "Brócoli", mx: "Brócoli" } },
+      { id: "4", name: "Huevo", category: "proteína", regional: { es: "Huevo", mx: "Huevo" } },
+      { id: "5", name: "Tomate", category: "verdura", regional: { es: "Tomate", mx: "Tomate" } },
+    ];
+  } catch (error) {
+    safeLog("error", "[Ingredients] Fatal error loading", error);
+    return [];
+  }
+}
+
+/**
+ * 🧹 Filtra ingredientes según restricciones del usuario
+ * 
+ * Excluye:
+ * - Alimentos alérgenos
+ * - Alimentos no deseados
+ * - Ingredientes incompatibles con dieta (vegano, vegetariano, etc)
+ * - Alimentos incompatibles con enfermedades (diabetes, etc)
+ */
+/**
+ * Filtra ingredientes según alergias, dieta, enfermedades y preferencias del usuario
+ * 
+ * Casa: alergias -> dieta -> enfermedades -> preferencias
+ * 
+ * @performance O(n*m) donde n=ingredientes, m=criterios (acepta <5000 items)
+ * @security Todos los parámetros se normalizan antes de comparar
+ */
+function filterIngredientes(
+  allIngredients: FirestoreIngredient[],
+  user: UserProfile
+): FirestoreIngredient[] {
+  const allergies = (user.allergies || []).map(a => a.toLowerCase());
+  const dislikedFoods = (user.dislikedFoods || []).map(d => d.toLowerCase());
+  const eatingHabit = (user.eatingHabit || "").toLowerCase();
+  const diseases = (user.diseases || []).map(d => d.toLowerCase());
+
+  // Mapeo detallado de alérgenos (coverage completa)
+  const allergenMap: Record<string, string[]> = {
+    "alergia a frutos secos": ["nuez", "almendra", "cacahuate", "pistacho", "avellana", "semilla", "pecan"],
+    "celíaco": ["trigo", "cebada", "centeno", "gluten", "pan", "pasta", "galleta"],
+    "alergia a mariscos": ["camarón", "langosta", "cangrejo", "mejillón", "ostra", "camarones", "pulpo"],
+    "alergia a cacahuates": ["cacahuate", "maní", "mantequilla de maní"],
+    "intolerancia a la lactosa": ["leche", "queso", "yogur", "mantequilla", "crema", "nata", "helado"],
+    "alergia al huevo": ["huevo", "clara", "yema"],
+  };
+
+  return allIngredients.filter(ingredient => {
+    const name = ingredient.name.toLowerCase();
+    const regional = ingredient.regional.es?.toLowerCase() || "";
+    const mx = ingredient.regional.mx?.toLowerCase() || "";
+    const combinedText = `${name} ${regional} ${mx}`;
+
+    // 1️⃣ PRIORIDAD CRÍTICA: Excluir alimentos no deseados
+    if (dislikedFoods.some(d => {
+      const pattern = createRegexPattern(d);
+      return new RegExp(pattern, 'i').test(combinedText);
+    })) {
+      return false;
+    }
+
+    // 2️⃣ Excluir alérgenos (high priority)
+    for (const allergyKey of allergies) {
+      const allergens = allergenMap[allergyKey] || [allergyKey];
+      if (allergens.some(a => 
+        new RegExp(`\\b${a}\\b`, 'i').test(combinedText)
+      )) {
+        return false;
+      }
+    }
+
+    // 3️⃣ Filtrar por dieta (vegano/vegetariano)
+    if (eatingHabit.includes("vegano")) {
+      const animalProducts = ["carne", "pollo", "pavo", "res", "cerdo", "cordero", "pescado", "camarón", "huevo", "leche", "queso", "miel"];
+      if (animalProducts.some(m => new RegExp(`\\b${m}\\b`, 'i').test(combinedText))) {
+        return false;
+      }
+    } else if (eatingHabit.includes("vegetariano")) {
+      const meats = ["carne", "pollo", "pavo", "res", "cerdo", "cordero", "pescado", "camarón"];
+      if (meats.some(m => new RegExp(`\\b${m}\\b`, 'i').test(combinedText))) {
+        return false;
+      }
+    }
+
+    // 4️⃣ Filtrar según enfermedades crónicas
+    for (const disease of diseases) {
+      // 🩺 DIABETES: Evitar alimentos altos en azúcar
+      if (disease.includes("diabetes")) {
+        const highSugar = ["azúcar", "dulce", "postre", "chocolate", "refresco", "jugo de", "miel", "caramelo"];
+        if (highSugar.some(s => combinedText.includes(s))) {
+          return false;
+        }
+      }
+
+      // 🩺 HIPERTENSIÓN: Evitar alimentos salados
+      if (disease.includes("hipertensión")) {
+        const saltyFoods = ["sal", "embutido", "jamón", "tocino", "salchicha", "conserva", "enlatado"];
+        if (saltyFoods.some(s => combinedText.includes(s))) {
+          return false;
+        }
+      }
+
+      // 🩺 COLESTEROL: Evitar grasas saturadas
+      if (disease.includes("colesterol")) {
+        const fattyFoods = ["manteca", "mantequilla", "chicharrón", "grasa animal", "crema"];
+        if (fattyFoods.some(f => combinedText.includes(f))) {
+          return false;
+        }
+      }
+
+      // 🩺 HIPOTIROIDISMO: Necesita más yodo (preservar lácteos, pescados, algas)
+      // En DB: marcar ingredientes altos en yodo, aquí simplemente NO excluir
+      if (disease.includes("hipotiroidismo")) {
+        const lowIodine = ["agua destilada"];
+        if (lowIodine.some(l => combinedText.includes(l))) {
+          return false;
+        }
+        // Nota: El algoritmo debería dar MEJOR SCORING a alimentos con yodo
+        // pero por ahora solo excluir los claramente deficientes
+      }
+
+      // 🩺 HIPERTIROIDISMO: Evitar exceso de yodo (algas, mucho pescado)
+      if (disease.includes("hipertiroidismo")) {
+        const highIodine = ["alga", "nori", "kombu"];
+        if (highIodine.some(h => combinedText.includes(h))) {
+          return false;
+        }
+      }
+
+      // 🩺 SÍNDROME DE INTESTINO IRRITABLE: Evitar irritantes
+      if (disease.includes("intestino irritable") || disease.includes("ibs")) {
+        const irritants = ["picante", "chile", "ají", "curry", "café"];
+        if (irritants.some(i => combinedText.includes(i))) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  });
+}
 
 // ============================================
 // 6. RATE LIMITING POR IP (Protección contra abuso)
@@ -1552,17 +1766,12 @@ export default async function handler(req: any, res: any) {
     let finalPrompt = "";
     let parsedData: any;
 
-<<<<<<< HEAD
     if (type === "En casa") {
-      // ✅ Fetch from Firestore (replaces Airtable)
-=======
-    if (type === 'En casa') {
-
->>>>>>> 74a8734 (FastApi)
+      // ✅ Obtener ingredientes de Firestore (reemplaza Airtable)
       let filteredItems: FirestoreIngredient[] = [];
       try {
-        const allIngredients = await getAllIngredients();
-        filteredItems = filterIngredients(allIngredients, user);
+        const allIngredients = await getAllIngredientes();
+        filteredItems = filterIngredientes(allIngredients, user);
         safeLog(
           "log",
           `[Ingredients] ${filteredItems.length}/${allIngredients.length} passed filters`,

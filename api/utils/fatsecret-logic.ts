@@ -10,7 +10,22 @@ export interface FatSecretFood {
   servings?: { serving: any };
 }
 
-const FATSECRET_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+// ============================================
+// ⚠️ IMPORTANTE: LÍMITES DE FATSECRET PLAN PREMIUM FREE
+// ============================================
+// Max 100 requests/hora, 3000 requests/día
+// Implementar rate limiting serializado (no paralelo)
+
+const FATSECRET_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días (optimizado)
+const FATSECRET_REQUEST_DELAY_MS = 300; // 300ms entre requests (para evitar spike)
+const MAX_SEARCHES_PER_CALL = 3; // Máximo 3 búsquedas por call (en lugar de 5)
+
+/**
+ * Espera N millisegundos (utility)
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export async function getFatSecretIngredientsWithCache(
   db: any,
@@ -19,16 +34,26 @@ export async function getFatSecretIngredientsWithCache(
   safeLog: (...args: any[]) => void = () => {}
 ): Promise<{ priorityList: string; marketList: string; hasPantryItems: boolean }> {
   const searchTerms = buildFatSecretSearchTerms(user, language);
-  const cacheKey = `fatsecret_${crypto.createHash('md5').update(searchTerms.join('|') + (user.eatingHabit || '')).digest('hex').substring(0, 16)}`;
-  const cacheRef = db.collection('fatsecret_cache').doc(cacheKey); // caché propia de FatSecret
-  // Intentar leer caché (TTL: 24h)
+  
+  // Limitar a MAX_SEARCHES_PER_CALL para no exceder cuota
+  const limitedTerms = searchTerms.slice(0, MAX_SEARCHES_PER_CALL);
+  
+  const cacheKey = `fatsecret_${crypto
+    .createHash('md5')
+    .update(limitedTerms.join('|') + (user.eatingHabit || ''))
+    .digest('hex')
+    .substring(0, 16)}`;
+  
+  const cacheRef = db.collection('fatsecret_cache').doc(cacheKey);
+  
+  // Layer 1: Intentar leer caché (TTL: 7 días)
   try {
     const cached = await cacheRef.get();
     if (cached.exists) {
       const data = cached.data() as any;
       const age = Date.now() - (data?.cachedAt?.toMillis?.() || 0);
       if (age < FATSECRET_CACHE_TTL_MS) {
-        safeLog('log', `[FatSecret] Cache HIT: ${cacheKey.substring(0, 20)}...`);
+        safeLog('log', `[FatSecret] Cache HIT: ${cacheKey.substring(0, 20)}... (age: ${Math.round(age / 1000 / 60)}min)`);
         return data.result;
       }
     }
@@ -36,17 +61,31 @@ export async function getFatSecretIngredientsWithCache(
     safeLog('warn', '[FatSecret] Error leyendo caché', e);
   }
 
-  // Buscar múltiples términos en paralelo
+  // Layer 2: Buscar múltiples términos SERIALIZADOS (no paralelo)
+  // Esto previene exceder el límite de 100 req/hora
   const allFoods: string[] = [];
   try {
     const token = await getFatSecretToken();
-    const searches = searchTerms.map(term => searchFatSecretFoods(token, term, user, safeLog));
-    const results = await Promise.allSettled(searches);
-    results.forEach(result => {
-      if (result.status === 'fulfilled') {
-        allFoods.push(...result.value);
+    
+    // ✅ SERIALIZADO: Una búsqueda a la vez con delay
+    safeLog('log', `[FatSecret] Iniciando ${limitedTerms.length} búsquedas serializadas...`);
+    
+    for (let i = 0; i < limitedTerms.length; i++) {
+      const term = limitedTerms[i];
+      
+      try {
+        const foods = await searchFatSecretFoods(token, term, user, safeLog);
+        allFoods.push(...foods);
+        
+        // Delay entre requests para no spammear la API
+        if (i < limitedTerms.length - 1) {
+          await delay(FATSECRET_REQUEST_DELAY_MS);
+        }
+      } catch (searchError: any) {
+        // Si una búsqueda falla, continuar con las siguientes
+        safeLog('warn', `[FatSecret] Búsqueda "${term}" falló, continuando...`, searchError);
       }
-    });
+    }
   } catch (error) {
     safeLog('error', '[FatSecret] Error en búsqueda', error);
   }

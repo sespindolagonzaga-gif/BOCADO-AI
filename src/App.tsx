@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { auth, trackEvent } from "./firebaseConfig";
@@ -14,14 +14,24 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { ToastContainer } from "./components/ui/Toast";
 import { FeedbackModalProvider } from "./components/FeedbackModal";
 
-// ✅ IMPORTACIÓN ESTÁTICA (sin lazy loading)
-import HomeScreen from "./components/HomeScreen";
-import RegistrationMethodScreen from "./components/RegistrationMethodScreen";
-import RegistrationFlow from "./components/RegistrationFlow";
-import LoginScreen from "./components/LoginScreen";
-import PermissionsScreen from "./components/PermissionsScreen";
-import PlanScreen from "./components/PlanScreen";
-import MainApp from "./components/MainApp";
+// 🚀 LAZY LOADING: Reduce bundle inicial ~50KB
+const HomeScreen = lazy(() => import("./components/HomeScreen"));
+const RegistrationMethodScreen = lazy(() => import("./components/RegistrationMethodScreen"));
+const RegistrationFlow = lazy(() => import("./components/RegistrationFlow"));
+const LoginScreen = lazy(() => import("./components/LoginScreen"));
+const PermissionsScreen = lazy(() => import("./components/PermissionsScreen"));
+const PlanScreen = lazy(() => import("./components/PlanScreen"));
+const MainApp = lazy(() => import("./components/MainApp"));
+
+// Fallback loading component
+const ScreenLoadingFallback = () => (
+  <div className="flex items-center justify-center h-full bg-white dark:bg-slate-950">
+    <div className="animate-pulse text-center">
+      <div className="w-16 h-16 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full mx-auto mb-4"></div>
+      <p className="text-slate-600 dark:text-slate-400">Cargando...</p>
+    </div>
+  </div>
+);
 
 export type AppScreen =
   | "home"
@@ -204,73 +214,87 @@ function AppContent() {
       switch (currentScreen) {
         case "permissions":
           return (
-            <PermissionsScreen
-              onAccept={() => setCurrentScreen("registerMethod")}
-              onGoHome={() => setCurrentScreen("home")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <PermissionsScreen
+                onAccept={() => setCurrentScreen("registerMethod")}
+                onGoHome={() => setCurrentScreen("home")}
+              />
+            </Suspense>
           );
         case "registerMethod":
           return (
-            <RegistrationMethodScreen
-              onGoogleSuccess={(uid, email) => {
-                // Usuario se registró con Google, ir al flujo de completar perfil
-                setIsNewUser(true);
-                setCurrentScreen("register");
-              }}
-              onChooseEmail={() => setCurrentScreen("register")}
-              onGoHome={() => setCurrentScreen("home")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <RegistrationMethodScreen
+                onGoogleSuccess={(uid, email) => {
+                  // Usuario se registró con Google, ir al flujo de completar perfil
+                  setIsNewUser(true);
+                  setCurrentScreen("register");
+                }}
+                onChooseEmail={() => setCurrentScreen("register")}
+                onGoHome={() => setCurrentScreen("home")}
+              />
+            </Suspense>
           );
         case "register":
           return (
-            <RegistrationFlow
-              onRegistrationComplete={() => {
-                setIsNewUser(true);
-                setCurrentScreen("recommendation");
-              }}
-              onGoHome={() => setCurrentScreen("home")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <RegistrationFlow
+                onRegistrationComplete={() => {
+                  setIsNewUser(true);
+                  setCurrentScreen("recommendation");
+                }}
+                onGoHome={() => setCurrentScreen("home")}
+              />
+            </Suspense>
           );
         case "login":
           return (
-            <LoginScreen
-              onLoginSuccess={() => {
-                setIsNewUser(false);
-                setCurrentScreen("recommendation");
-              }}
-              onGoHome={() => setCurrentScreen("home")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <LoginScreen
+                onLoginSuccess={() => {
+                  setIsNewUser(false);
+                  setCurrentScreen("recommendation");
+                }}
+                onGoHome={() => setCurrentScreen("home")}
+              />
+            </Suspense>
           );
         case "recommendation":
           return (
-            <MainApp
-              showTutorial={isNewUser}
-              onPlanGenerated={(id) => {
-                setPlanId(id);
-                setCurrentScreen("plan");
-              }}
-              onTutorialFinished={() => setIsNewUser(false)}
-              onLogoutComplete={() => setCurrentScreen("home")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <MainApp
+                showTutorial={isNewUser}
+                onPlanGenerated={(id) => {
+                  setPlanId(id);
+                  setCurrentScreen("plan");
+                }}
+                onTutorialFinished={() => setIsNewUser(false)}
+                onLogoutComplete={() => setCurrentScreen("home")}
+              />
+            </Suspense>
           );
         case "plan":
           return (
-            <PlanScreen
-              planId={planId!}
-              onStartNewPlan={() => {
-                setPlanId(null);
-                setCurrentScreen("recommendation");
-              }}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <PlanScreen
+                planId={planId!}
+                onStartNewPlan={() => {
+                  setPlanId(null);
+                  setCurrentScreen("recommendation");
+                }}
+              />
+            </Suspense>
           );
         case "home":
         default:
           return (
-            <HomeScreen
-              onStartRegistration={() => setCurrentScreen("permissions")}
-              onGoToApp={() => setCurrentScreen("recommendation")}
-              onGoToLogin={() => setCurrentScreen("login")}
-            />
+            <Suspense fallback={<ScreenLoadingFallback />}>
+              <HomeScreen
+                onStartRegistration={() => setCurrentScreen("permissions")}
+                onGoToApp={() => setCurrentScreen("recommendation")}
+                onGoToLogin={() => setCurrentScreen("login")}
+              />
+            </Suspense>
           );
       }
     } catch (error) {
